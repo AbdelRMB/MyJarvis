@@ -65,7 +65,7 @@ DEFAUT = {
     "dossier_partage": "",        # vide = OneDrive\Jarvis (ou un dossier local s'il n'y a pas OneDrive)
     "ecoute_fond": True,          # appli de bureau : écoute « Hey Jarvis » même fenêtre cachée
     "seuil_eveil": 0.5,           # sensibilité du mot d'activation (0-1, plus bas = plus sensible)
-    "silence_fin": 5.0,           # s de silence avant d'envoyer ta demande (il t'écoute jusqu'au bout)
+    "silence_fin": 2.5,           # s de silence avant d'envoyer ta demande (il écoute en continu jusque-là)
     "raccourci": "<ctrl>+<alt>+j",
 }
 

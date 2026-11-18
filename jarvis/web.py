@@ -446,7 +446,7 @@ def etat_appli(req: Request):
             "dossier_partage": str(PARTAGE), "ecoute_fond": CONFIG.get("ecoute_fond", True),
             "ecoute_active": bool(APPLI["ecoute"] and APPLI["ecoute"].actif),
             "seuil_eveil": CONFIG.get("seuil_eveil", 0.5), "raccourci": CONFIG.get("raccourci"),
-            "silence_fin": CONFIG.get("silence_fin", 5.0)}
+            "silence_fin": CONFIG.get("silence_fin", 2.5)}
 
 
 @app.post("/api/appli")

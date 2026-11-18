@@ -4,8 +4,9 @@ Deux détecteurs, 100 % locaux :
 1. openWakeWord « Hey Jarvis » (prononciation anglaise) : instantané, ~2 % d'un cœur.
 2. Pour le français : chaque phrase entendue est découpée (détection d'énergie), puis transcrite par un
    petit modèle Whisper ; si elle commence par « Jarvis » (« Jarvis, ouvre Discord »), c'est pour lui.
-Dès que son nom est reconnu, il enregistre TOUTE ta demande, pauses comprises, jusqu'à ce que tu te taises
-pendant CONFIG["silence_fin"] secondes (5 s par défaut).
+Tu parles d'une traite (« Jarvis, ouvre Discord et… ») : rien à attendre après son nom, il écoute en continu
+et n'envoie ta demande que lorsque tu te tais pendant CONFIG["silence_fin"] secondes (2,5 s par défaut),
+comptées depuis la fin réelle de ta voix (le temps d'analyse du nom n'est pas ajouté).
 Rien n'est envoyé nulle part tant que son nom n'a pas été reconnu.
 """
 import re
@@ -21,6 +22,7 @@ TRAME = 1280            # 80 ms à 16 kHz
 SR = 16000
 DUREE_DEMANDE_MAX = 120.0   # s de parole au maximum pour une demande
 ATTENTE_DEBUT = 8.0         # s pour commencer à parler après « Jarvis » seul
+APRES_MAX = 375             # trames (30 s) gardées pendant l'analyse du nom : rien de ce que tu dis n'est perdu
 
 RX_NOM = re.compile(r"^\W*(?:(?:hey|hé|he|eh|et|é|ok|okay|dis|salut|bonjour)\W+)?(?:d[ie]\s?)?(?:j|dj)[ae]r?v[iy](?:s|ce|sse|ss)?\b\W*"
                     r"|^\W*j\.a\.r\.v\.i\.s\.?\W*", re.I)
@@ -33,7 +35,7 @@ RX_STOP_SEUL = re.compile(r"^\W*" + MOTS_STOP + r"\W*$", re.I)
 
 
 def silence_fin() -> float:
-    return float(CONFIG.get("silence_fin", 5.0))
+    return float(CONFIG.get("silence_fin", 2.5))
 
 
 class Segmenteur:
@@ -51,9 +53,19 @@ class Segmenteur:
     def seuil(self):
         return max(self.bruit * 3.0, 450)
 
-    def deja_en_cours(self, morceaux):
-        """La personne parle déjà : on continue l'enregistrement à partir de ces morceaux."""
+    def deja_en_cours(self, morceaux, suite=()):
+        """La personne parle déjà : on continue l'enregistrement à partir de ces morceaux, puis on rejoue
+        ce qui a été entendu depuis (le silence est mesuré depuis ta dernière syllabe, pas depuis maintenant)."""
         self.morceaux, self.debut, self.dernier_son = list(morceaux), self.t, self.t
+        return self.rejouer(suite)
+
+    def rejouer(self, suite):
+        """Ajoute des trames déjà entendues ; renvoie la phrase si elle s'est terminée pendant ce temps."""
+        for m in suite:
+            phrase = self.ajouter(m)
+            if phrase is not None:
+                return phrase
+        return None
 
     def ajouter(self, x: np.ndarray):
         """Renvoie une phrase complète (int16) quand elle se termine, sinon None."""
@@ -147,13 +159,15 @@ class EcouteFond:
         else:
             threading.Thread(target=fn, args=args, daemon=True).start()
 
-    def _ouvrir_commande(self, morceaux=None):
+    def _ouvrir_commande(self, morceaux=None, suite=()):
         """Nom reconnu : enregistrement de la demande jusqu'à silence_fin() secondes de silence."""
         self.commande = Segmenteur(silence_fin=silence_fin(), duree_max=DUREE_DEMANDE_MAX, bruit=self.seg.bruit)
-        if morceaux:
-            self.commande.deja_en_cours(morceaux)
         self.attente_debut = self.seg.t
         self._precedent = None
+        demande = self.commande.deja_en_cours(morceaux, suite) if morceaux else self.commande.rejouer(suite)
+        if demande is not None:      # tu t'étais déjà tu assez longtemps pendant l'analyse : on envoie
+            self.commande = None
+            self._lancer(self.sur_commande, demande.astype(np.float32) / 32768.0)
 
     def traiter_trame(self, x: np.ndarray, oww=None):
         """Une trame de 80 ms du micro. Toute la logique d'écoute est ici (testable sans micro)."""
@@ -162,11 +176,9 @@ class EcouteFond:
             phrase, parle_encore = self._a_reprendre
             self._a_reprendre = None
             suite = self._apres_phrase
-            self._ouvrir_commande([phrase, *suite] if parle_encore else None)
-            if not parle_encore:          # « Jarvis » seul : il a peut-être déjà commencé la suite
-                for m in suite:
-                    self.commande.ajouter(m)
-        self._apres_phrase = (self._apres_phrase + [x])[-60:] if self._analyse_en_cours else []
+            # la phrase + tout ce que tu as dit pendant l'analyse : une seule demande continue
+            self._ouvrir_commande([phrase] if parle_encore else None, suite)
+        self._apres_phrase = (self._apres_phrase + [x])[-APRES_MAX:] if self._analyse_en_cours else []
 
         # 2. enregistrement d'une demande en cours
         if self.commande is not None:
