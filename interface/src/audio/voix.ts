@@ -1,0 +1,104 @@
+/**
+ * Chaîne vocale : phrase captée → Whisper (serveur) → filtrage mot d'activation → envoi à Jarvis.
+ * Branche aussi la voix et les bips sur les événements de la conversation.
+ */
+import { api } from "../lib/api";
+import { audio, majAudio } from "../stores/audio";
+import { arreter, bus, envoyer, useJarvis } from "../stores/jarvis";
+import { reglages } from "../stores/reglages";
+import { toast } from "../stores/toasts";
+import { sons } from "./bips";
+import { micro, versPcm16k } from "./micro";
+import { finirFlux, recevoirFlux, taire } from "./tts";
+
+const RX_EVEIL = /^\s*(ok\s+|hey\s+|hé\s+|eh\s+)?(jarvis|jarvi|djarvis|jarvice|jarviss|j\.a\.r\.v\.i\.s\.?)\b[\s,.!?:;-]*/i;
+const RX_STOP = /^\s*(jarvis[\s,.]*)?(stop|arr[êe]te|annule|tais[- ]toi|silence)\b/i;
+
+export async function transcrire(morceaux: Float32Array[]) {
+  const pcm = versPcm16k(morceaux, micro.sr);
+  const r = await api<{ texte: string; secondes: number }>(`/api/transcrire?langue=${encodeURIComponent(reglages().langue)}`, {
+    method: "POST",
+    body: pcm.buffer as ArrayBuffer,
+    headers: { "content-type": "application/octet-stream" },
+  });
+  return r.texte.trim();
+}
+
+export function stopTout() {
+  taire();
+  if (useJarvis.getState().occupe) arreter();
+  sons.stop();
+}
+
+function traiterParole(texte: string, auto: boolean) {
+  if (!texte) return;
+  majAudio({ derniereTranscription: texte });
+  const { occupe } = useJarvis.getState();
+  const a = audio();
+  if (RX_STOP.test(texte) && (occupe || a.parle)) return stopTout();
+  if (auto && occupe) return; // mains libres : on ignore ce qui est dit pendant une tâche
+  if (reglages().mode === "eveil" && Date.now() > a.eveilJusqua) {
+    if (!RX_EVEIL.test(texte)) return; // ce n'était pas pour Jarvis
+    texte = texte.replace(RX_EVEIL, "").trim();
+    if (texte.length < 3) {
+      // « Jarvis ? » tout seul : il attend la suite
+      majAudio({ eveilJusqua: Date.now() + 8000 });
+      sons.eveil();
+      return;
+    }
+  } else {
+    texte = texte.replace(RX_EVEIL, "").trim() || texte;
+  }
+  majAudio({ eveilJusqua: 0 });
+  envoyer(texte);
+}
+
+let branche = false;
+export function brancherVoix() {
+  if (branche) return;
+  branche = true;
+
+  micro.surPhrase = async (morceaux, auto) => {
+    majAudio({ transcrit: true });
+    try {
+      traiterParole(await transcrire(morceaux), auto);
+    } catch (e) {
+      toast(`Transcription impossible : ${(e as Error).message}`, "erreur");
+    } finally {
+      majAudio({ transcrit: false });
+    }
+  };
+
+  window.addEventListener("jarvis:debut-ecoute", (e) => {
+    const { auto } = (e as CustomEvent<{ auto: boolean }>).detail;
+    if (audio().parle) taire();
+    const r = reglages();
+    if (!auto || r.mode === "auto" || Date.now() < audio().eveilJusqua) sons.ecoute();
+  });
+
+  bus.addEventListener("envoi", () => {
+    taire();
+    sons.envoi();
+  });
+  bus.addEventListener("texte", (e) => recevoirFlux((e as CustomEvent<string>).detail));
+  bus.addEventListener("outil", () => {
+    finirFlux(); // dit ce qui a été écrit avant l'action (« Je regarde ça… »)
+    sons.outil();
+  });
+  bus.addEventListener("erreur", () => sons.erreur());
+  // « Hey Jarvis » entendu par l'écoute de fond de l'appli (même fenêtre cachée)
+  bus.addEventListener("vocal", (e) => {
+    const v = (e as CustomEvent<{ etat: string; texte?: string }>).detail;
+    if (v.etat === "eveil") {
+      taire();
+      sons.eveil();
+      majAudio({ vocalServeur: "eveil" });
+    } else if (v.etat === "transcription") majAudio({ vocalServeur: "transcription" });
+    else majAudio({ vocalServeur: null, ...(v.texte ? { derniereTranscription: v.texte } : {}) });
+  });
+  bus.addEventListener("stop_voix", () => stopTout());
+  bus.addEventListener("fin", () => {
+    sons.fin();
+    finirFlux();
+  });
+}

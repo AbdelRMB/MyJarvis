@@ -1,0 +1,10 @@
+.env
+build/
+dist/
+installateur/
+logs/
+captures/
+webview/
+__pycache__/
+.venv/
+interface/node_modules/
