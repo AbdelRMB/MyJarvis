@@ -25,6 +25,8 @@ class Micro {
   frequences = new Uint8Array(256);
   niveau = 0;
   sr = 48000;
+  /** Niveau du silence de la pièce (moyenne glissante quand personne ne parle). */
+  bruit = 0.004;
 
   private flux: MediaStream | null = null;
   private src: MediaStreamAudioSourceNode | null = null;
@@ -134,18 +136,53 @@ class Micro {
       this.morceaux.push(d);
       if (r.mode !== "ptt") {
         const t = performance.now();
-        if (rms > r.seuil * 0.7) this.dernierSon = t;
+        // silence = sous le seuil réglé ET proche du bruit de la pièce (une voix faible compte comme de la parole)
+        if (rms > Math.max(r.seuil * 0.7, this.bruit * 1.8)) this.dernierSon = t;
         else if (t - this.dernierSon > r.silence) this.finEnregistrement();
-        if (t - this.debut > 30000) this.finEnregistrement();
+        if (t - this.debut > 180000) this.finEnregistrement();
       }
       return;
     }
+    if (!a.parle) this.bruit = 0.97 * this.bruit + 0.03 * Math.min(rms, 0.1);
     // ~350 ms gardés en mémoire pour ne pas couper le début de la phrase
     this.preRoll.push(d);
     if (this.preRoll.length > 8) this.preRoll.shift();
+    // Jarvis parle : l'annulation d'écho du navigateur retire sa voix du micro,
+    // donc ce qui dépasse le seuil, c'est toi qui l'interromps (« stop », « Jarvis, … »).
+    if (a.parle) {
+      this.surveillerInterruption(d, rms, r.seuil);
+      return;
+    }
+    this.interruption = null;
     const sourdine = r.sourdine && a.parle;
     const serveurEcoute = r.mode === "eveil" && a.ecouteFond; // l'appli de bureau s'en charge déjà
-    if (r.mode !== "ptt" && !serveurEcoute && !sourdine && !a.transcrit && rms > r.seuil) this.debutEnregistrement(true);
+    const seuilDebut = r.seuil > 0 ? r.seuil : this.bruit * 2.5; // seuil 0 = automatique (s'adapte à la pièce)
+    if (r.mode !== "ptt" && !serveurEcoute && !sourdine && !a.transcrit && rms > Math.max(seuilDebut, 0.002)) this.debutEnregistrement(true);
+  }
+
+  private interruption: Float32Array[] | null = null;
+  private intDebut = 0;
+  private intDernierSon = 0;
+  /** Phrase dite par-dessus la voix de Jarvis (max 2,5 s), transmise à surInterruption. */
+  surInterruption: ((morceaux: Float32Array[]) => void) | null = null;
+
+  private surveillerInterruption(d: Float32Array, rms: number, seuil: number) {
+    const t = performance.now();
+    const s = Math.max(seuil * 1.5, 0.02);
+    if (!this.interruption) {
+      if (rms > s) {
+        this.interruption = [...this.preRoll.slice(-3)];
+        this.intDebut = this.intDernierSon = t;
+      }
+      return;
+    }
+    this.interruption.push(d);
+    if (rms > s * 0.7) this.intDernierSon = t;
+    if (t - this.intDernierSon > 500 || t - this.intDebut > 2500) {
+      const m = this.interruption;
+      this.interruption = null;
+      if (t - this.intDebut > 300) this.surInterruption?.(m);
+    }
   }
 
   debutEnregistrement(auto = false) {

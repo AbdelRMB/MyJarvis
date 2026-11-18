@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
+import { useOS } from "../lib/os";
 import { toast } from "../stores/toasts";
 
 type ChampDef = { nom: string; libelle: string; type: "text" | "secret" | "url" | "choix"; aide?: string; requis?: boolean; choix?: string[] };
@@ -33,6 +34,7 @@ function Editeur({
   onFermer: () => void;
   onFini: () => void;
 }) {
+  const os = useOS();
   const [conf, setConf] = useState<Record<string, string>>({ mode: "commande", ...(existant?.conf ?? {}) });
   const [secrets, setSecrets] = useState<Record<string, string>>({});
   const [envoi, setEnvoi] = useState(false);
@@ -111,7 +113,7 @@ function Editeur({
             </label>
           ))}
           <p className="text-[12px] text-tres-doux">
-            Les mots de passe et jetons sont rangés dans le Gestionnaire d'identifiants Windows de ce PC. Ils ne partent pas sur OneDrive.
+            Les mots de passe et jetons sont rangés dans le {os.coffre}. Ils ne partent pas sur OneDrive.
           </p>
         </div>
         <footer className="flex gap-2 border-t border-ligne p-4">

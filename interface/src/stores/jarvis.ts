@@ -72,6 +72,8 @@ export function envoyer(texte: string) {
 }
 
 export const arreter = () => envoyerBrut({ type: "stop" });
+/** Prévient le serveur quand Jarvis parle : l'écoute de fond guette alors « Jarvis, stop » même mêlé à sa voix. */
+export const signalerParole = (actif: boolean) => envoyerBrut({ type: "parle", actif });
 export const nouvelleConversation = () => envoyerBrut({ type: "reset" });
 export const rescanner = () => envoyerBrut({ type: "scan" });
 

@@ -3,16 +3,30 @@
  * Branche aussi la voix et les bips sur les événements de la conversation.
  */
 import { api } from "../lib/api";
-import { audio, majAudio } from "../stores/audio";
-import { arreter, bus, envoyer, useJarvis } from "../stores/jarvis";
+import { audio, majAudio, useAudio } from "../stores/audio";
+import { arreter, bus, envoyer, signalerParole, useJarvis } from "../stores/jarvis";
 import { reglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { sons } from "./bips";
 import { micro, versPcm16k } from "./micro";
 import { finirFlux, recevoirFlux, taire } from "./tts";
 
-const RX_EVEIL = /^\s*(ok\s+|hey\s+|hé\s+|eh\s+)?(jarvis|jarvi|djarvis|jarvice|jarviss|j\.a\.r\.v\.i\.s\.?)\b[\s,.!?:;-]*/i;
-const RX_STOP = /^\s*(jarvis[\s,.]*)?(stop|arr[êe]te|annule|tais[- ]toi|silence)\b/i;
+// Même règles que l'écoute de fond (jarvis/ecoute.py) : « Jarvis », « Hé/Et/Ok/Dis Jarvis », transcriptions approximatives
+const NOM = String.raw`(?:d[ie]\s?)?(?:j|dj)[ae]r?v[iy](?:s|ce|sse|ss)?`;
+const MOTS_STOP = String.raw`(?:stop+|arr[êe]te[sz]?(?:[- ]toi)?|annule|tais[- ]toi|taisez[- ]vous|chut+|silence|ça suffit|ca suffit|attends|pause|ferme[- ]la|c'est bon)`;
+const RX_EVEIL = new RegExp(String.raw`^\W*(?:(?:hey|hé|he|eh|et|é|ok|okay|dis|salut|bonjour)\W+)?` + NOM + String.raw`\b[\s,.!?:;-]*`, "i");
+const RX_STOP = new RegExp(String.raw`^\W*(?:` + NOM + String.raw`\W+)?` + MOTS_STOP + String.raw`(?![a-zà-ÿ])`, "i");
+const RX_STOP_PARTOUT = new RegExp(NOM + String.raw`\W{0,3}(?:\w+\W+)?` + MOTS_STOP + String.raw`(?![a-zà-ÿ])`, "i");
+
+async function transcrireRapide(morceaux: Float32Array[]) {
+  const pcm = versPcm16k(morceaux, micro.sr);
+  const r = await api<{ texte: string }>("/api/transcrire_rapide", {
+    method: "POST",
+    body: pcm.buffer as ArrayBuffer,
+    headers: { "content-type": "application/octet-stream" },
+  });
+  return r.texte.trim();
+}
 
 export async function transcrire(morceaux: Float32Array[]) {
   const pcm = versPcm16k(morceaux, micro.sr);
@@ -58,6 +72,30 @@ export function brancherVoix() {
   if (branche) return;
   branche = true;
 
+  // Tu parles par-dessus Jarvis : « stop » le coupe, « Jarvis, … » le coupe et lance la nouvelle demande
+  let interruptionEnCours = false;
+  micro.surInterruption = async (morceaux) => {
+    if (interruptionEnCours) return;
+    interruptionEnCours = true;
+    try {
+      const texte = await transcrireRapide(morceaux);
+      if (!texte) return;
+      if (RX_STOP.test(texte) || RX_STOP_PARTOUT.test(texte)) {
+        majAudio({ derniereTranscription: texte });
+        stopTout();
+      } else if (RX_EVEIL.test(texte) && texte.replace(RX_EVEIL, "").trim().length >= 3) {
+        majAudio({ derniereTranscription: texte });
+        stopTout();
+        const suite = await transcrire(morceaux); // transcription précise de la nouvelle demande
+        traiterParole(suite || texte, false);
+      }
+    } catch {
+      /* interruption non comprise : on laisse Jarvis continuer */
+    } finally {
+      interruptionEnCours = false;
+    }
+  };
+
   micro.surPhrase = async (morceaux, auto) => {
     majAudio({ transcrit: true });
     try {
@@ -97,6 +135,9 @@ export function brancherVoix() {
     else majAudio({ vocalServeur: null, ...(v.texte ? { derniereTranscription: v.texte } : {}) });
   });
   bus.addEventListener("stop_voix", () => stopTout());
+  useAudio.subscribe((s, avant) => {
+    if (s.parle !== avant.parle) signalerParole(s.parle);
+  });
   bus.addEventListener("fin", () => {
     sons.fin();
     finirFlux();

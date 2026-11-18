@@ -339,8 +339,8 @@ function BandeauCle() {
       onClick={() => maj({ vue: "reglages" })}
       className="mb-6 w-full max-w-2xl rounded-md border border-ambre/50 bg-ambre/10 px-4 py-3 text-left text-sm text-ambre hover:bg-ambre/15"
     >
-      <strong>Bienvenue sur ce PC !</strong> Ajoute ta clé API Claude pour que Jarvis puisse réfléchir : Réglages › Cerveau.
-      <span className="mt-1 block text-[13px] text-doux">Ta mémoire et tes connecteurs sont déjà là grâce à OneDrive. Les mots de passe des connecteurs sont à ressaisir une fois sur ce PC.</span>
+      <strong>Bienvenue sur ce nouvel ordinateur !</strong> Ajoute ta clé API Claude pour que Jarvis puisse réfléchir : Réglages › Cerveau.
+      <span className="mt-1 block text-[13px] text-doux">Ta mémoire et tes connecteurs sont déjà là grâce à OneDrive. Les mots de passe des connecteurs sont à ressaisir une fois ici.</span>
     </button>
   );
 }

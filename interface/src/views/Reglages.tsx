@@ -9,6 +9,7 @@ import { VuMetre } from "../components/VuMetre";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import type { ConfigServeur } from "../lib/types";
+import { useOS } from "../lib/os";
 import { majAudio, useAudio } from "../stores/audio";
 import { rescanner, useJarvis } from "../stores/jarvis";
 import { DEFAUT, useReglages } from "../stores/reglages";
@@ -29,6 +30,7 @@ type EtatAppli = {
 };
 
 function OngletApplication() {
+  const os = useOS();
   const [e, setE] = useState<EtatAppli | null>(null);
   useEffect(() => {
     api<EtatAppli>("/api/appli").then(setE).catch((x) => toast(x.message, "erreur"));
@@ -43,7 +45,7 @@ function OngletApplication() {
       toast((x as Error).message, "erreur");
     }
   };
-  const raccourci = e.raccourci.replace(/[<>]/g, "").split("+").map((k) => k.charAt(0).toUpperCase() + k.slice(1)).join(" + ");
+  const raccourci = os.touches(e.raccourci);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Panneau titre="Application" icone={<AppWindow />}>
@@ -54,8 +56,8 @@ function OngletApplication() {
         )}
         <div className="divide-y divide-ligne">
           <Interrupteur
-            label="Lancer Jarvis au démarrage de Windows"
-            aide="Il démarre caché dans la zone de notification et attend que tu l'appelles."
+            label={`Lancer Jarvis ${os.demarrage}`}
+            aide={`Il démarre caché (icône ${os.zoneIcone}) et attend que tu l'appelles.`}
             actif={e.demarrage_auto}
             onChange={(v) => regler({ demarrage_auto: v })}
           />
@@ -78,7 +80,9 @@ function OngletApplication() {
         />
         <div className="mt-2 rounded-md border border-ligne bg-black/20 p-3 text-sm">
           Raccourci pour l'appeler : <kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{raccourci}</kbd>
-          <p className="mt-1 text-[13px] text-doux">Fermer la fenêtre la cache seulement. Pour quitter : clic droit sur l'icône Jarvis près de l'horloge, puis « Quitter ».</p>
+          <br />
+          Pour le faire taire : dis « Jarvis, stop », ou appuie sur <kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{os.touches("<ctrl>+<alt>+s")}</kbd> (même fenêtre cachée).
+          <p className="mt-1 text-[13px] text-doux">Fermer la fenêtre la cache seulement. Pour quitter : clic sur l'icône Jarvis {os.zoneIcone}, puis « Quitter ».</p>
         </div>
       </Panneau>
       <Panneau titre="Mémoire partagée entre tes PC" icone={<Cloud />}>
@@ -88,7 +92,7 @@ function OngletApplication() {
         <p className="mt-3 text-sm">Dossier partagé :</p>
         <p className="mt-1 rounded border border-ligne bg-black/20 p-2 font-mono text-xs break-all text-hud-clair">{e.dossier_partage}</p>
         <p className="mt-3 text-[13px] leading-relaxed text-doux">
-          Les souvenirs, l'historique des conversations et la liste des connecteurs sont rangés ici. OneDrive les synchronise : sur tes autres PC (même compte Microsoft), Jarvis se souvient des mêmes choses. Les mots de passe des connecteurs et la clé API restent sur chaque PC.
+          Les souvenirs, l'historique des conversations et la liste des connecteurs sont rangés ici. OneDrive les synchronise : sur tes autres ordinateurs, PC ou Mac avec le même compte Microsoft, Jarvis se souvient des mêmes choses. Les mots de passe des connecteurs et la clé API restent sur chaque machine.
         </p>
       </Panneau>
     </div>
@@ -174,16 +178,28 @@ function OngletMicro() {
           </p>
         </div>
         <Curseur label="Gain" valeur={r.gain} min={0.5} max={5} pas={0.1} affichage={`×${r.gain.toFixed(1)}`} onChange={(v) => { r.maj({ gain: v }); micro.setGain(v); }} />
-        <Curseur label="Seuil de détection" valeur={r.seuil} min={0.005} max={0.25} pas={0.001} affichage={(r.seuil * 100).toFixed(1)} onChange={(v) => r.maj({ seuil: v })} />
+        <Curseur
+          label="Seuil de détection"
+          valeur={r.seuil}
+          min={0}
+          max={0.25}
+          pas={0.001}
+          affichage={r.seuil === 0 ? "0 · auto" : (r.seuil * 100).toFixed(1)}
+          onChange={(v) => r.maj({ seuil: v })}
+          aide="À 0, pas de seuil fixe : Jarvis s'adapte au bruit de ta pièce et capte même une voix faible."
+        />
         <Curseur
           label="Silence avant envoi"
           valeur={r.silence}
-          min={400}
-          max={3000}
-          pas={100}
+          min={500}
+          max={10000}
+          pas={250}
           affichage={`${(r.silence / 1000).toFixed(1)} s`}
-          onChange={(v) => r.maj({ silence: v })}
-          aide="Modes Auto et « Jarvis » : durée de silence après laquelle ta phrase est envoyée."
+          onChange={(v) => {
+            r.maj({ silence: v });
+            api("/api/appli", { method: "POST", json: { silence_fin: v / 1000 } }).catch(() => {});
+          }}
+          aide="Jarvis t'écoute jusqu'au bout, pauses comprises : il n'envoie ta demande qu'après ce temps de silence. Vaut aussi pour « Jarvis, … » fenêtre fermée."
         />
       </Panneau>
       <div className="space-y-4">

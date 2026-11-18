@@ -5,6 +5,7 @@ import pyautogui
 import pyperclip
 
 from . import outil
+from ..plateforme import MAC, echapper_as, osascript, touche_principale
 
 pyautogui.FAILSAFE = True   # coup de souris dans le coin haut-gauche = arrêt d'urgence
 pyautogui.PAUSE = 0.05
@@ -69,7 +70,7 @@ def taper_texte(texte: str, entree: bool = False):
     else:
         ancien = pyperclip.paste()
         pyperclip.copy(texte)
-        pyautogui.hotkey("ctrl", "v")
+        pyautogui.hotkey(touche_principale(), "v")
         time.sleep(0.1)
         pyperclip.copy(ancien)
     if entree:
@@ -82,7 +83,10 @@ def raccourci_clavier(touches: str):
     """Appuie sur une touche ou un raccourci (ex: 'ctrl+s', 'alt+tab', 'win+d', 'enter', 'f5', 'ctrl+shift+p').
     touches: touches séparées par +"""
     ks = [k.strip().lower() for k in touches.split("+")]
-    ks = ["win" if k in ("windows", "super") else k for k in ks]
+    if MAC:   # sur Mac : cmd = command, option = alt
+        ks = ["command" if k in ("cmd", "win", "windows", "super", "meta") else "option" if k == "alt" else k for k in ks]
+    else:
+        ks = ["win" if k in ("windows", "super", "cmd", "command") else k for k in ks]
     pyautogui.hotkey(*ks) if len(ks) > 1 else pyautogui.press(ks[0])
     return f"Touches : {touches}"
 
@@ -95,6 +99,13 @@ def media(action: str):
          "volume_plus": "volumeup", "volume_moins": "volumedown", "muet": "volumemute"}.get(action)
     if not k:
         return "Action inconnue."
+    if MAC and action in ("volume_plus", "volume_moins", "muet"):
+        if action == "muet":
+            osascript("set volume output muted (not (output muted of (get volume settings)))")
+        else:
+            pas = 10 if action == "volume_plus" else -10
+            osascript(f"set volume output volume ((output volume of (get volume settings)) + {pas})")
+        return f"{action} fait."
     for _ in range(5 if "volume_" in action else 1):
         pyautogui.press(k)
     return f"{action} fait."
@@ -113,6 +124,19 @@ def presse_papier(texte: str = ""):
 @outil
 def lister_fenetres():
     """Liste les fenêtres ouvertes avec leur position."""
+    if MAC:
+        r = osascript("""
+set l to {}
+tell application "System Events"
+    repeat with p in (processes whose visible is true)
+        repeat with w in windows of p
+            set end of l to (name of p) & " — " & (name of w)
+        end repeat
+    end repeat
+end tell
+set AppleScript's text item delimiters to linefeed
+return l as text""")
+        return r or "Aucune fenêtre."
     import pygetwindow as gw
     out = []
     for w in gw.getAllWindows():
@@ -126,6 +150,8 @@ def gerer_fenetre(titre: str, action: str = "activer"):
     """Active, maximise, minimise, restaure ou ferme une fenêtre (titre partiel).
     titre: partie du titre de la fenêtre
     action: activer | maximiser | minimiser | restaurer | fermer"""
+    if MAC:
+        return _gerer_fenetre_mac(titre, action)
     import pygetwindow as gw
     ws = [w for w in gw.getAllWindows() if titre.lower() in w.title.lower() and w.title.strip()]
     if not ws:
@@ -145,11 +171,41 @@ def gerer_fenetre(titre: str, action: str = "activer"):
     return f"{action} : {w.title}"
 
 
+def _gerer_fenetre_mac(titre, action):
+    """macOS : on agit sur l'application dont le nom ou une fenêtre contient le titre."""
+    t = echapper_as(titre)   # « contains » d'AppleScript ignore la casse
+    app = osascript(f"""
+tell application "System Events"
+    repeat with p in (processes whose visible is true)
+        if (name of p as text) contains "{t}" then return name of p
+        repeat with w in windows of p
+            if (name of w as text) contains "{t}" then return name of p
+        end repeat
+    end repeat
+end tell
+return \"\"""").strip() if titre else ""
+    if not app:
+        try:
+            app = osascript(f'tell application "{echapper_as(titre)}" to return name')   # nom exact d'application
+        except Exception:
+            return "Fenêtre introuvable."
+    osascript(f'tell application "{echapper_as(app)}" to activate')
+    if action in ("minimiser", "fermer", "maximiser"):
+        time.sleep(0.3)
+        touches = {"minimiser": ('"m"', "command down"), "fermer": ('"w"', "command down"),
+                   "maximiser": ('"f"', "{control down, command down}")}[action]
+        osascript(f'tell application "System Events" to keystroke {touches[0]} using {touches[1]}')
+    return f"{action} : {app}"
+
+
 @outil
 def cliquer_element(nom: str, fenetre: str = ""):
     """Clique sur un bouton/élément d'interface par son texte via l'accessibilité Windows (plus fiable que les coordonnées).
     nom: texte du bouton/menu/lien
     fenetre: partie du titre de la fenêtre (défaut : fenêtre active)"""
+    if MAC:   # pas d'accès UI Automation : on passe par la vision
+        from .ecran import trouver_et_cliquer
+        return trouver_et_cliquer(f"l'élément « {nom} »" + (f" dans la fenêtre {fenetre}" if fenetre else ""))
     from pywinauto import Desktop
     d = Desktop(backend="uia")
     if fenetre:

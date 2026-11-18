@@ -77,7 +77,7 @@ export function VueSysteme() {
         </Panneau>
         <Panneau titre="Stockage" icone={<HardDrive />} corpsClassName="space-y-3">
           <div className="flex items-baseline justify-between text-sm">
-            <span>Disque C:</span>
+            <span>Disque principal</span>
             <span className={cx("font-mono", s.disque > 90 ? "text-rouge" : "text-doux")}>{s.disque.toFixed(0)} %</span>
           </div>
           <div className="h-2 overflow-hidden rounded bg-hud/10">

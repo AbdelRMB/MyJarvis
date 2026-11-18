@@ -1,8 +1,8 @@
-import ctypes
 import threading
 from datetime import datetime, timedelta
 
 from . import outil
+from ..plateforme import alerte
 
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
@@ -16,16 +16,14 @@ def date_heure():
 
 def _alerte(msg):
     try:
-        from .. import voix
-        voix.parler(msg)
+        alerte(msg, "Jarvis - Rappel")
     except Exception:
         pass
-    ctypes.windll.user32.MessageBoxW(0, msg, "Jarvis - Rappel", 0x40 | 0x40000)
 
 
 @outil
 def rappel(minutes: float, message: str):
-    """Programme un rappel (popup + voix) dans X minutes.
+    """Programme un rappel (fenêtre d'alerte) dans X minutes.
     minutes: délai en minutes
     message: texte du rappel"""
     t = threading.Timer(minutes * 60, _alerte, args=(message,))

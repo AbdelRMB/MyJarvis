@@ -17,7 +17,7 @@ export type MessageJarvis = { id: string; role: "jarvis"; blocs: Bloc[]; date: n
 export type MessageSysteme = { id: string; role: "info" | "erreur"; texte: string; date: number };
 export type Message = MessageUtilisateur | MessageJarvis | MessageSysteme;
 
-export type Session = { jeton: string; nom: string; nb_outils: number };
+export type Session = { jeton: string; nom: string; nb_outils: number; plateforme?: "windows" | "mac" | "linux" };
 
 export type Gpu = { nom: string; util: number; vram_used: number; vram_total: number; temp: number };
 export type Systeme = {

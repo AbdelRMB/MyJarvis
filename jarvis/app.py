@@ -99,7 +99,8 @@ def main():
         afficher()
         web.diffuser(type="vocal", etat="eveil")
 
-    ecoute = EcouteFond(sur_eveil, web.commande_vocale, web.transcrire_rapide)
+    ecoute = EcouteFond(sur_eveil, web.commande_vocale, web.transcrire_rapide,
+                        sur_stop=web.stop_vocal, est_occupe=web.jarvis_occupe)
     if CONFIG.get("ecoute_fond", True):
         ecoute.demarrer()
     web.APPLI.update(active=True, afficher=afficher, ecoute=ecoute)
@@ -107,7 +108,8 @@ def main():
     # --- raccourci clavier global
     try:
         from pynput import keyboard
-        keyboard.GlobalHotKeys({CONFIG.get("raccourci") or "<ctrl>+<alt>+j": afficher}).start()
+        keyboard.GlobalHotKeys({CONFIG.get("raccourci") or "<ctrl>+<alt>+j": afficher,
+                               "<ctrl>+<alt>+s": web.stop_vocal}).start()   # arrêt d'urgence, même fenêtre cachée
     except Exception as e:
         print(f"  ! Raccourci clavier : {e}")
 
@@ -134,11 +136,16 @@ def main():
         pystray.MenuItem("Écoute « Jarvis »", basculer_ecoute, checked=lambda _: ecoute.actif),
         pystray.Menu.SEPARATOR,
         pystray.MenuItem("Quitter", quitter)))
-    icone.run_detached()
+    try:
+        # sur Mac, l'icône vit dans la barre des menus, sur la boucle Cocoa de la fenêtre (d'où run_detached)
+        icone.run_detached()
+    except Exception as e:
+        print(f"  ! Icône de notification indisponible ({e}) : appelle Jarvis à la voix ou au raccourci")
 
     # boucle de l'interface (bloque jusqu'à « Quitter ») ; Jarvis peut parler sans clic préalable
     import os
-    os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--autoplay-policy=no-user-gesture-required")
+    if sys.platform == "win32":
+        os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--autoplay-policy=no-user-gesture-required")
     webview.start(private_mode=False, storage_path=str(RACINE / "webview"))
 
     serveur.should_exit = True

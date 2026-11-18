@@ -34,7 +34,7 @@ export const DEFAUT: Reglages = {
   deviceId: "",
   gain: 1.5,
   seuil: 0.03,
-  silence: 800,
+  silence: 5000,
   bruit: true,
   echo: true,
   agc: false,
@@ -70,14 +70,12 @@ export const useReglages = create<Reglages & { maj: (p: Partial<Reglages>) => vo
   persist((set) => ({ ...DEFAUT, maj: (p) => set(p) }), {
     name: "jarvis.reglages.v2",
     storage: createJSONStorage(stockageSur),
-    version: 1,
+    version: 2,
     // v0 -> v1 : nouvelle voix serveur, envoi plus réactif
     migrate: (ancien, version) => {
       const r = { ...DEFAUT, ...(ancien as Partial<Reglages>) };
-      if (version < 1) {
-        if (r.silence === 1100) r.silence = 800;
-        r.debit = 1.05;
-      }
+      if (version < 1) r.debit = 1.05;
+      if (version < 2) r.silence = 5000; // il t'écoute jusqu'au bout : 5 s de silence avant d'envoyer
       return r as Reglages & { maj: (p: Partial<Reglages>) => void };
     },
   }),

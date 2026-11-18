@@ -62,7 +62,9 @@ def trouver_et_cliquer(description: str, bouton: str = "left", nombre: int = 1):
     d = json.loads(m.group(0))
     if not d.get("trouve", True):
         return "Élément non trouvé à l'écran."
-    x, y = int(d["x"] * w / 1000), int(d["y"] * h / 1000)
+    # clic en points d'écran : sur Mac Retina la capture fait 2x la taille logique
+    lw, lh = pyautogui.size()
+    x, y = int(d["x"] * lw / 1000), int(d["y"] * lh / 1000)
     pyautogui.click(x, y, clicks=nombre, button=bouton, interval=0.1)
     return f"Cliqué en ({x},{y}). Vérifie avec regarder_ecran si besoin."
 

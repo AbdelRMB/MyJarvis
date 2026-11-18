@@ -25,10 +25,18 @@ npm run build      # recompile jarvis/static
 ## Application de bureau (installée)
 - **Installer** : `installateur\JarvisSetup-1.0.0.exe` (sans droits admin). Coche « Lancer au démarrage de Windows ».
 - **Au démarrage du PC** : Jarvis se lance caché (icône près de l'horloge), sans fenêtre.
+- **Le faire taire** : « Jarvis, stop » (même pendant qu'il parle) ou `Ctrl+Alt+S`, même fenêtre cachée.
 - **L'appeler** : dis « Jarvis, ouvre Discord » (d'une traite) ou « Jarvis » puis ta demande — ou `Ctrl+Alt+J`, ou double-clic sur l'icône. La fenêtre apparaît.
 - **Fermer la fenêtre** la cache seulement. Quitter : clic droit sur l'icône > Quitter.
 - Écoute de fond 100 % locale : openWakeWord (« Hey Jarvis » à l'anglaise) + petit Whisper qui reconnaît « Jarvis » en français. Rien n'est envoyé avant que le nom soit reconnu.
 - Données de ce PC : `%LOCALAPPDATA%\Jarvis` (config, clé API `.env`, journaux `logs\jarvis.log`).
+
+## macOS
+Le même code tourne sur Mac (outils adaptés : terminal zsh, applis de /Applications, fenêtres via AppleScript, Cmd au lieu de Ctrl, LaunchAgent au démarrage, Trousseau pour les mots de passe, OneDrive pour Mac pour la mémoire partagée).
+- **Construire sur un Mac** : copie le dossier du projet (sans `.venv`, `dist`, `node_modules`), puis `bash construire-mac.sh` -> `installateur/Jarvis-<version>-mac-<arm64|x86_64>.dmg`.
+- **Ou sans Mac** : pousse le projet sur un dépôt GitHub privé, onglet Actions > « Jarvis macOS » > Run workflow -> le .dmg (puce Apple et Intel) est dans les Artifacts.
+- **Installer** : ouvre le .dmg, glisse Jarvis dans Applications, puis **clic droit > Ouvrir** la première fois (appli non signée par Apple). Autorise ensuite le micro, l'Accessibilité (raccourcis, souris, clavier) et l'Enregistrement de l'écran (vision) dans Réglages Système > Confidentialité et sécurité.
+- Icône dans la barre des menus ; appel : « Jarvis, … » ou ⌃ Ctrl + ⌥ Option + J ; arrêt : « Jarvis, stop » ou ⌃ Ctrl + ⌥ Option + S.
 
 ## Plusieurs PC, une seule mémoire
 - Dossier partagé : `OneDrive\Jarvis` (souvenirs, historique — un fichier par PC et par jour —, connecteurs, prénom et choix du cerveau).

@@ -1,7 +1,7 @@
 ; Programme d'installation de Jarvis (Inno Setup 6) : "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installateur.iss
 ; Prérequis : avoir construit dist\Jarvis avec  .venv\Scripts\pyinstaller jarvis.spec --noconfirm
 
-#define Version "1.0.0"
+#define Version "1.0.3"
 
 [Setup]
 AppId={{6E0B7C1A-4C1F-4B9B-9E2A-3F7D1A2B9C01}

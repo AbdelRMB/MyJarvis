@@ -106,7 +106,8 @@ def resume_recent(n_lignes=30):
 
 def _vscode_recents():
     from urllib.parse import unquote
-    base = Path(os.environ["APPDATA"]) / "Code/User/globalStorage"
+    from .plateforme import vscode_stockage
+    base = vscode_stockage()
     uris = []
     try:
         d = json.loads((base / "storage.json").read_text(encoding="utf-8"))
@@ -152,14 +153,18 @@ def scanner_systeme():
             return subprocess.run(c, capture_output=True, text=True, timeout=10, shell=True).stdout.strip()
         except Exception:
             return ""
-    gpu = cmd("nvidia-smi --query-gpu=name,memory.total --format=csv,noheader")
+    from .plateforme import MAC, NOM_OS
+    import getpass
+    gpu = cmd("sysctl -n machdep.cpu.brand_string") if MAC else cmd("nvidia-smi --query-gpu=name,memory.total --format=csv,noheader")
     apps = sorted({p.stem for p in _raccourcis() if "uninstall" not in p.stem.lower() and "désinstall" not in p.stem.lower()})
     l = [
-        f"# PC de l'utilisateur (scanné le {datetime.now():%d/%m/%Y %H:%M})",
-        f"- Windows : {platform.platform()} | Machine : {platform.node()} | Compte : {os.getlogin()}",
+        f"# {'Mac' if MAC else 'PC'} de l'utilisateur (scanné le {datetime.now():%d/%m/%Y %H:%M})",
+        f"- {NOM_OS} : {platform.mac_ver()[0] if MAC else platform.platform()} | Machine : {platform.node()} | Compte : {getpass.getuser()}",
         f"- Dossier perso : {Path.home()}",
-        f"- CPU : {platform.processor()} ({psutil.cpu_count()} threads) | RAM : {psutil.virtual_memory().total/1e9:.0f} Go | GPU : {gpu}",
-        f"- Git : {cmd('git config --global user.name')} | Node : {cmd('node --version')} | Python : {cmd('py --version')}",
+        f"- {'Puce' if MAC else 'CPU'} : {gpu if MAC else platform.processor()} ({psutil.cpu_count()} threads) | RAM : "
+        f"{psutil.virtual_memory().total/1e9:.0f} Go" + ("" if MAC else f" | GPU : {gpu}"),
+        f"- Git : {cmd('git config --global user.name')} | Node : {cmd('node --version')} | Python : "
+        f"{cmd('python3 --version') if MAC else cmd('py --version')}",
         "## Projets détectés", *[f"- {p}" for p in _projets()],
         "## Récents dans VS Code", *[f"- {p}" for p in _vscode_recents()],
         "## Applications installées", ", ".join(apps[:250]),

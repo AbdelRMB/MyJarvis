@@ -16,15 +16,35 @@ from pathlib import Path
 
 GELE = getattr(sys, "frozen", False)          # True dans l'appli .exe (PyInstaller)
 RESSOURCES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
-RACINE = (Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Jarvis") if GELE else Path(__file__).resolve().parents[1]
+if not GELE:
+    RACINE = Path(__file__).resolve().parents[1]
+elif sys.platform == "darwin":
+    RACINE = Path.home() / "Library" / "Application Support" / "Jarvis"
+else:
+    RACINE = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Jarvis"
 RACINE.mkdir(parents=True, exist_ok=True)
 FICHIER_CONFIG = RACINE / "config.json"
-MACHINE = platform.node() or "PC"
+MACHINE = (platform.node() or "PC").removesuffix(".local")
+
+
+def _onedrive():
+    """Dossier OneDrive : variable d'environnement (Windows) ou emplacements de l'appli OneDrive pour Mac."""
+    od = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
+    if od and Path(od).exists():
+        return Path(od)
+    if sys.platform == "darwin":
+        nuage = Path.home() / "Library" / "CloudStorage"
+        candidats = sorted(nuage.glob("OneDrive*")) if nuage.exists() else []
+        candidats += [Path.home() / "OneDrive"]
+        for c in candidats:   # « OneDrive-Personnel » en priorité, puis un compte pro
+            if c.exists():
+                return c
+    return None
 
 
 def _partage_par_defaut() -> str:
-    od = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
-    return str(Path(od) / "Jarvis") if od and Path(od).exists() else str(RACINE / "partage")
+    od = _onedrive()
+    return str(od / "Jarvis") if od else str(RACINE / "partage")
 
 
 DEFAUT = {
@@ -45,6 +65,7 @@ DEFAUT = {
     "dossier_partage": "",        # vide = OneDrive\Jarvis (ou un dossier local s'il n'y a pas OneDrive)
     "ecoute_fond": True,          # appli de bureau : écoute « Hey Jarvis » même fenêtre cachée
     "seuil_eveil": 0.5,           # sensibilité du mot d'activation (0-1, plus bas = plus sensible)
+    "silence_fin": 5.0,           # s de silence avant d'envoyer ta demande (il t'écoute jusqu'au bout)
     "raccourci": "<ctrl>+<alt>+j",
 }
 
@@ -68,7 +89,7 @@ def dossier_partage() -> Path:
 PARTAGE = dossier_partage()
 
 # Réglages communs à tous les PC (prénom, cerveau) : rangés dans le dossier partagé
-CLES_PARTAGEES = ["nom_utilisateur", "cerveau", "claude_modele", "claude_effort"]
+CLES_PARTAGEES = ["nom_utilisateur", "cerveau", "claude_modele", "claude_effort", "silence_fin"]
 PROFIL = PARTAGE / "profil.json"
 try:
     CONFIG.update({k: v for k, v in json.loads(PROFIL.read_text(encoding="utf-8")).items() if k in CLES_PARTAGEES and v})

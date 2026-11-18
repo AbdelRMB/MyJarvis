@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import connecteurs, memoire, outils, tts
+from .plateforme import CACHE_FENETRE, MAC, WIN
 from .agent import Jarvis
 from .config import CONFIG, MACHINE, PARTAGE, RACINE, sauver_config, sauver_profil
 
@@ -66,7 +67,8 @@ def _verifier(req: Request):
 @app.get("/api/session")
 def session():
     """Sans en-tête CORS : seule une page servie en local peut lire ce jeton."""
-    return {"jeton": JETON, "nom": CONFIG["nom_utilisateur"], "nb_outils": len(outils.OUTILS)}
+    return {"jeton": JETON, "nom": CONFIG["nom_utilisateur"], "nb_outils": len(outils.OUTILS),
+            "plateforme": "mac" if MAC else "windows" if WIN else "linux"}
 
 
 # ---------- diffusion vers tous les onglets ----------
@@ -83,7 +85,7 @@ def _gpu():
     try:
         out = subprocess.run(["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
                               "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=3,
-                             creationflags=subprocess.CREATE_NO_WINDOW).stdout.strip().split("\n")[0]
+                             **CACHE_FENETRE).stdout.strip().split("\n")[0]
         nom, util, used, tot, temp = [x.strip() for x in out.split(",")]
         return {"nom": nom, "util": float(util), "vram_used": float(used) / 1024, "vram_total": float(tot) / 1024,
                 "temp": float(temp)}
@@ -101,7 +103,7 @@ def systeme(req: Request):
     except Exception:
         charges, ollama_ok = [], False
     ram = psutil.virtual_memory()
-    disque = psutil.disk_usage("C:\\")
+    disque = psutil.disk_usage("C:\\" if WIN else "/")
     return {"cpu": psutil.cpu_percent(interval=None), "ram": ram.percent, "ram_used": ram.used / 2**30,
             "ram_total": ram.total / 2**30, "disque": disque.percent, "disque_libre": disque.free / 2**30,
             "gpu": _gpu(), "ollama": ollama_ok, "charges": charges, "cerveau": CONFIG.get("cerveau", "ollama"),
@@ -299,6 +301,16 @@ def transcrire_rapide(audio: np.ndarray) -> str:
         return " ".join(s.text for s in segs).strip()
 
 
+@app.post("/api/transcrire_rapide")
+async def transcrire_vite(req: Request):
+    """Petit Whisper pour les interruptions (« stop ») pendant que Jarvis parle : ~0,3 s."""
+    _verifier(req)
+    audio = np.frombuffer(await req.body(), dtype=np.float32)
+    if audio.size < 16000 * 0.2:
+        return {"texte": ""}
+    return {"texte": await asyncio.to_thread(transcrire_rapide, audio)}
+
+
 @app.post("/api/transcrire")
 async def transcrire(req: Request, langue: str = "fr"):
     """Corps : PCM float32 mono 16 kHz brut."""
@@ -399,6 +411,22 @@ async def supprimer_connecteur(cid: str, req: Request):
 
 # ---------- application de bureau (fenêtre, démarrage, écoute de fond) ----------
 APPLI = {"active": False, "afficher": None, "ecoute": None}   # renseigné par jarvis/app.py
+PAROLE = {"actif": False, "depuis": 0.0}   # la fenêtre signale quand Jarvis parle (pour l'écoute de fond)
+
+
+def jarvis_occupe() -> bool:
+    """Jarvis parle ou travaille : l'écoute de fond guette « stop » même mêlé à sa voix."""
+    parle = PAROLE["actif"] and time.time() - PAROLE["depuis"] < 300   # sécurité si la fenêtre disparaît
+    return parle or verrou_tache.locked()
+
+
+def stop_vocal():
+    """« Jarvis, stop » ou Ctrl+Alt+S : coupe la voix et la tâche en cours."""
+    if jarvis is not None:
+        jarvis.arreter = True
+    PAROLE["actif"] = False
+    diffuser(type="stop_voix")
+    print("  Stop demandé")
 
 
 @app.post("/api/fenetre/afficher")
@@ -413,10 +441,12 @@ def afficher_fenetre(req: Request):
 def etat_appli(req: Request):
     _verifier(req)
     from . import demarrage
-    return {"appli": APPLI["active"], "demarrage_auto": demarrage.est_actif(), "machine": MACHINE,
+    return {"appli": APPLI["active"], "plateforme": "mac" if MAC else "windows" if WIN else "linux",
+            "demarrage_auto": demarrage.est_actif(), "machine": MACHINE,
             "dossier_partage": str(PARTAGE), "ecoute_fond": CONFIG.get("ecoute_fond", True),
             "ecoute_active": bool(APPLI["ecoute"] and APPLI["ecoute"].actif),
-            "seuil_eveil": CONFIG.get("seuil_eveil", 0.5), "raccourci": CONFIG.get("raccourci")}
+            "seuil_eveil": CONFIG.get("seuil_eveil", 0.5), "raccourci": CONFIG.get("raccourci"),
+            "silence_fin": CONFIG.get("silence_fin", 5.0)}
 
 
 @app.post("/api/appli")
@@ -430,6 +460,10 @@ async def regler_appli(req: Request):
         if k in d:
             CONFIG[k] = d[k]
             sauver_config([k])
+    if "silence_fin" in d:   # partagé entre tous tes ordinateurs
+        CONFIG["silence_fin"] = max(0.5, min(15.0, float(d["silence_fin"])))
+        sauver_config(["silence_fin"])
+        sauver_profil()
     if APPLI["ecoute"] and "ecoute_fond" in d:
         APPLI["ecoute"].demarrer() if d["ecoute_fond"] else APPLI["ecoute"].arreter()
     return etat_appli(req)
@@ -451,9 +485,9 @@ def commande_vocale(audio: np.ndarray):
     from .ecoute import RX_NOM
     texte = RX_NOM.sub("", texte).strip()
     if len(texte) >= 2:
-        if re.match(r"^(stop|arr[êe]te|annule|tais[- ]toi)\b", texte, re.I):
-            jarvis.arreter = True
-            diffuser(type="stop_voix")
+        from .ecoute import RX_STOP_SEUL
+        if RX_STOP_SEUL.match(texte) or re.match(r"^(stop|arr[êe]te|annule|tais[- ]toi|chut|silence)\b", texte, re.I):
+            stop_vocal()
             return
         threading.Thread(target=executer, args=(texte,), daemon=True).start()
 
@@ -579,6 +613,8 @@ async def ws(sock: WebSocket):
                 threading.Thread(target=executer, args=(m["texte"].strip(),), daemon=True).start()
             elif t == "stop":
                 jarvis.arreter = True
+            elif t == "parle":
+                PAROLE.update(actif=bool(m.get("actif")), depuis=time.time())
             elif t == "reset":
                 jarvis.arreter = True
                 jarvis.reset()
@@ -624,8 +660,11 @@ def _demarrer_ollama():
     if not exe:
         print("  ! Ollama introuvable : installe-le depuis ollama.com"); return
     print("  Démarrage d'Ollama...")
-    subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                     creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+    if WIN:
+        subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+    else:
+        subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
     for _ in range(30):
         time.sleep(0.5)
         try:

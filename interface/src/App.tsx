@@ -72,9 +72,10 @@ export default function App() {
         useJarvis.setState({ session: s });
         connecter();
         rafraichirSysteme();
-        api<{ appli: boolean; ecoute_active: boolean }>("/api/appli")
+        api<{ appli: boolean; ecoute_active: boolean; silence_fin: number }>("/api/appli")
           .then((a) => {
             majAudio({ ecouteFond: a.appli && a.ecoute_active });
+            if (a.silence_fin) useReglages.getState().maj({ silence: Math.round(a.silence_fin * 1000) });
             if (a.appli) demarrerRef.current?.(); // fenêtre de bureau : prêt tout de suite, même cachée
           })
           .catch(() => {});

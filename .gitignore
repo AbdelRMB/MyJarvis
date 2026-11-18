@@ -1,10 +1,18 @@
+# Données personnelles : ne jamais publier
 .env
+memoire/
+config.json
+captures/
+logs/
+webview/
+partage/
+# Fichiers générés
 build/
 dist/
 installateur/
-logs/
-captures/
-webview/
+voix/*.onnx
+voix/*.onnx.json
 __pycache__/
 .venv/
+.venv-mac/
 interface/node_modules/
