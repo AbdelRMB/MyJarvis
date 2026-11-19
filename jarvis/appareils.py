@@ -198,6 +198,25 @@ def _executer(o: dict):
         _noter("recu", de, quoi, str(e), "erreur")
 
 
+def _mettre_a_jour() -> str:
+    """Mise à jour demandée depuis un autre appareil : installe la dernière version puis redémarre."""
+    from . import mises_a_jour, web
+    from .version import VERSION
+    r = mises_a_jour.lister()
+    if r.get("erreur"):
+        raise RuntimeError(r["erreur"])
+    dispo = [m for m in r["majs"] if m["disponible"]]
+    if not dispo:
+        return f"{MACHINE} est déjà à jour (version {VERSION})."
+    if not web.APPLI.get("quitter"):
+        raise RuntimeError("Jarvis tourne depuis le code source sur cet appareil : mise à jour avec « git pull ».")
+    cible = dispo[0]["version"]
+    mises_a_jour.installer(cible, lambda *a: None, web.APPLI["quitter"])
+    from . import notifications
+    notifications.ajouter("Mise à jour à distance", f"Mise à jour vers {cible} demandée depuis un autre appareil.", genre="info")
+    return f"Mise à jour de {MACHINE} vers la version {cible} lancée : il redémarre tout seul dans une minute environ."
+
+
 def _realiser(d: dict) -> tuple[str, dict]:
     t = d.get("type")
     if t == "demande":
@@ -220,4 +239,6 @@ def _realiser(d: dict) -> tuple[str, dict]:
         return f"Fichier enregistré sur {MACHINE} : {p}", {}
     if t == "ping":
         return f"{MACHINE} est là.", {}
+    if t == "mettre_a_jour":
+        return _mettre_a_jour(), {}
     raise ValueError(f"Type d'ordre inconnu : {t}")

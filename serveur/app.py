@@ -19,7 +19,8 @@ import time
 from contextlib import contextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 BASE = os.environ.get("JARVIS_DB", "/donnees/jarvis.db")
@@ -31,6 +32,8 @@ CLE_APPLI = os.environ.get("JARVIS_CLE_APPLI", "")   # même valeur que jarvis/c
 @app.middleware("http")
 async def seulement_l_appli(req: Request, suite):
     """Tout ce qui n'est pas l'appli Jarvis (navigateur, robots) reçoit un 404 vide (Apache filtre déjà)."""
+    if req.url.path.startswith("/mobile/") and req.method == "GET":   # l'appli mobile (pages) est publique
+        return await suite(req)
     if CLE_APPLI and (not req.url.path.startswith("/v1/") or
                       not hmac.compare_digest(req.headers.get("x-jarvis-appli", ""), CLE_APPLI)):
         return JSONResponse({"detail": "Introuvable"}, status_code=404)
@@ -618,3 +621,15 @@ async def attendre_reponse(oid: str, s: tuple = Depends(session_courante)):
 @app.get("/v1/sante")
 def sante():
     return {"ok": True}
+
+
+# ---------- appli mobile (télécommande depuis le téléphone) ----------
+@app.get("/mobile/config.js")
+def config_mobile():
+    return PlainTextResponse(f"window.JARVIS_CLE_APPLI = {json.dumps(CLE_APPLI)};", media_type="application/javascript",
+                             headers={"Cache-Control": "no-store"})
+
+
+_MOBILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mobile")
+if os.path.isdir(_MOBILE):
+    app.mount("/mobile", StaticFiles(directory=_MOBILE, html=True), name="mobile")

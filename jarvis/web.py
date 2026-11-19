@@ -618,8 +618,15 @@ async def lister_appareils(req: Request):
             liste = await asyncio.to_thread(appareils.lister)
         except compte.ErreurCompte as e:
             erreur = str(e)
+    derniere = ""
+    try:
+        from . import mises_a_jour
+        journal = (await asyncio.to_thread(mises_a_jour.lister)).get("journal") or []
+        derniere = journal[0]["version"] if journal else ""
+    except Exception:
+        pass
     return {"appareils": liste, "reglages": appareils.reglages(), "journal": list(reversed(appareils.journal()))[:100],
-            "connecte": compte.connecte(), "mode": compte.mode(), "erreur": erreur}
+            "connecte": compte.connecte(), "mode": compte.mode(), "erreur": erreur, "derniere_version": derniere}
 
 
 @app.post("/api/appareils/reglages")
@@ -643,6 +650,18 @@ async def deconnecter_un_appareil(aid: str, req: Request):
         return await asyncio.to_thread(appareils.deconnecter, aid)
     except compte.ErreurCompte as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/appareils/{aid}/mettre_a_jour")
+async def mettre_a_jour_appareil(aid: str, req: Request):
+    """Met à jour Jarvis sur un autre appareil allumé (il télécharge, s'installe et redémarre)."""
+    _verifier(req)
+    from . import appareils
+    try:
+        r = await asyncio.to_thread(appareils.envoyer, aid, {"type": "mettre_a_jour"}, 120)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"resultat": r.get("resultat", ""), "ok": r.get("ok", False)}
 
 
 @app.post("/api/appareils/{aid}/demander")

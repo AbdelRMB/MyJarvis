@@ -9,7 +9,13 @@ import { toast } from "../stores/toasts";
 
 type Appareil = { id: string; nom: string; plateforme: string; version: string; vu: number; en_ligne: boolean; occupe: boolean; accepte: boolean; mode: string; connecte_depuis: number; moi: boolean };
 type Entree = { ts: number; sens: "envoye" | "recu"; appareil: string; quoi: string; resultat: string; statut: string };
-type Etat = { appareils: Appareil[]; reglages: { accepte: boolean; mode: string }; journal: Entree[]; connecte: boolean; mode: string; erreur: string };
+type Etat = { appareils: Appareil[]; reglages: { accepte: boolean; mode: string }; journal: Entree[]; connecte: boolean; mode: string; erreur: string; derniere_version: string };
+
+const plusRecent = (a: string, b: string) => {
+  const x = a.split(".").map(Number), y = b.split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+};
 
 function ilYa(ts: number) {
   const s = Math.max(0, Date.now() / 1000 - ts);
@@ -40,6 +46,18 @@ export function VueAppareils() {
     const r = await api<{ moi?: boolean }>(`/api/appareils/${a.id}/deconnecter`, { method: "POST", json: {} }).catch((x) => toast((x as Error).message, "erreur"));
     if (r && r.moi) location.reload();
     else charger();
+  };
+  const [majEnCours, setMajEnCours] = useState("");
+  const mettreAJour = async (a: Appareil) => {
+    setMajEnCours(a.id);
+    try {
+      const r = await api<{ resultat: string; ok: boolean }>(`/api/appareils/${a.id}/mettre_a_jour`, { method: "POST", json: {} });
+      toast(`${a.nom} : ${r.resultat}`, r.ok ? "succes" : "erreur");
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setMajEnCours("");
+    }
   };
   const regler = async (p: object) => setE(await api<Etat>("/api/appareils/reglages", { method: "POST", json: p }));
   const envoyer = async (a: Appareil) => {
@@ -113,7 +131,19 @@ export function VueAppareils() {
               </div>
             )}
 
-            {!a.moi && a.en_ligne && a.accepte && (
+            {!a.moi && e && e.derniere_version && a.version && a.plateforme !== "telephone" && plusRecent(e.derniere_version, a.version) && (
+              <div className="mt-3 rounded-md border border-hud/40 bg-hud/5 p-3 text-[13px]">
+                {t("Nouvelle version disponible : {v}", { v: e.derniere_version })}
+                {a.en_ligne && a.accepte ? (
+                  <Bouton className="mt-2" taille="sm" variante="primaire" chargement={majEnCours === a.id} onClick={() => mettreAJour(a)}>
+                    {t("Mettre à jour {nom} maintenant", { nom: a.nom })}
+                  </Bouton>
+                ) : (
+                  <p className="mt-1 text-doux">{a.en_ligne ? t("Cet appareil refuse les ordres à distance.") : t("Allume l'appareil (avec Jarvis) pour le mettre à jour à distance.")}</p>
+                )}
+              </div>
+            )}
+            {!a.moi && a.en_ligne && a.accepte && a.plateforme !== "telephone" && (
               <div className="mt-3 flex gap-2">
                 <Champ
                   className="flex-1"

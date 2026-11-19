@@ -445,4 +445,8 @@ export const EN: Record<string, string> = {
   "Journal des ordres": "Order log",
   "Envoyé à {nom}": "Sent to {nom}",
   "Reçu de {nom}": "Received from {nom}",
+  "Nouvelle version disponible : {v}": "New version available: {v}",
+  "Mettre à jour {nom} maintenant": "Update {nom} now",
+  "Cet appareil refuse les ordres à distance.": "This device refuses remote orders.",
+  "Allume l'appareil (avec Jarvis) pour le mettre à jour à distance.": "Turn the device on (with Jarvis) to update it remotely.",
 };

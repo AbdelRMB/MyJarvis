@@ -3,6 +3,10 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.5.0
+- **Jarvis sur ton téléphone** : ouvre https://jarvis.abdelrahimriche.com/mobile/ sur ton iPhone ou Android, connecte-toi avec ton compte et ajoute-la à l'écran d'accueil. Choisis ton ordinateur, parle ou écris : il exécute et te répond à voix haute. Tes demandes sont chiffrées sur le téléphone (ton mot de passe n'en sort pas) : le serveur ne peut pas les lire. / **Jarvis on your phone**: a web app to control your computers by voice.
+- **Mise à jour à distance** : dans « Mes appareils » (et sur le téléphone), un appareil allumé avec une ancienne version a un bouton « Mettre à jour » : il télécharge, s'installe et redémarre tout seul (à partir de la 1.4.0). / **Remote update** of your other devices.
+
 ## 1.4.0
 - **Mes appareils** : nouvel onglet avec tous les ordinateurs où Jarvis est connecté à ton compte — allumé ou non, Jarvis disponible ou occupé, version, dernière activité. Tu peux déconnecter n'importe lequel depuis n'importe quel autre (ses clés sont alors retirées). / **My devices**: see and disconnect every device signed in to your account.
 - **Pilote tes autres appareils** : « sur mon PC, lance Discord », « quel est l'espace disque du PC ? », « envoie-moi le fichier rapport.pdf du bureau du PC ». Le Jarvis de l'autre appareil l'exécute avec ses propres outils et te répond (environ 1 seconde + le temps de l'action). Fichiers dans les deux sens (10 Mo max). / **Control your other devices** by voice.
