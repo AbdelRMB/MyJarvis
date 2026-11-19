@@ -16,6 +16,7 @@ import {
   VolumeX,
   Wrench,
   Zap,
+  ListTodo,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { micro } from "../audio/micro";
@@ -34,6 +35,7 @@ const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
   { id: "historique", libelle: t("Historique"), icone: History },
   { id: "memoire", libelle: t("Mémoire"), icone: Brain },
   { id: "connecteurs", libelle: t("Connecteurs"), icone: Plug },
+  { id: "taches", libelle: t("Tâches"), icone: ListTodo },
   { id: "automatisations", libelle: t("Automatisations"), icone: Zap },
   { id: "activite", libelle: t("Activité"), icone: Activity },
   { id: "arsenal", libelle: t("Arsenal"), icone: Wrench },

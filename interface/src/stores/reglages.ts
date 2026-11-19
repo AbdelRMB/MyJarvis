@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export type ModeMicro = "ptt" | "auto" | "eveil";
-export type Vue = "assistant" | "historique" | "memoire" | "connecteurs" | "activite" | "arsenal" | "systeme" | "reglages" | "majs" | "automatisations";
+export type Vue = "assistant" | "historique" | "memoire" | "connecteurs" | "activite" | "arsenal" | "systeme" | "reglages" | "majs" | "automatisations" | "taches";
 
 export type Reglages = {
   mode: ModeMicro;

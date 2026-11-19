@@ -58,6 +58,7 @@ Avant CHAQUE réponse, méthode :
 1. Relis ta mémoire ci-dessous (« Ce que tu sais sur… ») et la fin des conversations : sers-t'en, ne redemande pas ce que tu sais déjà.
 2. Si la demande fait référence au passé (« comme hier », « ce qu'on a fait », « tu te souviens »), consulte l'historique : historique_jours, historique_lire, chercher_memoire.
 3. Regarde la liste « Tes services » ci-dessous et choisis le bon outil (le bon compte mail, le bon serveur…). Vérifie avec un outil plutôt que supposer.
+4bis. Coder : quand on te demande de coder, développer ou corriger quelque chose dans un projet, lance une tâche de fond (lancer_tache_code) au lieu de le faire dans la conversation. Si l'utilisateur change d'avis ou précise une tâche déjà lancée, utilise mettre_a_jour_tache ; s'il ne veut plus, arreter_tache.
 4. Mémoire : si un souvenir est faux ou a changé, corrige-le avec modifier_souvenir (ne supprime pas pour recréer) ; oublier seulement s'il n'est plus vrai du tout.
 
 Nous sommes le {JOURS[n.weekday()]} {n:%d/%m/%Y} (pour l'heure exacte, utilise l'outil date_heure).
@@ -243,3 +244,21 @@ class Jarvis:
         except Exception:
             return []
         return [memoire.ajouter(f["fait"], f.get("categorie", "general")) for f in faits if f.get("fait")]
+
+
+def completer(prompt: str) -> str:
+    """Réponse simple (sans outils) du cerveau choisi : sert à Jarvis pour piloter les tâches de fond."""
+    cerveau = CONFIG.get("cerveau")
+    if cerveau == "claude":
+        from . import claude
+        r = claude.client().messages.create(model=CONFIG["claude_modele"], max_tokens=3000, output_config={"effort": "low"},
+                                            messages=[{"role": "user", "content": prompt}])
+        claude.enregistrer_cout(r.usage, CONFIG["claude_modele"])
+        return "".join(b.text for b in r.content if b.type == "text")
+    if cerveau == "openai":
+        from . import openai_cerveau as o
+        r = o.client().chat.completions.create(model=o.modele(), messages=[{"role": "user", "content": prompt}])
+        return r.choices[0].message.content or ""
+    r = ollama.chat(model=CONFIG["modele"], think=False, options={"num_ctx": CONFIG["num_ctx"], "temperature": 0.2},
+                    messages=[{"role": "user", "content": prompt}])
+    return r.message.content or ""

@@ -607,6 +607,67 @@ async def afficher_fenetre(req: Request):
     return {"ok": bool(APPLI["afficher"])}
 
 
+# ---------- tâches de fond (code avec Claude Code / Jarvis) ----------
+@app.get("/api/taches")
+def lister_taches(req: Request):
+    _verifier(req)
+    from . import taches
+    return [taches.resume(t) for t in taches.lister()]
+
+
+@app.get("/api/taches/{tid}")
+def lire_tache(tid: str, req: Request):
+    _verifier(req)
+    from . import taches
+    t = taches.lire(tid)
+    if not t:
+        raise HTTPException(404, "Tâche introuvable.")
+    return t
+
+
+@app.post("/api/taches")
+async def creer_tache(req: Request):
+    _verifier(req)
+    from . import taches
+    d = await req.json()
+    try:
+        t = await asyncio.to_thread(taches.creer, d.get("consigne", ""), d.get("projet", ""), d.get("outil", "claude_code"), d.get("titre", ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return taches.resume(t)
+
+
+@app.post("/api/taches/{tid}/{action}")
+async def agir_tache(tid: str, action: str, req: Request):
+    _verifier(req)
+    from . import taches
+    if action == "consigne":
+        return {"message": taches.mettre_a_jour(tid, (await req.json()).get("texte", ""))}
+    if action == "arreter":
+        return {"message": taches.arreter(tid)}
+    if action == "reprendre":
+        t = taches.lire(tid)
+        if t and t["statut"] != "en_cours":
+            t["statut"] = "en_cours"
+            taches._sauver(t)
+            taches.demarrer(tid)
+        return {"message": "Tâche reprise."}
+    if action == "ouvrir":
+        t = taches.lire(tid)
+        if t and t.get("dossier"):
+            from .plateforme import ouvrir_chemin
+            ouvrir_chemin(t["dossier"])
+        return {"ok": True}
+    raise HTTPException(404, "Action inconnue.")
+
+
+@app.delete("/api/taches/{tid}")
+def supprimer_tache(tid: str, req: Request):
+    _verifier(req)
+    from . import taches
+    return {"ok": taches.supprimer(tid)}
+
+
 # ---------- automatisations ----------
 @app.get("/api/automatisations")
 def lister_automatisations(req: Request):
@@ -974,8 +1035,9 @@ def preparer():
         diffuser(type="memoire_maj", **changements)
     compte.ecouteurs.append(apres_synchro)
     compte.au_demarrage()   # mémoire, connecteurs et profil du compte connecté (cache local + synchro)
-    from . import automatisations
+    from . import automatisations, taches
     automatisations.demarrer()   # surveille tes boîtes mail pour les règles « quand je reçois… »
+    taches.au_demarrage()        # tâches de fond coupées par la fermeture : « interrompues » (bouton Reprendre)
     if CONFIG.get("cerveau") not in ("claude", "openai"):
         _demarrer_ollama()
     if not memoire.SYSTEME.exists():

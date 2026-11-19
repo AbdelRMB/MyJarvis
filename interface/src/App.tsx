@@ -23,10 +23,11 @@ import { VueHistorique } from "./views/Historique";
 import { VueMemoire } from "./views/Memoire";
 import { VueReglages } from "./views/Reglages";
 import { VueAutomatisations } from "./views/Automatisations";
+import { VueTaches } from "./views/Taches";
 import { VueMisesAJour } from "./views/MisesAJour";
 import { VueSysteme } from "./views/Systeme";
 
-const VUES: Vue[] = ["assistant", "historique", "memoire", "connecteurs", "activite", "arsenal", "automatisations", "systeme", "reglages", "majs"];
+const VUES: Vue[] = ["assistant", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "systeme", "reglages", "majs"];
 
 function useRaccourcis() {
   useEffect(() => {
@@ -157,6 +158,7 @@ export default function App() {
             {vue === "reglages" && <VueReglages />}
             {vue === "majs" && <VueMisesAJour />}
             {vue === "automatisations" && <VueAutomatisations />}
+            {vue === "taches" && <VueTaches />}
           </div>
         </main>
       </div>
