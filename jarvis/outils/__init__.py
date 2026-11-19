@@ -81,7 +81,47 @@ def schemas():
     return [o["schema"] for o in OUTILS.values()]
 
 
+ARRET = __import__("threading").Event()   # bouton STOP / « Jarvis, stop » : coupe l'action en cours
+
+
+def arreter_tout():
+    """Arrêt demandé : l'outil en cours est abandonné et les programmes qu'il a lancés sont tués."""
+    ARRET.set()
+
+
+def _tuer_enfants_depuis(t0: float):
+    """Tue les programmes lancés par l'outil interrompu (commande, script, AppleScript…), pas les autres."""
+    try:
+        import psutil
+        for p in psutil.Process().children(recursive=True):
+            try:
+                if p.create_time() >= t0 - 0.5:
+                    p.kill()
+            except psutil.Error:
+                pass
+    except Exception:
+        pass
+
+
 def appeler(nom: str, args: dict) -> str:
+    """Exécute l'outil dans un fil à part : un STOP l'interrompt aussitôt, sans attendre qu'il ait fini."""
+    import threading
+    import time
+    if ARRET.is_set():
+        return "Annulé par l'utilisateur."
+    resultat, t0 = {}, time.time()
+    fil = threading.Thread(target=lambda: resultat.update(r=_appeler(nom, args)), daemon=True, name=f"outil-{nom}")
+    fil.start()
+    while fil.is_alive():
+        fil.join(0.1)
+        if ARRET.is_set():
+            _tuer_enfants_depuis(t0)
+            log.info("  -> interrompu par l'utilisateur")
+            return "Action interrompue par l'utilisateur (STOP). Ne la relance pas."
+    return resultat.get("r", "Erreur : l'outil n'a rien renvoyé.")
+
+
+def _appeler(nom: str, args: dict) -> str:
     if nom not in OUTILS:
         return f"Erreur : outil inconnu '{nom}'."
     args = args or {}

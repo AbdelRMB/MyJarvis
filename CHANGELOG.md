@@ -3,6 +3,9 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.2.1
+- **Le bouton STOP coupe vraiment** : l'action en cours (commande, script, souris, téléchargement…) est interrompue tout de suite et les programmes qu'elle a lancés sont fermés, au lieu d'aller jusqu'au bout. Pareil avec Échap, « Jarvis, stop » et Ctrl+Alt+S. / **STOP really stops**: the running action is interrupted immediately.
+
 ## 1.2.0
 - **English version**: choose French or English (Settings › Interface, or on the first screen). Interface, Jarvis's replies, speech recognition, voice and announcements switch language. / **Version anglaise** : choisis français ou anglais ; interface, réponses, reconnaissance vocale, voix et annonces suivent.
 - **Cerveau OpenAI** : en plus de Claude et Ollama, utilise ta clé API OpenAI (GPT). Le modèle se choisit parmi ceux de ta clé.

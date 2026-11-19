@@ -491,6 +491,7 @@ def stop_vocal():
     """« Jarvis, stop » ou Ctrl+Alt+S : coupe la voix et la tâche en cours."""
     if jarvis is not None:
         jarvis.arreter = True
+    outils.arreter_tout()
     PAROLE["actif"] = False
     diffuser(type="stop_voix")
     print("  Stop demandé")
@@ -807,6 +808,7 @@ def executer(texte: str):
     if not verrou_tache.acquire(blocking=False):
         diffuser(type="erreur", texte="Je suis déjà sur une tâche. STOP pour l'interrompre.")
         return
+    outils.ARRET.clear()   # nouvelle tâche : l'arrêt précédent ne compte plus
     id_outil = None
 
     def sur_outil(nom, a, res):
@@ -857,6 +859,7 @@ async def ws(sock: WebSocket):
                 threading.Thread(target=executer, args=(m["texte"].strip(),), daemon=True).start()
             elif t == "stop":
                 jarvis.arreter = True
+                outils.arreter_tout()
             elif t == "parle":
                 PAROLE.update(actif=bool(m.get("actif")), depuis=time.time())
             elif t == "reset":
