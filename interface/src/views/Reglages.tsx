@@ -22,7 +22,6 @@ type EtatAppli = {
   appli: boolean;
   demarrage_auto: boolean;
   machine: string;
-  dossier_partage: string;
   ecoute_fond: boolean;
   ecoute_active: boolean;
   seuil_eveil: number;
@@ -46,21 +45,28 @@ function OngletApplication() {
     }
   };
   const raccourci = os.touches(e.raccourci);
-  const [envoi, setEnvoi] = useState(false);
-  const envoyerMemoire = async () => {
-    setEnvoi(true);
+  const [compte, setCompte] = useState<{ email: string; prenom: string; serveur: string; machine: string } | null>(null);
+  const [action, setAction] = useState("");
+  useEffect(() => {
+    api<{ email: string; prenom: string; serveur: string; machine: string }>("/api/compte").then(setCompte).catch(() => {});
+  }, []);
+  const agir = async (a: "importer" | "synchroniser" | "deconnexion") => {
+    setAction(a);
     try {
-      const r = await api<{ faits: number; historique: number; connecteurs: number }>("/api/memoire/envoyer", { method: "POST" });
-      toast(
-        r.faits || r.historique || r.connecteurs
-          ? `Envoyé : ${r.faits} souvenir(s), ${r.historique} journée(s) d'historique, ${r.connecteurs} connecteur(s).`
-          : "Rien de nouveau à envoyer : tout est déjà dans le dossier partagé.",
-        "succes",
-      );
+      const r = await api<{ import?: { faits: number; lignes: number } }>(`/api/compte/${a}`, { method: "POST" });
+      if (a === "importer")
+        toast(
+          r.import && (r.import.faits || r.import.lignes)
+            ? `Ajouté à ton compte : ${r.import.faits} souvenir(s), ${r.import.lignes} ligne(s) d'historique.`
+            : "Rien de nouveau : tout ce que cet appareil savait est déjà dans ton compte.",
+          "succes",
+        );
+      else if (a === "synchroniser") toast("Synchronisé avec ton compte.", "succes");
+      else location.reload();   // déconnecté : retour à l'écran de connexion
     } catch (x) {
       toast((x as Error).message, "erreur");
     } finally {
-      setEnvoi(false);
+      setAction("");
     }
   };
   return (
@@ -102,19 +108,31 @@ function OngletApplication() {
           <p className="mt-1 text-[13px] text-doux">Fermer la fenêtre la cache seulement. Pour quitter : clic sur l'icône Jarvis {os.zoneIcone}, puis « Quitter ».</p>
         </div>
       </Panneau>
-      <Panneau titre="Mémoire partagée entre tes PC" icone={<Cloud />}>
+      <Panneau titre="Mon compte" icone={<Cloud />}>
         <p className="text-sm">
-          Ce PC : <span className="font-mono text-hud">{e.machine}</span>
+          Connecté : <span className="font-mono text-hud">{compte?.email ?? "…"}</span>
         </p>
-        <p className="mt-3 text-sm">Dossier partagé :</p>
-        <p className="mt-1 rounded border border-ligne bg-black/20 p-2 font-mono text-xs break-all text-hud-clair">{e.dossier_partage}</p>
+        <p className="mt-1 text-sm">
+          Cet appareil : <span className="font-mono text-hud">{e.machine}</span>
+        </p>
         <p className="mt-3 text-[13px] leading-relaxed text-doux">
-          Les souvenirs, l'historique des conversations et la liste des connecteurs sont rangés ici. OneDrive les synchronise : sur tes autres ordinateurs, PC ou Mac avec le même compte Microsoft, Jarvis se souvient des mêmes choses. Les mots de passe des connecteurs et la clé API restent sur chaque machine.
+          Tes souvenirs, l'historique des conversations, tes connecteurs et tes réglages sont rangés dans ton compte : connecte-toi sur n'importe quel appareil et
+          Jarvis se souvient des mêmes choses. Ta clé API et les mots de passe des connecteurs y sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.
         </p>
-        <Bouton className="mt-4" icone={<Cloud />} chargement={envoi} onClick={envoyerMemoire}>
-          Envoyer la mémoire de ce PC vers le dossier partagé
-        </Bouton>
-        <p className="mt-2 text-[13px] text-doux">Ajoute ce que ce PC savait avant OneDrive (souvenirs, historique, connecteurs). Rien n'est écrasé.</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Bouton icone={<Cloud />} chargement={action === "importer"} onClick={() => agir("importer")}>
+            Envoyer la mémoire de cet appareil
+          </Bouton>
+          <Bouton variante="fantome" chargement={action === "synchroniser"} onClick={() => agir("synchroniser")}>
+            Synchroniser
+          </Bouton>
+          <Bouton variante="danger" chargement={action === "deconnexion"} onClick={() => agir("deconnexion")}>
+            Se déconnecter
+          </Bouton>
+        </div>
+        <p className="mt-2 text-[13px] text-doux">
+          « Envoyer » ajoute à ton compte ce que cet appareil savait avant (anciennes versions, OneDrive). Rien n'est écrasé, les doublons sont ignorés.
+        </p>
       </Panneau>
     </div>
   );

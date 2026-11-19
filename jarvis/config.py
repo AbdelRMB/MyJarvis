@@ -4,8 +4,8 @@ Trois emplacements :
 - RESSOURCES : fichiers livrés avec l'appli (interface compilée, voix Piper). En lecture seule une fois installée.
 - RACINE     : données propres à CE PC (config.json, clé API .env, journaux, captures, scan du PC).
                Dossier du projet en développement, %LOCALAPPDATA%\\Jarvis dans l'appli installée.
-- PARTAGE    : mémoire commune à tous tes PC (souvenirs, historique, connecteurs).
-               Par défaut OneDrive\\Jarvis : OneDrive la synchronise entre les machines.
+- PARTAGE    : cache local du compte connecté (souvenirs, historique, connecteurs, profil), synchronisé
+               avec le serveur de comptes (jarvis/compte.py). OneDrive ne sert plus qu'à importer l'ancienne mémoire.
 """
 import json
 import os
@@ -45,11 +45,6 @@ def _onedrive():
     return None
 
 
-def _partage_par_defaut() -> str:
-    od = _onedrive()
-    return str(od / "Jarvis") if od else str(RACINE / "partage")
-
-
 DEFAUT = {
     "modele": "qwen3.5:9b",
     "modele_vision": "qwen3.5:9b",
@@ -65,7 +60,7 @@ DEFAUT = {
     "cerveau": "claude",          # "claude" (API Anthropic) ou "ollama" (local)
     "claude_modele": "claude-sonnet-5-5",
     "claude_effort": "low",       # low = le plus réactif à l'oral ; medium pour les tâches longues avec outils
-    "dossier_partage": "",        # vide = OneDrive\Jarvis (ou un dossier local s'il n'y a pas OneDrive)
+    "serveur_comptes": "",        # vide = serveur Jarvis par défaut (jarvis/compte.py)
     "ecoute_fond": True,          # appli de bureau : écoute « Hey Jarvis » même fenêtre cachée
     "seuil_eveil": 0.5,           # sensibilité du mot d'activation (0-1, plus bas = plus sensible)
     "silence_fin": 2.5,           # s de silence avant d'envoyer ta demande (il écoute en continu jusque-là)
@@ -83,40 +78,30 @@ def sauver_config(cles=None):
     FICHIER_CONFIG.write_text(json.dumps(actuel, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def dossier_partage() -> Path:
-    p = Path(CONFIG.get("dossier_partage") or _partage_par_defaut())
-    p.mkdir(parents=True, exist_ok=True)
+def _dossier_compte() -> Path:
+    """Cache local du compte connecté (RACINE/comptes/<id>) ; la source de vérité est le serveur (jarvis/compte.py)."""
+    try:
+        uid = json.loads((RACINE / "compte.json").read_text(encoding="utf-8")).get("id")
+    except (OSError, ValueError):
+        uid = None
+    p = RACINE / "comptes" / (str(uid) if uid else "_sans_compte")
+    (p / "memoire" / "historique").mkdir(parents=True, exist_ok=True)
     return p
 
 
-PARTAGE = dossier_partage()
+PARTAGE = _dossier_compte()   # remplacé par compte.activer_dossiers() à la connexion
 
-# Réglages communs à tous les PC (prénom, cerveau) : rangés dans le dossier partagé
+# Réglages communs à tous tes appareils (prénom, cerveau) : rangés dans ton compte
 CLES_PARTAGEES = ["nom_utilisateur", "cerveau", "claude_modele", "claude_effort", "silence_fin"]
 PROFIL = PARTAGE / "profil.json"
 try:
     CONFIG.update({k: v for k, v in json.loads(PROFIL.read_text(encoding="utf-8")).items() if k in CLES_PARTAGEES and v})
 except (OSError, ValueError):
-    if FICHIER_CONFIG.exists():   # 1er PC : on publie ses réglages pour les suivants
-        PROFIL.write_text(json.dumps({k: CONFIG[k] for k in CLES_PARTAGEES}, ensure_ascii=False, indent=1), encoding="utf-8")
+    pass
 
 
 def sauver_profil():
-    PROFIL.write_text(json.dumps({k: CONFIG[k] for k in CLES_PARTAGEES}, ensure_ascii=False, indent=1), encoding="utf-8")
-
-# Première fois : la mémoire existante de ce PC rejoint le dossier partagé (sans rien écraser)
-_ancienne = RACINE / "memoire"
-if _ancienne.exists() and _ancienne.resolve() != (PARTAGE / "memoire").resolve():
-    (PARTAGE / "memoire" / "historique").mkdir(parents=True, exist_ok=True)
-    if (_ancienne / "faits.json").exists() and not (PARTAGE / "memoire" / "faits.json").exists():
-        shutil.copy2(_ancienne / "faits.json", PARTAGE / "memoire" / "faits.json")
-    for f in (_ancienne / "historique").glob("*.md") if (_ancienne / "historique").exists() else []:
-        cible = PARTAGE / "memoire" / "historique" / (f.stem + f"__{MACHINE}.md" if "__" not in f.stem else f.name)
-        if not cible.exists():
-            shutil.copy2(f, cible)
-        else:   # lignes écrites ici depuis la première copie : on les rajoute
-            deja = cible.read_text(encoding="utf-8")
-            nouvelles = f.read_text(encoding="utf-8")
-            if nouvelles.startswith(deja) and len(nouvelles) > len(deja):
-                with open(cible, "a", encoding="utf-8") as h:
-                    h.write(nouvelles[len(deja):])
+    profil = {k: CONFIG[k] for k in CLES_PARTAGEES}
+    PROFIL.write_text(json.dumps(profil, ensure_ascii=False, indent=1), encoding="utf-8")
+    from . import compte
+    compte.document_modifie("profil", profil)

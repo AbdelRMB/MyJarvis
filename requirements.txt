@@ -28,3 +28,4 @@ rich
 send2trash
 sounddevice
 uvicorn[standard]
+cryptography

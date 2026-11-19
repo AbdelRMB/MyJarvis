@@ -58,7 +58,7 @@ def cle_masquee() -> str:
     return f"{k[:7]}…{k[-4:]}" if len(k) > 12 else ""
 
 
-def definir_cle(cle: str):
+def definir_cle(cle: str, synchro: bool = True):
     """Enregistre la clé dans .env (fichier local, jamais envoyé ailleurs qu'à Anthropic)."""
     global _client
     cle = cle.strip()
@@ -71,6 +71,9 @@ def definir_cle(cle: str):
         os.environ.pop("ANTHROPIC_API_KEY", None)
     ENV.write_text("\n".join(lignes) + "\n", encoding="utf-8")
     _client = None
+    if synchro:   # la clé rejoint le coffre chiffré du compte (lisible sur tes autres appareils seulement)
+        from . import compte
+        compte.cle_api_modifiee(cle)
 
 
 def client():

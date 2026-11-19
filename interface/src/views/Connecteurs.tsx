@@ -113,7 +113,7 @@ function Editeur({
             </label>
           ))}
           <p className="text-[12px] text-tres-doux">
-            Les mots de passe et jetons sont rangés dans le {os.coffre}. Ils ne partent pas sur OneDrive.
+            Les mots de passe et jetons sont rangés dans le {os.coffre}. Ils rejoignent aussi ton compte, chiffrés avec ton mot de passe : le serveur ne peut pas les lire.
           </p>
         </div>
         <footer className="flex gap-2 border-t border-ligne p-4">

@@ -41,6 +41,8 @@ def definir_jeton(valeur: str):
             keyring.delete_password(SERVICE, CLE)
         except Exception:
             pass
+    from . import compte
+    compte.secret_modifie(CLE, valeur.strip())
 
 
 def _entetes(binaire=False):

@@ -429,17 +429,56 @@ def stop_vocal():
     print("  Stop demandé")
 
 
-@app.post("/api/memoire/envoyer")
-def envoyer_memoire(req: Request):
+# ---------- compte en ligne ----------
+def _etat_compte():
+    from . import compte
+    e = compte.etat()
+    return {"connecte": compte.connecte(), "email": e.get("email", ""), "prenom": e.get("prenom", ""),
+            "serveur": compte.serveur(), "machine": MACHINE}
+
+
+def _apres_connexion():
+    """Le compte a changé : nouvelle conversation avec la mémoire et les connecteurs de ce compte."""
+    from .agent import prompt_systeme
+    if jarvis is not None:
+        jarvis.reset()
+        jarvis.messages[0]["content"] = prompt_systeme()
+    diffuser(type="reset")
+    threading.Thread(target=connecteurs.demarrer_tous, daemon=True).start()
+
+
+@app.get("/api/compte")
+def lire_compte(req: Request):
     _verifier(req)
-    r = memoire.envoyer_memoire_locale()
-    if r["faits"] and jarvis is not None:
-        try:
-            from .agent import prompt_systeme
-            jarvis.messages[0]["content"] = prompt_systeme()   # nouveaux souvenirs pris en compte tout de suite
-        except Exception:
-            pass
-    return r
+    return _etat_compte()
+
+
+@app.post("/api/compte/{action}")
+async def agir_compte(action: str, req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json() if action in ("inscription", "connexion") else {}
+    try:
+        if action == "inscription":
+            r = await asyncio.to_thread(compte.inscrire, d.get("email", ""), d.get("mot_de_passe", ""), d.get("prenom", ""))
+        elif action == "connexion":
+            r = await asyncio.to_thread(compte.connecter, d.get("email", ""), d.get("mot_de_passe", ""))
+        elif action == "deconnexion":
+            await asyncio.to_thread(compte.deconnecter)
+            r = {}
+        elif action == "importer":   # bouton « Envoyer la mémoire de cet appareil vers mon compte »
+            r = {"import": await asyncio.to_thread(compte.importer_appareil)}
+            await asyncio.to_thread(compte.synchroniser)
+        elif action == "synchroniser":
+            await asyncio.to_thread(compte.synchroniser)
+            r = {}
+        else:
+            raise HTTPException(404, "Action inconnue.")
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    if action in ("inscription", "connexion", "deconnexion", "importer"):
+        _apres_connexion()
+    return {**_etat_compte(), **r}
 
 
 @app.post("/api/fenetre/afficher")
@@ -491,7 +530,7 @@ def etat_appli(req: Request):
     from . import demarrage
     return {"appli": APPLI["active"], "plateforme": "mac" if MAC else "windows" if WIN else "linux",
             "demarrage_auto": demarrage.est_actif(), "machine": MACHINE,
-            "dossier_partage": str(PARTAGE), "ecoute_fond": CONFIG.get("ecoute_fond", True),
+            "ecoute_fond": CONFIG.get("ecoute_fond", True),
             "ecoute_active": bool(APPLI["ecoute"] and APPLI["ecoute"].actif),
             "seuil_eveil": CONFIG.get("seuil_eveil", 0.5), "raccourci": CONFIG.get("raccourci"),
             "silence_fin": CONFIG.get("silence_fin", 2.5)}
@@ -729,6 +768,8 @@ def _demarrer_ollama():
 
 def preparer():
     global jarvis
+    from . import compte
+    compte.au_demarrage()   # mémoire, connecteurs et profil du compte connecté (cache local + synchro)
     if CONFIG.get("cerveau") != "claude":
         _demarrer_ollama()
     if not memoire.SYSTEME.exists():

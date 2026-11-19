@@ -46,6 +46,17 @@ Les commits qui ne touchent pas l'appli (README, CLAUDE.md, CI seule) n'ont pas 
   Mac = remplacement de `/Applications/Jarvis.app` depuis le .dmg (`jarvis/mises_a_jour.py`).
 - Raccourci « Mettre à jour Jarvis » (menu Démarrer / Spotlight) = `Jarvis --maj`, ouvre l'écran Mises à jour.
 
+## Serveur des comptes (VPS)
+
+- Code : `serveur/` (FastAPI + SQLite dans Docker, conteneur `jarvis-comptes`, port 127.0.0.1:8020), exposé par Apache
+  sur https://jarvis.abdelrahimriche.com (`serveur/apache-jarvis.conf`, installé par `sudo bash installer-apache.sh`).
+- Accès SSH : `ssh -i ~/.ssh/cle utilisateur@serveur` (sudo demande le mot de passe de l'utilisateur :
+  lui faire lancer les commandes sudo). 
+- Redéployer après un changement de `serveur/` : `rsync -az --exclude __pycache__ serveur/ utilisateur@serveur:~/jarvis-serveur/`
+  puis `docker compose up -d --build` dans `~/jarvis-serveur`. Ne jamais supprimer le volume `donnees` (comptes des utilisateurs).
+- La clé d'appli (`CLE_APPLI` dans `jarvis/compte.py`) doit être identique dans `serveur/.env` (non versionné) et
+  dans `serveur/apache-jarvis.conf`. Toute modification de l'API doit rester compatible avec les versions déjà installées.
+
 ## Données personnelles
 
 Ne jamais committer `.env`, `config.json`, `memoire/`, `logs/`, jetons ou clés. La mémoire partagée vit dans

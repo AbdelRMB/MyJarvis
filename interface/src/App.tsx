@@ -4,6 +4,7 @@ import { sons } from "./audio/bips";
 import { chargerVoix } from "./audio/tts";
 import { brancherVoix, stopTout } from "./audio/voix";
 import { BarreHaut, BarreLaterale, NavMobile, Toasts } from "./components/Cadre";
+import { Connexion, type Compte } from "./components/Connexion";
 import { Demarrage } from "./components/Demarrage";
 import { api, ouvrirSession } from "./lib/api";
 import { majAudio } from "./stores/audio";
@@ -68,6 +69,7 @@ if (PARAMS.get("vue") === "majs") useReglages.getState().maj({ vue: "majs" });  
 export default function App() {
   const [demarre, setDemarre] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [compte, setCompte] = useState<Compte | null>(null);
   const session = useJarvis((s) => s.session);
   const vue = useReglages((s) => s.vue);
 
@@ -75,6 +77,7 @@ export default function App() {
     ouvrirSession()
       .then((s) => {
         useJarvis.setState({ session: s });
+        api<Compte>("/api/compte").then(setCompte).catch(() => {});
         connecter();
         rafraichirSysteme();
         api<{ appli: boolean; ecoute_active: boolean; silence_fin: number }>("/api/appli")
@@ -109,6 +112,7 @@ export default function App() {
 
   return (
     <div className="grille-hud flex h-full flex-col">
+      {compte && !compte.connecte && <Connexion onConnecte={setCompte} />}
       {!demarre && !FENETRE_BUREAU && <Demarrage pret={!!session} erreur={erreur} nbOutils={session?.nb_outils ?? 0} onDemarrer={demarrer} />}
       <div className="flex min-h-0 flex-1">
         <BarreLaterale />

@@ -32,15 +32,17 @@ npm run build      # recompile jarvis/static
 - Données de ce PC : `%LOCALAPPDATA%\Jarvis` (config, clé API `.env`, journaux `logs\jarvis.log`).
 
 ## macOS
-Le même code tourne sur Mac (outils adaptés : terminal zsh, applis de /Applications, fenêtres via AppleScript, Cmd au lieu de Ctrl, LaunchAgent au démarrage, Trousseau pour les mots de passe, OneDrive pour Mac pour la mémoire partagée).
+Le même code tourne sur Mac (outils adaptés : terminal zsh, applis de /Applications, fenêtres via AppleScript, Cmd au lieu de Ctrl, LaunchAgent au démarrage, Trousseau pour les mots de passe).
 - **Construire sur un Mac** : copie le dossier du projet (sans `.venv`, `dist`, `node_modules`), puis `bash construire-mac.sh` -> `installateur/Jarvis-<version>-mac-<arm64|x86_64>.dmg`.
 - **Ou sans Mac** : pousse le projet sur un dépôt GitHub privé, onglet Actions > « Jarvis macOS » > Run workflow -> le .dmg (puce Apple et Intel) est dans les Artifacts.
 - **Installer** : ouvre le .dmg, glisse Jarvis dans Applications, puis **clic droit > Ouvrir** la première fois (appli non signée par Apple). Autorise ensuite le micro, l'Accessibilité (raccourcis, souris, clavier) et l'Enregistrement de l'écran (vision) dans Réglages Système > Confidentialité et sécurité.
 - Icône dans la barre des menus ; appel : « Jarvis, … » ou ⌃ Ctrl + ⌥ Option + J ; arrêt : « Jarvis, stop » ou ⌃ Ctrl + ⌥ Option + S.
 
-## Plusieurs PC, une seule mémoire
-- Dossier partagé : `OneDrive\Jarvis` (souvenirs, historique — un fichier par PC et par jour —, connecteurs, prénom et choix du cerveau).
-- Sur un autre PC : même compte OneDrive, installe Jarvis, colle ta clé API (Réglages > Cerveau) et ressaisis les mots de passe des connecteurs (ils restent dans le Gestionnaire d'identifiants Windows de chaque PC, jamais sur OneDrive).
+## Comptes : une mémoire par personne, sur tous ses appareils
+- Au lancement : créer un compte ou se connecter. Mémoire, historique, connecteurs et réglages sont dans le compte (serveur `serveur/`, hébergé sur le VPS : https://jarvis.abdelrahimriche.com, réservé à l'appli).
+- Clé API et mots de passe des connecteurs : chiffrés sur l'appareil avec le mot de passe du compte (le serveur ne peut pas les lire).
+- 1re connexion sur un appareil : sa mémoire existante (ancienne version, OneDrive) est versée dans le compte, sans doublon.
+- Serveur : `serveur/app.py` (FastAPI + SQLite, Docker). Redéployer : `rsync` de `serveur/` vers `~/jarvis-serveur/` sur le VPS puis `docker compose up -d --build`.
 
 ## Connecteurs
 Écran **Connecteurs** : Gmail (mot de passe d'application), autre messagerie IMAP, agenda (lien iCal secret), GitHub, Notion, et **n'importe quel serveur MCP** (Spotify, Slack, Home Assistant…). Leurs outils s'ajoutent à Jarvis.
