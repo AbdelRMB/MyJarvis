@@ -4,6 +4,7 @@ import { sons } from "./audio/bips";
 import { chargerVoix } from "./audio/tts";
 import { brancherVoix, stopTout } from "./audio/voix";
 import { BarreHaut, BarreLaterale, NavMobile, Toasts } from "./components/Cadre";
+import { BandeauAutorisations } from "./components/Autorisations";
 import { Connexion, type Compte } from "./components/Connexion";
 import { Demarrage } from "./components/Demarrage";
 import { api, ouvrirSession } from "./lib/api";
@@ -113,6 +114,7 @@ export default function App() {
   return (
     <div className="grille-hud flex h-full flex-col">
       {compte && !compte.connecte && <Connexion onConnecte={setCompte} />}
+      {compte?.connecte && FENETRE_BUREAU && <BandeauAutorisations />}
       {!demarre && !FENETRE_BUREAU && <Demarrage pret={!!session} erreur={erreur} nbOutils={session?.nb_outils ?? 0} onDemarrer={demarrer} />}
       <div className="flex min-h-0 flex-1">
         <BarreLaterale />

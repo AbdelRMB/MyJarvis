@@ -493,6 +493,34 @@ async def afficher_fenetre(req: Request):
     return {"ok": bool(APPLI["afficher"])}
 
 
+# ---------- autorisations du système (micro, écran, accessibilité, fichiers, applis) ----------
+@app.get("/api/autorisations")
+def lire_autorisations(req: Request):
+    _verifier(req)
+    from . import autorisations
+    return autorisations.etat()
+
+
+@app.post("/api/autorisations/{action}")
+async def agir_autorisation(action: str, req: Request):
+    _verifier(req)
+    from . import autorisations
+    d = await req.json()
+    if action == "demander":
+        r = await asyncio.to_thread(autorisations.demander, d["id"])
+    elif action == "retirer":
+        r = await asyncio.to_thread(autorisations.retirer, d["id"])
+    elif action == "reglages":
+        autorisations.ouvrir_reglages(d["id"])
+        r = "reglages"
+    elif action == "ignorer":
+        autorisations.ignorer(d.get("ids", []))
+        r = "ignore"
+    else:
+        raise HTTPException(404, "Action inconnue.")
+    return {"resultat": r, **autorisations.etat()}
+
+
 # ---------- mises à jour ----------
 @app.get("/api/majs")
 def lister_majs(req: Request):

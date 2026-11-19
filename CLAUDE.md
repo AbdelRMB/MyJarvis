@@ -98,6 +98,10 @@ Vérification avant commit : `cd interface && npx tsc -p .`
 ## 3. Construire les installateurs
 
 - **Mac** (sur un Mac) : `bash construire-mac.sh` → `installateur/Jarvis-<version>-mac-<arm64|x86_64>.dmg`.
+  Le script signe avec un certificat Apple s'il en trouve un (`Developer ID Application`, sinon `Apple Development`,
+  ou `JARVIS_SIGNATURE="nom du certificat"`). Une signature stable est indispensable : macOS y rattache les
+  autorisations (micro, écran, accessibilité, fichiers). Sans certificat (signature ad hoc), elles sont perdues à
+  chaque nouvelle version.
   Si `codesign` refuse (« resource fork… »), le script retire déjà les attributs Finder (`xattr -cr`).
 - **Windows** (sur un PC) : installer **Inno Setup 6** (`winget install JRSoftware.InnoSetup`), puis `construire.bat`
   → `installateur\JarvisSetup-<version>.exe`.

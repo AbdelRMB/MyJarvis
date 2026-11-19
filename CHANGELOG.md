@@ -8,6 +8,8 @@ Chaque section `## x.y.z` devient la description de la mise à jour affichée da
 - **Moins d'attente au démarrage sur Mac** : le trousseau n'est plus relu à chaque échange avec le serveur.
 - **Pas de doublon d'historique** quand la même ancienne mémoire est trouvée à deux endroits sur un appareil.
 - **Bouton « Actualiser » dans l'écran Mémoire** : récupère tout de suite ce que tes autres appareils ont appris, sans attendre la synchronisation automatique.
+- **Autorisations demandées une seule fois** (Mac) : l'appli est maintenant signée avec un certificat Apple, donc macOS garde le micro, l'écran, l'accessibilité et l'accès aux fichiers d'une mise à jour à l'autre. Au premier lancement, Jarvis les demande une fois (tu acceptes ou non) et ne redemande plus. Après cette mise à jour, il faudra les accorder une dernière fois.
+- **Nouvel onglet Réglages › Autorisations** : voir chaque accès, l'accorder, le retirer ou ouvrir le bon réglage du système.
 - **Jarvis ne bloque plus l'arrêt de l'ordinateur** : à l'extinction, au redémarrage ou à la déconnexion (Windows et Mac), il se ferme tout de suite au lieu de se cacher.
 - **Mises à jour sans jeton GitHub** : le projet est maintenant public (github.com/AbdelRMB/MyJarvis), plus rien à configurer pour recevoir les nouvelles versions.
 

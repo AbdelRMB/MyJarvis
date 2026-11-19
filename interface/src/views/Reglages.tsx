@@ -1,9 +1,10 @@
-import { AppWindow, Brain, Cloud, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Volume2, Zap } from "lucide-react";
+import { AppWindow, Brain, Cloud, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Volume2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { crete, micro } from "../audio/micro";
 import { sons } from "../audio/bips";
 import { chargerVoix, listerVoixServeur, parler, taire, type VoixServeur } from "../audio/tts";
 import { transcrire } from "../audio/voix";
+import { OngletAutorisations } from "../components/Autorisations";
 import { Bouton, Curseur, EnTetePage, Interrupteur, Onglets, Panneau, Selecteur } from "../components/ui";
 import { VuMetre } from "../components/VuMetre";
 import { api } from "../lib/api";
@@ -16,7 +17,7 @@ import { DEFAUT, useReglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { rafraichirSysteme } from "../stores/systeme";
 
-type Onglet = "micro" | "voix" | "cerveau" | "application" | "interface";
+type Onglet = "micro" | "voix" | "cerveau" | "application" | "autorisations" | "interface";
 
 type EtatAppli = {
   appli: boolean;
@@ -683,6 +684,7 @@ export function VueReglages() {
           { id: "voix", libelle: "Voix", icone: <Volume2 /> },
           { id: "cerveau", libelle: "Cerveau", icone: <Brain /> },
           { id: "application", libelle: "Application", icone: <AppWindow /> },
+          { id: "autorisations", libelle: "Autorisations", icone: <ShieldCheck /> },
           { id: "interface", libelle: "Interface", icone: <Monitor /> },
         ]}
       />
@@ -691,6 +693,7 @@ export function VueReglages() {
         {onglet === "voix" && <OngletVoix />}
         {onglet === "cerveau" && <OngletCerveau />}
         {onglet === "application" && <OngletApplication />}
+        {onglet === "autorisations" && <OngletAutorisations />}
         {onglet === "interface" && <OngletInterface />}
       </div>
     </div>
