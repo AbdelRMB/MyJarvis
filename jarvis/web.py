@@ -926,7 +926,7 @@ def preparer():
 
     def apres_synchro(changements):
         """Un autre appareil a modifié le compte : Jarvis tient compte des nouveaux souvenirs dès maintenant."""
-        if jarvis is not None and (changements["faits"] or changements["reglages"]):
+        if jarvis is not None and (changements["faits_texte"] or changements["reglages"]):
             from .agent import prompt_systeme
             jarvis.messages[0]["content"] = prompt_systeme()
         if changements["connecteurs"]:

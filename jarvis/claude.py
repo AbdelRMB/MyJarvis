@@ -145,11 +145,14 @@ def _parametres_requete():
         model=CONFIG["claude_modele"],
         max_tokens=16000,
         # réflexion adaptative : à effort « low », le modèle saute la réflexion sur les demandes simples (réactif à l'oral)
-        thinking={"type": "adaptive", "display": "summarized"},
+        # la mémoire (dans les instructions) peut changer en cours de conversation (synchro entre appareils) :
+        # les anciens blocs de réflexion sont alors ignorés au lieu de faire échouer la requête
+        thinking={"type": "adaptive", "display": "summarized",
+                  "block_binding": {"prefix_mismatch_behavior": "drop_block"}},
         output_config={"effort": CONFIG["claude_effort"]},
         cache_control={"type": "ephemeral"},   # met en cache tout le début de conversation, automatiquement
         # si le modèle refuse une demande (faux positif de sécurité), l'API la rejoue sur un modèle de secours
-        betas=["server-side-fallback-2026-07-01"],
+        betas=["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01"],
         fallbacks="default",
     )
 

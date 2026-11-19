@@ -431,8 +431,8 @@ _dernier_coffre = {"blob": None}
 def synchroniser() -> dict:
     """Récupère du serveur l'état du compte : souvenirs ajoutés, modifiés ou supprimés sur un autre appareil,
     nouvel historique, réglages, connecteurs, secrets. Renvoie ce qui a changé ici."""
-    changements = {"faits": False, "historique": 0, "reglages": False, "connecteurs": False, "coffre": False,
-                   "automatisations": False}
+    changements = {"faits": False, "faits_texte": False, "historique": 0, "reglages": False, "connecteurs": False,
+                   "coffre": False, "automatisations": False}
     if not connecte():
         return changements
     from . import memoire
@@ -443,9 +443,13 @@ def synchroniser() -> dict:
         faits = [{k: x[k] for k in ("fait", "categorie", "date", "fid", "modifie") if k in x}
                  for x in _appel("GET", "/v1/faits")]
         with _verrou:   # une modification faite ici pendant l'appel n'est pas écrasée : on la laisse partir d'abord
-            if not _lire_attente() and faits != memoire._charger():
+            avant = memoire._charger()
+            if not _lire_attente() and faits != avant:
                 memoire._sauver(faits)   # ajout, suppression ou modification : le serveur fait foi
                 changements["faits"] = True
+                # le TEXTE a-t-il changé (et pas seulement la date d'utilisation) ? Seulement alors Jarvis relit sa mémoire
+                changements["faits_texte"] = sorted((x["fait"], x.get("categorie")) for x in faits) != \
+                    sorted((x["fait"], x.get("categorie")) for x in avant)
         d = dossier()
         curseur_f = d / "historique.curseur"
         depuis = int(curseur_f.read_text()) if curseur_f.exists() else 0

@@ -4,6 +4,7 @@ Chaque section `## x.y.z` devient la description de la mise à jour affichée da
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
 ## 1.2.1
+- **Corrigé : « Invalid signature in thinking block »** (cerveau Claude). L'erreur survenait souvent quand la mémoire changeait en pleine conversation (synchronisation entre appareils). Jarvis ne relit maintenant ses souvenirs que si leur texte change, et l'API ignore les anciens blocs de réflexion au lieu de refuser la demande.
 - **Le bouton STOP coupe vraiment** : l'action en cours (commande, script, souris, téléchargement…) est interrompue tout de suite et les programmes qu'elle a lancés sont fermés, au lieu d'aller jusqu'au bout. Pareil avec Échap, « Jarvis, stop » et Ctrl+Alt+S. / **STOP really stops**: the running action is interrupted immediately.
 
 ## 1.2.0
