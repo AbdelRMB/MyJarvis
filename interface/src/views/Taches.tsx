@@ -44,7 +44,7 @@ export function VueTaches() {
   const [detail, setDetail] = useState<Tache | null>(null);
   const [nouvelle, setNouvelle] = useState({ consigne: "", projet: "", outil: "claude_code" });
   const [ajout, setAjout] = useState("");
-  const fin = useRef<HTMLDivElement>(null);
+  const defilement = useRef<HTMLDivElement>(null);
 
   const charger = () => api<Resume[]>("/api/taches").then(setListe).catch(() => {});
   const chargerDetail = (id: string) => api<Tache>(`/api/taches/${id}`).then(setDetail).catch(() => {});
@@ -63,7 +63,11 @@ export function VueTaches() {
     choisieRef.current = choisie;
     if (choisie) chargerDetail(choisie);
   }, [choisie]);
-  useEffect(() => fin.current?.scrollIntoView({ block: "end" }), [detail?.journal.length]);
+  // on fait défiler le journal lui-même : scrollIntoView décalait aussi toute la fenêtre (écran noir)
+  useEffect(() => {
+    const d = defilement.current;
+    if (d) d.scrollTop = d.scrollHeight;
+  }, [detail?.id, detail?.journal?.length]);
 
   const creer = async () => {
     try {
@@ -184,8 +188,8 @@ export function VueTaches() {
                   </Bouton>
                 </div>
               </div>
-              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
-                {detail.journal.map((e, i) => {
+              <div ref={defilement} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+                {(detail.journal ?? []).map((e, i) => {
                   const [qui, Icone] = QUI[e.genre] ?? [e.genre, CircleDot];
                   return (
                     <div key={i} className={cx("flex gap-2 text-[13px]", e.genre === "outil" && "text-doux")}>
@@ -194,12 +198,11 @@ export function VueTaches() {
                         <span className="mr-2 font-mono text-[10px] text-tres-doux">
                           {new Date(e.ts * 1000).toLocaleTimeString()} · {t(qui)}
                         </span>
-                        <span className={cx("whitespace-pre-wrap break-words", e.genre === "outil" && "font-mono text-[12px]")}>{e.texte}</span>
+                        <span className={cx("whitespace-pre-wrap break-words", e.genre === "outil" && "font-mono text-[12px]")}>{String(e.texte ?? "")}</span>
                       </div>
                     </div>
                   );
                 })}
-                <div ref={fin} />
               </div>
               <div className="flex gap-2 border-t border-ligne p-3">
                 <Champ

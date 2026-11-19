@@ -165,7 +165,7 @@ export function BarreHaut() {
   }, []);
 
   return (
-    <header className="flex h-16 flex-none items-center gap-3 border-b border-ligne bg-surface/50 px-4 backdrop-blur md:px-6">
+    <header className="relative z-30 flex h-16 flex-none items-center gap-3 border-b border-ligne bg-surface/50 px-4 backdrop-blur md:px-6">
       <div className="flex items-center rounded-md border border-ligne bg-surface-2 p-0.5" role="radiogroup" aria-label={t("Mode du micro")}>
         {MODES.map((m) => (
           <button

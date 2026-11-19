@@ -10,6 +10,7 @@ import { BandeauAutorisations } from "./components/Autorisations";
 import { toast } from "./stores/toasts";
 import { Connexion, type Compte } from "./components/Connexion";
 import { Demarrage } from "./components/Demarrage";
+import { GardeVue } from "./components/GardeVue";
 import { api, ouvrirSession } from "./lib/api";
 import { majAudio } from "./stores/audio";
 import { bus, connecter, useJarvis } from "./stores/jarvis";
@@ -153,9 +154,10 @@ export default function App() {
       {!demarre && !FENETRE_BUREAU && <Demarrage pret={!!session} erreur={erreur} nbOutils={session?.nb_outils ?? 0} onDemarrer={demarrer} />}
       <div className="flex min-h-0 flex-1">
         <BarreLaterale />
-        <main className="flex min-w-0 flex-1 flex-col">
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <BarreHaut />
           <div className="min-h-0 flex-1">
+            <GardeVue cle={vue}>
             {vue === "assistant" && <VueAssistant />}
             {vue === "historique" && <VueHistorique />}
             {vue === "memoire" && <VueMemoire />}
@@ -168,6 +170,7 @@ export default function App() {
             {vue === "automatisations" && <VueAutomatisations />}
             {vue === "taches" && <VueTaches />}
             {vue === "appareils" && <VueAppareils />}
+            </GardeVue>
           </div>
         </main>
       </div>

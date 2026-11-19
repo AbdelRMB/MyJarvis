@@ -3,6 +3,11 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.6.0
+- **Tâches de code vraiment en arrière-plan** : Claude Code et Codex ne font plus apparaître de fenêtres noires sur Windows pendant qu'ils travaillent. / **Coding tasks run silently** on Windows, no more console windows.
+- **Notifications au premier plan** : la liste de la cloche passe au-dessus de la conversation. / **Notifications** now show above the conversation.
+- **Plus d'écran noir** en changeant de tâche ou d'onglet : la fenêtre ne se décale plus, et si une page plante, un message s'affiche à la place avec « Réessayer ». / **No more black screen** when switching tasks or tabs.
+
 ## 1.5.0
 - **Jarvis sur ton téléphone** : ouvre https://jarvis.abdelrahimriche.com/mobile/ sur ton iPhone ou Android, connecte-toi avec ton compte et ajoute-la à l'écran d'accueil. Choisis ton ordinateur, parle ou écris : il exécute et te répond à voix haute. Tes demandes sont chiffrées sur le téléphone (ton mot de passe n'en sort pas) : le serveur ne peut pas les lire. / **Jarvis on your phone**: a web app to control your computers by voice.
 - **Mise à jour à distance** : dans « Mes appareils » (et sur le téléphone), un appareil allumé avec une ancienne version a un bouton « Mettre à jour » : il télécharge, s'installe et redémarre tout seul (à partir de la 1.4.0). / **Remote update** of your other devices.

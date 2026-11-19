@@ -249,10 +249,10 @@ def scanner_systeme():
     from .outils.systeme import _raccourcis
     def cmd(c):
         try:
-            return subprocess.run(c, capture_output=True, text=True, timeout=10, shell=True).stdout.strip()
+            return subprocess.run(c, capture_output=True, text=True, timeout=10, shell=True, **CACHE_FENETRE).stdout.strip()
         except Exception:
             return ""
-    from .plateforme import MAC, NOM_OS
+    from .plateforme import CACHE_FENETRE, MAC, NOM_OS
     import getpass
     gpu = cmd("sysctl -n machdep.cpu.brand_string") if MAC else cmd("nvidia-smi --query-gpu=name,memory.total --format=csv,noheader")
     apps = sorted({p.stem for p in _raccourcis() if "uninstall" not in p.stem.lower() and "désinstall" not in p.stem.lower()})

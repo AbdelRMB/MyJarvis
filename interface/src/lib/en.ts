@@ -372,6 +372,8 @@ export const EN: Record<string, string> = {
   "Tout marquer comme lu": "Mark all as read",
   "Tout effacer": "Clear all",
   "Aucune notification.": "No notifications.",
+  "Cette page a rencontré un problème.": "This page ran into a problem.",
+  "Réessayer": "Try again",
   "expirée": "expired",
   "expire dans {n} jour(s)": "expires in {n} day(s)",
   "expire dans {n} h": "expires in {n} h",

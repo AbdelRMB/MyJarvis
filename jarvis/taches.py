@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .config import CONFIG, RACINE
+from .plateforme import CACHE_FENETRE
 
 DOSSIER = RACINE / "taches"
 MAX_ETAPES = 40
@@ -177,7 +178,7 @@ def demarrer(tid: str):
 
 # ---------- branche / copie de travail ----------
 def _git(dossier, *args, verifier=True):
-    r = subprocess.run(["git", "-C", str(dossier), *args], capture_output=True, text=True)
+    r = subprocess.run(["git", "-C", str(dossier), *args], capture_output=True, text=True, **CACHE_FENETRE)
     if verifier and r.returncode:
         raise RuntimeError(r.stderr.strip() or r.stdout.strip())
     return r.stdout.strip()
@@ -187,7 +188,7 @@ def _preparer(t: dict):
     if t.get("dossier") and Path(t["dossier"]).is_dir():
         return
     projet = Path(t["projet"])
-    if subprocess.run(["git", "-C", str(projet), "rev-parse", "--is-inside-work-tree"], capture_output=True).returncode:
+    if subprocess.run(["git", "-C", str(projet), "rev-parse", "--is-inside-work-tree"], capture_output=True, **CACHE_FENETRE).returncode:
         t["dossier"], t["branche"] = str(projet), ""
         _noter(t, "info", "Ce dossier n'est pas un dépôt git : travail directement dedans, sans branche.")
         return
@@ -224,7 +225,7 @@ def _claude(t, a, message) -> dict:
     if t.get("session"):
         cmd += ["--resume", t["session"]]
     p = subprocess.Popen(cmd, cwd=t["dossier"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                         text=True, bufsize=1, start_new_session=True, env=agents_code._env())
+                         text=True, bufsize=1, start_new_session=True, env=agents_code._env(), **CACHE_FENETRE)
     a["proc"] = p
     res = {"texte": "", "erreur": False, "refus": [], "interrompu": False}
     for ligne in p.stdout:
@@ -269,7 +270,7 @@ def _codex(t, a, message) -> dict:
     res = {"texte": "", "erreur": False, "refus": [], "interrompu": False}
     for essai in (1, 2):
         p = subprocess.Popen(cmd, cwd=t["dossier"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                             stdin=subprocess.DEVNULL, text=True, bufsize=1, start_new_session=True, env=agents_code._env())
+                             stdin=subprocess.DEVNULL, text=True, bufsize=1, start_new_session=True, env=agents_code._env(), **CACHE_FENETRE)
         a["proc"] = p
         lignes_brutes = []
         for ligne in p.stdout:
