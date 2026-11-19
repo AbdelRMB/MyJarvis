@@ -1,4 +1,5 @@
-"""Mises à jour de Jarvis depuis les GitHub Releases du dépôt (privé : jeton en lecture seule).
+"""Mises à jour de Jarvis depuis les GitHub Releases du dépôt (public : aucun jeton nécessaire ;
+un jeton GitHub reste possible pour un dépôt privé ou pour dépasser la limite de 60 requêtes/heure).
 
 - lister()     : versions plus récentes que celle installée, avec leur description (CHANGELOG.md).
 - installer(v) : télécharge l'installateur de la version v pour cet appareil, quitte Jarvis,
@@ -46,8 +47,10 @@ def definir_jeton(valeur: str):
 
 
 def _entetes(binaire=False):
-    h = {"Authorization": f"Bearer {jeton()}", "X-GitHub-Api-Version": "2022-11-28",
+    h = {"X-GitHub-Api-Version": "2022-11-28", "User-Agent": "Jarvis",
          "Accept": "application/octet-stream" if binaire else "application/vnd.github+json"}
+    if jeton():
+        h["Authorization"] = f"Bearer {jeton()}"
     return h
 
 
@@ -67,16 +70,16 @@ def _fichier_attendu(version: str) -> str:
 # ---------- liste ----------
 def lister() -> dict:
     base = {"version": VERSION, "jeton": bool(jeton()), "installee": GELE, "majs": [], "erreur": ""}
-    if not base["jeton"]:
-        return base
     try:
         r = requests.get(f"{API}/releases?per_page=50", headers=_entetes(), timeout=15)
     except requests.RequestException as e:
         return {**base, "erreur": f"GitHub injoignable : {e}"}
-    if r.status_code in (401, 403):
-        return {**base, "erreur": "Jeton GitHub refusé (expiré, ou sans accès en lecture au dépôt)."}
+    if r.status_code == 401:
+        return {**base, "erreur": "Jeton GitHub refusé (expiré) : retire-le ou remplace-le."}
+    if r.status_code == 403:
+        return {**base, "erreur": "GitHub limite les vérifications : réessaie dans une heure."}
     if r.status_code == 404:
-        return {**base, "erreur": f"Dépôt {DEPOT} introuvable avec ce jeton (vérifie qu'il a accès à ce dépôt)."}
+        return {**base, "erreur": f"Dépôt {DEPOT} introuvable."}
     if not r.ok:
         return {**base, "erreur": f"GitHub a répondu {r.status_code}."}
     majs = []

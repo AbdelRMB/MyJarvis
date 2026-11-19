@@ -111,13 +111,46 @@ def main():
         except Exception:
             traceback.print_exc()
 
+    def fermeture_systeme_mac() -> bool:
+        """Mac : déconnexion, redémarrage ou extinction envoient l'Apple Event « quit » (un clic sur la croix,
+        non). Dans ce cas Jarvis doit se fermer, sinon macOS affiche « Jarvis a interrompu la déconnexion »."""
+        if sys.platform != "darwin":
+            return False
+        try:
+            import Foundation
+            ev = Foundation.NSAppleEventManager.sharedAppleEventManager().currentAppleEvent()
+            return ev is not None and ev.eventClass() == 0x61657674 and ev.eventID() == 0x71756974   # 'aevt' 'quit'
+        except Exception:
+            return False
+
     def en_fermeture():
         if etat["quitter"]:
+            return True
+        if fermeture_systeme_mac():
+            etat.update(quitter=True, fin_session=True)
             return True
         threading.Thread(target=fen.hide, daemon=True).start()
         return False              # annule la fermeture : la fenêtre est seulement cachée
 
     fen.events.closing += en_fermeture
+
+    def surveiller_arret_windows():
+        """Windows : à l'arrêt / redémarrage / déconnexion, la fenêtre reçoit une fermeture « WindowsShutDown ».
+        On la laisse passer (sinon Jarvis bloque l'arrêt de Windows : « Cette application empêche l'arrêt »)."""
+        try:
+            from webview.platforms.winforms import BrowserView
+            formulaire = BrowserView.instances[fen.uid]
+
+            def sur_fermeture(_expediteur, args):
+                if str(args.CloseReason) in ("WindowsShutDown", "TaskManagerClosing"):
+                    etat.update(quitter=True, fin_session=True)
+                    args.Cancel = False   # passe après le gestionnaire de pywebview, qui avait annulé
+            formulaire.FormClosing += sur_fermeture
+        except Exception as e:
+            print(f"  ! Surveillance de l'arrêt de Windows : {e}")
+
+    if sys.platform == "win32":
+        fen.events.shown += surveiller_arret_windows
     # NB : on ne touche pas à WebView2 pour autoriser le micro (bloquait tout le processus) :
     # Windows le demande une fois, le choix est mémorisé (storage_path).
 
@@ -183,6 +216,13 @@ def main():
     webview.start(private_mode=False, storage_path=str(RACINE / "webview"))
 
     serveur.should_exit = True
+    if etat.get("fin_session"):
+        # l'ordinateur s'éteint : on part tout de suite (la mémoire est déjà synchronisée à chaque écriture)
+        try:
+            ecoute.arreter()
+        except Exception:
+            pass
+        os._exit(0)
     try:
         print("Je mémorise ce que j'ai appris...")
         for f in web.jarvis.extraire_souvenirs():

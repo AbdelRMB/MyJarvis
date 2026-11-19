@@ -1,4 +1,4 @@
-import { Brain, Plus, Search, Sparkles, Trash2 } from "lucide-react";
+import { Brain, Plus, RefreshCw, Search, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -23,6 +23,24 @@ export function VueMemoire() {
   const [nouveau, setNouveau] = useState("");
   const [nouvelleCat, setNouvelleCat] = useState("general");
   const [analyse, setAnalyse] = useState(false);
+  const [actualisation, setActualisation] = useState(false);
+
+  /** Récupère du compte ce que tes autres appareils ont appris (sans attendre la synchro automatique). */
+  const actualiser = async () => {
+    setActualisation(true);
+    try {
+      const avant = faits.length;
+      await api("/api/compte/synchroniser", { method: "POST" });
+      const apres = await api<Fait[]>("/api/memoire");
+      setFaits(apres);
+      const n = apres.length - avant;
+      toast(n > 0 ? `${n} nouveau${n > 1 ? "x" : ""} souvenir${n > 1 ? "s" : ""} récupéré${n > 1 ? "s" : ""}.` : "Mémoire à jour.", "succes");
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setActualisation(false);
+    }
+  };
 
   const charger = () => api<Fait[]>("/api/memoire").then(setFaits).catch((e) => toast(e.message, "erreur"));
   useEffect(() => {
@@ -85,9 +103,14 @@ export function VueMemoire() {
         titre="Mémoire"
         sousTitre={`${faits.length} souvenirs sur toi — Jarvis les relit à chaque conversation.`}
         actions={
-          <Bouton icone={<Sparkles className="size-4" />} chargement={analyse} onClick={memoriserSession}>
-            Mémoriser la session
-          </Bouton>
+          <div className="flex flex-wrap gap-2">
+            <Bouton variante="fantome" icone={<RefreshCw className="size-4" />} chargement={actualisation} onClick={actualiser}>
+              Actualiser
+            </Bouton>
+            <Bouton icone={<Sparkles className="size-4" />} chargement={analyse} onClick={memoriserSession}>
+              Mémoriser la session
+            </Bouton>
+          </div>
         }
       />
 

@@ -19,8 +19,8 @@ Ce dépôt contient un guide d'installation pour [Claude Code](https://claude.co
 
 1. Installe Claude Code, puis récupère le projet :
    ```bash
-   git clone https://github.com/AbdelRMB/Jarvis-real.git
-   cd Jarvis-real
+   git clone https://github.com/AbdelRMB/MyJarvis.git
+   cd MyJarvis
    claude
    ```
 2. Dis-lui simplement : **« Installe Jarvis »**.
@@ -35,7 +35,7 @@ d'installer un logiciel sur ton ordinateur, et c'est toi qui tapes les mots de p
 
 ### 1. Télécharger
 
-Va dans l'onglet **[Releases](https://github.com/AbdelRMB/Jarvis-real/releases)** et prends la dernière version :
+Va dans l'onglet **[Releases](https://github.com/AbdelRMB/MyJarvis/releases)** et prends la dernière version :
 
 | Ton ordinateur | Fichier |
 |---|---|

@@ -21,7 +21,7 @@ export function VueMisesAJour() {
     try {
       const r = await api<Etat>("/api/majs");
       setE(r);
-      if (r.jeton && !r.erreur && r.majs.length === 0) toast(`Jarvis est à jour (version ${r.version}).`, "succes");
+      if (!r.erreur && r.majs.length === 0) toast(`Jarvis est à jour (version ${r.version}).`, "succes");
     } catch (x) {
       toast((x as Error).message, "erreur");
     } finally {
@@ -85,16 +85,15 @@ export function VueMisesAJour() {
         </Panneau>
       )}
 
-      {e && (!e.jeton || e.erreur.startsWith("Jeton")) && (
+      {e && e.erreur.startsWith("Jeton") && (
         <Panneau titre="Accès aux mises à jour" icone={<KeyRound />} className="mb-4">
           <p className="text-sm leading-relaxed text-doux">
-            Les versions de Jarvis sont publiées sur ton dépôt GitHub privé. Colle ici un jeton en lecture seule (une fois par appareil, il reste dans
-            le trousseau de cet appareil) : github.com › Settings › Developer settings › Fine-grained tokens › Generate new token › Repository access :
-            <span className="font-mono text-hud"> jarvis-real</span> › Permissions : <span className="font-mono text-hud">Contents : Read-only</span>.
+            Ton jeton GitHub n'est plus valide. Les mises à jour n'en ont pas besoin (le dépôt est public) : laisse le champ vide et enregistre pour le
+            retirer, ou colle un nouveau jeton.
           </p>
           <div className="mt-3 flex gap-2">
             <Champ type="password" placeholder="github_pat_…" value={jeton} onChange={(x) => setJeton(x.target.value)} className="flex-1" />
-            <Bouton variante="primaire" disabled={!jeton.trim()} onClick={enregistrerJeton}>
+            <Bouton variante="primaire" onClick={enregistrerJeton}>
               Enregistrer
             </Bouton>
           </div>
@@ -108,7 +107,7 @@ export function VueMisesAJour() {
         </p>
       )}
 
-      {e?.jeton && !e.erreur && e.majs.length === 0 && (
+      {e && !e.erreur && e.majs.length === 0 && (
         <div className="flex items-center gap-3 rounded-md border border-vert/40 bg-vert/5 p-4 text-sm">
           <CheckCircle2 className="size-5 text-vert" /> Jarvis est à jour.
         </div>
