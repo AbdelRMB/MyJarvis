@@ -3,6 +3,11 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.4.0
+- **Mes appareils** : nouvel onglet avec tous les ordinateurs où Jarvis est connecté à ton compte — allumé ou non, Jarvis disponible ou occupé, version, dernière activité. Tu peux déconnecter n'importe lequel depuis n'importe quel autre (ses clés sont alors retirées). / **My devices**: see and disconnect every device signed in to your account.
+- **Pilote tes autres appareils** : « sur mon PC, lance Discord », « quel est l'espace disque du PC ? », « envoie-moi le fichier rapport.pdf du bureau du PC ». Le Jarvis de l'autre appareil l'exécute avec ses propres outils et te répond (environ 1 seconde + le temps de l'action). Fichiers dans les deux sens (10 Mo max). / **Control your other devices** by voice.
+- **Sécurité** : chaque ordre est chiffré et signé avec la clé de ton compte (dérivée de ton mot de passe) : le serveur ne peut ni les lire ni en fabriquer. Pour chaque appareil, tu choisis : accepter les ordres (directement ou avec « Autoriser / Refuser ») ou les refuser. Tout est journalisé des deux côtés.
+
 ## 1.3.0
 - **Automatisations de tout type** : à heure fixe (choix des jours), toutes les X minutes, au démarrage ou à l'arrivée d'un mail. L'action peut être n'importe quelle demande à Jarvis (« lis-moi mon agenda », « vérifie mon serveur »…) : il la fait dans son coin et te lit le résultat. / **Any kind of automation**: scheduled, interval, startup or email.
 - **Cloche de notifications** dans la barre du haut : tâches terminées, automatisations, connexions à renouveler… tout ce qui s'est passé pendant ton absence. / **Notification bell**.

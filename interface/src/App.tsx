@@ -24,10 +24,11 @@ import { VueMemoire } from "./views/Memoire";
 import { VueReglages } from "./views/Reglages";
 import { VueAutomatisations } from "./views/Automatisations";
 import { VueTaches } from "./views/Taches";
+import { VueAppareils } from "./views/Appareils";
 import { VueMisesAJour } from "./views/MisesAJour";
 import { VueSysteme } from "./views/Systeme";
 
-const VUES: Vue[] = ["assistant", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "systeme", "reglages", "majs"];
+const VUES: Vue[] = ["assistant", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "appareils", "systeme", "reglages", "majs"];
 
 function useRaccourcis() {
   useEffect(() => {
@@ -110,6 +111,13 @@ export default function App() {
 
   useRaccourcis();
 
+  // déconnecté depuis un autre appareil : retour à l'écran de connexion
+  useEffect(() => {
+    const sur = () => location.reload();
+    bus.addEventListener("compte_deconnecte", sur);
+    return () => bus.removeEventListener("compte_deconnecte", sur);
+  }, []);
+
   // Automatisations : Jarvis prévient à voix haute (voix choisie dans Réglages › Voix), même fenêtre cachée
   useEffect(() => {
     const sur = (ev: Event) => {
@@ -159,6 +167,7 @@ export default function App() {
             {vue === "majs" && <VueMisesAJour />}
             {vue === "automatisations" && <VueAutomatisations />}
             {vue === "taches" && <VueTaches />}
+            {vue === "appareils" && <VueAppareils />}
           </div>
         </main>
       </div>

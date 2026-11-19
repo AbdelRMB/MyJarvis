@@ -61,6 +61,15 @@ CREATE TABLE IF NOT EXISTS journal_memoire (
     fid TEXT NOT NULL, action TEXT NOT NULL, fait TEXT NOT NULL, categorie TEXT NOT NULL DEFAULT '',
     appareil TEXT NOT NULL DEFAULT '', ts REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS journal_par_utilisateur ON journal_memoire (utilisateur, ts);
+CREATE TABLE IF NOT EXISTS appareils (
+    jeton_hash TEXT PRIMARY KEY, utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    nom TEXT NOT NULL DEFAULT '', plateforme TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '',
+    vu REAL NOT NULL DEFAULT 0, occupe INTEGER NOT NULL DEFAULT 0, accepte INTEGER NOT NULL DEFAULT 1,
+    mode TEXT NOT NULL DEFAULT 'libre', cree REAL NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS ordres (
+    id TEXT PRIMARY KEY, utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    de TEXT NOT NULL, vers TEXT NOT NULL, blob TEXT NOT NULL, reponse TEXT, livre INTEGER NOT NULL DEFAULT 0,
+    cree REAL NOT NULL, repondu REAL);
 CREATE TABLE IF NOT EXISTS documents (
     utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE, nom TEXT NOT NULL,
     contenu TEXT NOT NULL, modifie REAL NOT NULL, PRIMARY KEY (utilisateur, nom));
@@ -133,6 +142,19 @@ def _limiter(cle: str, maxi=10, fenetre=600):
 
 
 # ---------- session ----------
+def session_courante(authorization: str = Header("")) -> tuple[int, str]:
+    """(utilisateur, empreinte du jeton) : l'empreinte identifie l'appareil (une session = un appareil)."""
+    jeton = authorization.removeprefix("Bearer ").strip()
+    if not jeton:
+        raise HTTPException(401, "Non connecté.")
+    h = _empreinte(jeton)
+    with db() as c:
+        r = c.execute("SELECT utilisateur FROM sessions WHERE jeton_hash = ?", (h,)).fetchone()
+        if not r:
+            raise HTTPException(401, "Session expirée, reconnecte-toi.")
+        return r["utilisateur"], h
+
+
 def utilisateur(authorization: str = Header("")) -> int:
     jeton = authorization.removeprefix("Bearer ").strip()
     if not jeton:
@@ -453,16 +475,144 @@ def _revision(uid: int) -> int:
         c.close()
 
 
+def _ordres_en_attente(uid: int, appareil: str) -> list:
+    c = _connexion()
+    try:
+        lignes = c.execute("SELECT id, de, blob, cree FROM ordres WHERE utilisateur = ? AND vers = ? AND livre = 0 "
+                           "AND cree > ?", (uid, appareil, time.time() - 600)).fetchall()
+        if lignes:
+            c.execute(f"UPDATE ordres SET livre = 1 WHERE id IN ({','.join('?' * len(lignes))})", [l["id"] for l in lignes])
+            c.commit()
+        return [dict(l) for l in lignes]
+    finally:
+        c.close()
+
+
 @app.get("/v1/attendre")
-async def attendre(depuis: int = 0, uid: int = Depends(utilisateur)):
-    """Répond dès que le compte change (révision > depuis), ou au bout de 25 s sans changement.
-    Les appareils rappellent aussitôt : chaque changement arrive partout en ~1 s."""
+async def attendre(depuis: int = 0, s: tuple = Depends(session_courante)):
+    """Répond dès que le compte change (révision > depuis), qu'un ordre arrive pour cet appareil, ou au bout de
+    25 s. Les appareils rappellent aussitôt : changements et ordres arrivent partout en ~1 s."""
+    uid, appareil = s
     for _ in range(50):
+        ordres = await asyncio.to_thread(_ordres_en_attente, uid, appareil[:16])
         r = await asyncio.to_thread(_revision, uid)
-        if r > depuis:
-            return {"revision": r, "change": True}
+        if r > depuis or ordres:
+            return {"revision": r, "change": r > depuis, "ordres": ordres}
         await asyncio.sleep(0.5)
-    return {"revision": await asyncio.to_thread(_revision, uid), "change": False}
+    return {"revision": await asyncio.to_thread(_revision, uid), "change": False, "ordres": []}
+
+
+# ---------- mes appareils : présence, déconnexion à distance ----------
+EN_LIGNE = 75   # secondes sans nouvelles avant d'être considéré hors ligne
+
+
+class Presence(BaseModel):
+    nom: str = Field("", max_length=80)
+    plateforme: str = Field("", max_length=40)
+    version: str = Field("", max_length=20)
+    occupe: bool = False
+    accepte: bool = True
+    mode: str = Field("libre", max_length=20)
+
+
+@app.post("/v1/appareils/presence")
+def presence(d: Presence, s: tuple = Depends(session_courante)):
+    uid, h = s
+    with db() as c:
+        c.execute("INSERT INTO appareils (jeton_hash, utilisateur, nom, plateforme, version, vu, occupe, accepte, mode, cree) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (jeton_hash) DO UPDATE SET nom = excluded.nom, "
+                  "plateforme = excluded.plateforme, version = excluded.version, vu = excluded.vu, occupe = excluded.occupe, "
+                  "accepte = excluded.accepte, mode = excluded.mode",
+                  (h, uid, d.nom, d.plateforme, d.version, time.time(), int(d.occupe), int(d.accepte), d.mode, time.time()))
+    return {"id": h[:16]}
+
+
+@app.get("/v1/appareils")
+def appareils(s: tuple = Depends(session_courante)):
+    uid, h = s
+    with db() as c:
+        # les sessions sans présence (anciennes versions) apparaissent aussi, comme « connecté »
+        lignes = c.execute(
+            "SELECT s.jeton_hash, COALESCE(a.nom, s.appareil) AS nom, COALESCE(a.plateforme, '') AS plateforme, "
+            "COALESCE(a.version, '') AS version, COALESCE(a.vu, s.vu) AS vu, COALESCE(a.occupe, 0) AS occupe, "
+            "COALESCE(a.accepte, 0) AS accepte, COALESCE(a.mode, '') AS mode, s.cree AS connecte_depuis "
+            "FROM sessions s LEFT JOIN appareils a ON a.jeton_hash = s.jeton_hash WHERE s.utilisateur = ? "
+            "ORDER BY vu DESC", (uid,)).fetchall()
+    t = time.time()
+    return [{"id": l["jeton_hash"][:16], "nom": l["nom"], "plateforme": l["plateforme"], "version": l["version"],
+             "vu": l["vu"], "en_ligne": t - (l["vu"] or 0) < EN_LIGNE and bool(l["plateforme"]), "occupe": bool(l["occupe"]),
+             "accepte": bool(l["accepte"]), "mode": l["mode"], "connecte_depuis": l["connecte_depuis"],
+             "moi": l["jeton_hash"] == h} for l in lignes]
+
+
+@app.post("/v1/appareils/{aid}/deconnecter")
+def deconnecter_appareil(aid: str, s: tuple = Depends(session_courante)):
+    """Déconnecte un de tes appareils (depuis n'importe lequel) : sa session est supprimée, il revient à la connexion."""
+    uid, _ = s
+    with db() as c:
+        cibles = [r["jeton_hash"] for r in c.execute("SELECT jeton_hash FROM sessions WHERE utilisateur = ? AND substr(jeton_hash, 1, 16) = ?",
+                                                     (uid, aid))]
+        for h in cibles:
+            c.execute("DELETE FROM sessions WHERE jeton_hash = ?", (h,))
+            c.execute("DELETE FROM appareils WHERE jeton_hash = ?", (h,))
+    return {"deconnectes": len(cibles)}
+
+
+# ---------- ordres entre appareils (chiffrés par les appareils : le serveur ne peut ni les lire ni les fabriquer) ----------
+class Ordre(BaseModel):
+    vers: str = Field(min_length=4, max_length=16)
+    blob: str = Field(max_length=20_000_000)
+
+
+@app.post("/v1/ordres")
+def envoyer_ordre(d: Ordre, s: tuple = Depends(session_courante)):
+    uid, h = s
+    with db() as c:
+        if not c.execute("SELECT 1 FROM sessions WHERE utilisateur = ? AND substr(jeton_hash, 1, 16) = ?", (uid, d.vers)).fetchone():
+            raise HTTPException(404, "Appareil inconnu ou déconnecté.")
+        oid = secrets.token_hex(8)
+        c.execute("DELETE FROM ordres WHERE cree < ?", (time.time() - 86400,))
+        c.execute("INSERT INTO ordres (id, utilisateur, de, vers, blob, cree) VALUES (?, ?, ?, ?, ?, ?)",
+                  (oid, uid, h[:16], d.vers, d.blob, time.time()))
+    return {"id": oid}
+
+
+class Reponse(BaseModel):
+    blob: str = Field(max_length=20_000_000)
+
+
+@app.post("/v1/ordres/{oid}/reponse")
+def repondre_ordre(oid: str, d: Reponse, s: tuple = Depends(session_courante)):
+    uid, h = s
+    with db() as c:
+        n = c.execute("UPDATE ordres SET reponse = ?, repondu = ? WHERE id = ? AND utilisateur = ? AND vers = ?",
+                      (d.blob, time.time(), oid, uid, h[:16])).rowcount
+    if not n:
+        raise HTTPException(404, "Ordre introuvable.")
+    return {"ok": True}
+
+
+def _reponse(uid, oid):
+    c = _connexion()
+    try:
+        r = c.execute("SELECT reponse, livre FROM ordres WHERE id = ? AND utilisateur = ?", (oid, uid)).fetchone()
+        return dict(r) if r else None
+    finally:
+        c.close()
+
+
+@app.get("/v1/ordres/{oid}/attendre")
+async def attendre_reponse(oid: str, s: tuple = Depends(session_courante)):
+    """Attend (jusqu'à 25 s) la réponse de l'appareil ; l'appelant rappelle tant que ce n'est pas fini."""
+    uid, _ = s
+    for _ in range(50):
+        r = await asyncio.to_thread(_reponse, uid, oid)
+        if r is None:
+            raise HTTPException(404, "Ordre introuvable.")
+        if r["reponse"] is not None:
+            return {"pret": True, "blob": r["reponse"], "recu": bool(r["livre"])}
+        await asyncio.sleep(0.5)
+    return {"pret": False, "recu": bool((await asyncio.to_thread(_reponse, uid, oid) or {}).get("livre"))}
 
 
 @app.get("/v1/sante")

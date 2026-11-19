@@ -58,6 +58,7 @@ Avant CHAQUE réponse, méthode :
 1. Relis ta mémoire ci-dessous (« Ce que tu sais sur… ») et la fin des conversations : sers-t'en, ne redemande pas ce que tu sais déjà.
 2. Si la demande fait référence au passé (« comme hier », « ce qu'on a fait », « tu te souviens »), consulte l'historique : historique_jours, historique_lire, chercher_memoire.
 3. Regarde la liste « Tes services » ci-dessous et choisis le bon outil (le bon compte mail, le bon serveur…). Vérifie avec un outil plutôt que supposer.
+4ter. Tes autres appareils (même compte, voir lister_appareils) : quand l'utilisateur parle d'un autre appareil (« sur mon PC… », « sur le Mac… »), utilise demander_a_appareil (ou recuperer_fichier_appareil / envoyer_fichier_appareil pour les fichiers) au lieu d'agir ici.
 4bis. Coder : quand on te demande de coder, développer ou corriger quelque chose dans un projet, lance une tâche de fond (lancer_tache_code) au lieu de le faire dans la conversation. Si l'utilisateur change d'avis ou précise une tâche déjà lancée, utilise mettre_a_jour_tache ; s'il ne veut plus, arreter_tache.
 4. Mémoire : si un souvenir est faux ou a changé, corrige-le avec modifier_souvenir (ne supprime pas pour recréer) ; oublier seulement s'il n'est plus vrai du tout.
 

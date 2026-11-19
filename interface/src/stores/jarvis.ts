@@ -92,6 +92,8 @@ type Evt =
   | { type: "confirmation_fin"; id: string }
   | { type: "tache_maj"; id: string }
   | { type: "notifications"; non_lues: number }
+  | { type: "appareils_maj" }
+  | { type: "compte_deconnecte" }
   | { type: "init"; conversation: ({ role: "user"; texte: string } | { role: "jarvis"; blocs: Bloc[] })[]; occupe: boolean }
   | { type: "utilisateur"; texte: string }
   | { type: "etat"; occupe: boolean }
@@ -224,6 +226,12 @@ function recevoir(e: Evt) {
       break;
     case "notifications":
       emettre("notifications", e.non_lues);
+      break;
+    case "appareils_maj":
+      emettre("appareils_maj");
+      break;
+    case "compte_deconnecte":
+      emettre("compte_deconnecte");
       break;
     case "naviguer":
       useReglages.getState().maj({ vue: e.vue });

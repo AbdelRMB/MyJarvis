@@ -18,6 +18,7 @@ import {
   Wrench,
   Zap,
   ListTodo,
+  Laptop,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { micro } from "../audio/micro";
@@ -38,6 +39,7 @@ const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
   { id: "connecteurs", libelle: t("Connecteurs"), icone: Plug },
   { id: "taches", libelle: t("Tâches"), icone: ListTodo },
   { id: "automatisations", libelle: t("Automatisations"), icone: Zap },
+  { id: "appareils", libelle: t("Mes appareils"), icone: Laptop },
   { id: "activite", libelle: t("Activité"), icone: Activity },
   { id: "arsenal", libelle: t("Arsenal"), icone: Wrench },
   { id: "systeme", libelle: t("Système"), icone: Cpu },

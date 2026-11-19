@@ -607,6 +607,57 @@ async def afficher_fenetre(req: Request):
     return {"ok": bool(APPLI["afficher"])}
 
 
+# ---------- mes appareils ----------
+@app.get("/api/appareils")
+async def lister_appareils(req: Request):
+    _verifier(req)
+    from . import appareils, compte
+    liste, erreur = [], ""
+    if compte.connecte():
+        try:
+            liste = await asyncio.to_thread(appareils.lister)
+        except compte.ErreurCompte as e:
+            erreur = str(e)
+    return {"appareils": liste, "reglages": appareils.reglages(), "journal": list(reversed(appareils.journal()))[:100],
+            "connecte": compte.connecte(), "mode": compte.mode(), "erreur": erreur}
+
+
+@app.post("/api/appareils/reglages")
+async def regler_appareil(req: Request):
+    _verifier(req)
+    from . import appareils
+    d = await req.json()
+    appareils.regler(d.get("accepte"), d.get("mode"))
+    return await lister_appareils(req)
+
+
+@app.post("/api/appareils/{aid}/deconnecter")
+async def deconnecter_un_appareil(aid: str, req: Request):
+    _verifier(req)
+    from . import appareils, compte
+    moi = next((a for a in await asyncio.to_thread(appareils.lister) if a["moi"]), None)
+    if moi and moi["id"] == aid:   # cet appareil-ci : déconnexion complète
+        await asyncio.to_thread(compte.deconnecter)
+        return {"moi": True}
+    try:
+        return await asyncio.to_thread(appareils.deconnecter, aid)
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/appareils/{aid}/demander")
+async def demander_appareil(aid: str, req: Request):
+    """Depuis l'onglet Appareils : envoyer une demande à un autre appareil et attendre sa réponse."""
+    _verifier(req)
+    from . import appareils
+    texte = (await req.json()).get("texte", "").strip()
+    try:
+        r = await asyncio.to_thread(appareils.envoyer, aid, {"type": "demande", "texte": texte}, 600)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"resultat": r.get("resultat", ""), "ok": r.get("ok", False)}
+
+
 # ---------- notifications (cloche) ----------
 @app.get("/api/notifications")
 def lire_notifications(req: Request):

@@ -142,6 +142,10 @@ class ErreurCompte(Exception):
     pass
 
 
+class SessionRevoquee(ErreurCompte):
+    """La session de cet appareil a été supprimée (déconnecté depuis un autre appareil, ou expirée)."""
+
+
 def _appel(methode, chemin, jeton=None, http=None, **kw):
     h = {"Authorization": f"Bearer {jeton or _secret_local('compte:jeton')}", "X-Jarvis-Appli": CONFIG.get("cle_appli") or CLE_APPLI_DEFAUT,
          "User-Agent": "Jarvis"}
@@ -150,7 +154,7 @@ def _appel(methode, chemin, jeton=None, http=None, **kw):
     except requests.RequestException as e:
         raise ErreurCompte(f"Serveur Jarvis injoignable ({type(e).__name__}).") from e
     if r.status_code == 401 and chemin not in ("/v1/connexion", "/v1/inscription"):
-        raise ErreurCompte("Session expirée : reconnecte-toi.")
+        raise SessionRevoquee("Session expirée : reconnecte-toi.")
     if not r.ok:
         try:
             msg = r.json().get("detail")
@@ -513,6 +517,24 @@ def synchroniser() -> dict:
     return changements
 
 
+def _session_revoquee():
+    """Cet appareil a été déconnecté (depuis un autre appareil) : on retire ses secrets et on revient à la connexion."""
+    e = etat()
+    try:
+        deconnecter()   # retire aussi la clé API et les mots de passe venus du coffre (appareil perdu, prêté…)
+    except Exception:
+        pass
+    _sauver_etat({"mode": "en_ligne", "email": e.get("email", ""), "importe": e.get("importe", [])})
+    activer_dossiers()
+    try:
+        from . import notifications, web
+        notifications.ajouter("Appareil déconnecté", "Cet appareil a été déconnecté de ton compte. Reconnecte-toi pour retrouver ta mémoire.",
+                              genre="alerte", systeme=True)
+        web.diffuser(type="compte_deconnecte")
+    except Exception:
+        pass
+
+
 def demarrer_synchro():
     """Temps réel : le serveur répond dès qu'un appareil change quelque chose dans le compte (attente longue).
     Chaque ajout, suppression ou modification arrive sur tous tes appareils en ~1 seconde."""
@@ -522,18 +544,26 @@ def demarrer_synchro():
     _synchro_lancee = True
 
     def boucle():
-        revision = 0
+        from . import appareils
+        revision, derniere_presence = 0, 0.0
         while True:
             if not connecte():
                 time.sleep(5)
                 revision = 0
                 continue
             try:
+                if time.time() - derniere_presence > 20:   # « je suis en ligne » (onglet Appareils)
+                    derniere_presence = time.time()
+                    threading.Thread(target=appareils.presence, daemon=True).start()
                 vider_attente()   # écritures faites hors ligne : elles repartent dès que le réseau revient
                 r = _appel("GET", f"/v1/attendre?depuis={revision}", http=_http_attente, timeout=45)
+                if r.get("ordres"):   # un de tes autres appareils demande quelque chose à celui-ci
+                    appareils.traiter(r["ordres"])
                 if r["change"]:
                     synchroniser()
                 revision = r["revision"]
+            except SessionRevoquee:
+                _session_revoquee()
             except ErreurCompte:
                 time.sleep(10)   # pas de réseau ou serveur indisponible : on réessaie
             except Exception as e:
