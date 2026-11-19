@@ -126,8 +126,10 @@ export default function App() {
 
   return (
     <div className="grille-hud flex h-full flex-col">
-      {compte && !compte.connecte && <Connexion onConnecte={setCompte} />}
-      {compte?.connecte && FENETRE_BUREAU && <BandeauAutorisations />}
+      {compte && (compte.mode === "" || (compte.mode === "en_ligne" && !compte.connecte)) && (
+        <Connexion onConnecte={setCompte} choix={compte.mode === ""} />
+      )}
+      {compte && (compte.connecte || compte.mode === "local") && FENETRE_BUREAU && <BandeauAutorisations />}
       {!demarre && !FENETRE_BUREAU && <Demarrage pret={!!session} erreur={erreur} nbOutils={session?.nb_outils ?? 0} onDemarrer={demarrer} />}
       <div className="flex min-h-0 flex-1">
         <BarreLaterale />

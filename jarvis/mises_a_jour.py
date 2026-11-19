@@ -75,7 +75,7 @@ def _fichier_attendu(version: str) -> str:
 
 # ---------- liste ----------
 def lister() -> dict:
-    base = {"version": VERSION, "jeton": bool(jeton()), "installee": GELE, "majs": [], "erreur": ""}
+    base = {"version": VERSION, "jeton": bool(jeton()), "installee": GELE, "majs": [], "journal": [], "erreur": ""}
     try:
         r = requests.get(f"{API}/releases?per_page=50", headers=_entetes(), timeout=15)
     except requests.RequestException as e:
@@ -88,10 +88,15 @@ def lister() -> dict:
         return {**base, "erreur": f"Dépôt {DEPOT} introuvable."}
     if not r.ok:
         return {**base, "erreur": f"GitHub a répondu {r.status_code}."}
-    majs = []
+    majs, journal = [], []
     for rel in r.json():
         v = rel["tag_name"].lstrip("v")
-        if rel.get("draft") or _num(v) <= _num(VERSION):
+        if rel.get("draft"):
+            continue
+        # journal : toutes les versions publiées, avec leur description (la tienne est marquée)
+        journal.append({"version": v, "description": rel.get("body") or "", "date": (rel.get("published_at") or "")[:10],
+                        "installee": v == VERSION, "plus_recente": _num(v) > _num(VERSION)})
+        if _num(v) <= _num(VERSION):
             continue
         nom = _fichier_attendu(v)
         fichier = next((a for a in rel.get("assets", []) if a["name"] == nom), None)
@@ -99,7 +104,8 @@ def lister() -> dict:
                      "date": (rel.get("published_at") or "")[:10], "disponible": bool(fichier),
                      "taille": fichier["size"] if fichier else 0, "id_fichier": fichier["id"] if fichier else None})
     majs.sort(key=lambda m: _num(m["version"]), reverse=True)
-    return {**base, "majs": majs}
+    journal.sort(key=lambda m: _num(m["version"]), reverse=True)
+    return {**base, "majs": majs, "journal": journal}
 
 
 # ---------- installation ----------

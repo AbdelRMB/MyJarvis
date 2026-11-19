@@ -7,7 +7,8 @@ import { bus } from "../stores/jarvis";
 import { toast } from "../stores/toasts";
 
 type Maj = { version: string; titre: string; description: string; date: string; disponible: boolean; taille: number };
-type Etat = { version: string; jeton: boolean; installee: boolean; majs: Maj[]; erreur: string };
+type Entree = { version: string; description: string; date: string; installee: boolean; plus_recente: boolean };
+type Etat = { version: string; jeton: boolean; installee: boolean; majs: Maj[]; journal: Entree[]; erreur: string };
 type Progression = { etape: "telechargement" | "installation" | "erreur"; pct: number; texte: string };
 
 export function VueMisesAJour() {
@@ -150,6 +151,25 @@ export function VueMisesAJour() {
             ))}
           </div>
         </>
+      )}
+
+      {e && e.journal.length > 0 && (
+        <div className="mt-8">
+          <h2 className="titre-hud mb-3 text-[11px] text-ambre">Journal des mises à jour</h2>
+          <div className="space-y-3">
+            {e.journal.map((v) => (
+              <details key={v.version} open={v.installee} className="rounded-md border border-ligne bg-surface/60 px-4 py-3">
+                <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+                  Jarvis {v.version}
+                  {v.date && <Badge ton="doux">{v.date}</Badge>}
+                  {v.installee && <Badge ton="vert">installée</Badge>}
+                  {v.plus_recente && <Badge ton="hud">disponible</Badge>}
+                </summary>
+                <div className="mt-2 text-sm">{v.description ? <Markdown texte={v.description} /> : <span className="text-doux">Pas de description.</span>}</div>
+              </details>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

@@ -58,13 +58,35 @@ def serveur() -> str:
     return (CONFIG.get("serveur_comptes") or SERVEUR_DEFAUT).rstrip("/")
 
 
+def mode() -> str:
+    """« en_ligne » (compte, données sur tous les appareils), « local » (rien ne sort de cet appareil), ou « »
+    tant que l'utilisateur n'a pas choisi."""
+    e = etat()
+    return e.get("mode") or ("en_ligne" if e.get("id") else "")
+
+
 def connecte() -> bool:
-    return bool(etat().get("id")) and bool(_secret_local("compte:jeton"))
+    return mode() == "en_ligne" and bool(etat().get("id")) and bool(_secret_local("compte:jeton"))
 
 
 def dossier(uid=None) -> Path:
+    if not uid and mode() == "local":
+        return RACINE / "comptes" / "local"
     uid = uid or etat().get("id")
     return RACINE / "comptes" / (str(uid) if uid else "_sans_compte")
+
+
+def choisir_local():
+    """Mode local : pas de compte, rien n'est envoyé au serveur. Les données restent sur cet appareil."""
+    _sauver_etat({"mode": "local", "importe": etat().get("importe", [])})
+    activer_dossiers()
+
+
+def changer_de_mode():
+    """Revient à l'écran de choix (ex : passer du local au compte en ligne). Les données locales sont gardées :
+    elles seront envoyées dans le compte à la connexion."""
+    e = etat()
+    _sauver_etat({"importe": e.get("importe", []), "mode_precedent": mode()})
 
 
 # ---------- trousseau de l'appareil ----------
@@ -157,8 +179,10 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
     global _coffre
     _definir_secret_local("compte:jeton", reponse["jeton"])
     _definir_secret_local("compte:cle_coffre", base64.b64encode(cle_coffre).decode())
-    e = {"id": reponse["id"], "email": reponse["email"], "prenom": reponse.get("prenom", ""), "serveur": serveur()}
-    importe = etat().get("importe", [])
+    venait_du_local = etat().get("mode_precedent") == "local"
+    e = {"mode": "en_ligne", "id": reponse["id"], "email": reponse["email"], "prenom": reponse.get("prenom", ""),
+         "serveur": serveur()}
+    importe = [] if venait_du_local else etat().get("importe", [])   # du local vers le compte : tout part
     e["importe"] = importe
     _sauver_etat(e)
     try:
@@ -166,9 +190,9 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
     except Exception:
         _coffre = {}
     activer_dossiers()
-    if nouveau:
-        _pousser_coffre_depuis_appareil()   # 1re fois : la clé API et les secrets déjà sur cet appareil montent
-    else:
+    if nouveau or venait_du_local:
+        _pousser_coffre_depuis_appareil()   # la clé API et les secrets déjà sur cet appareil rejoignent le coffre
+    if not nouveau:
         _appliquer_coffre()
     if e["prenom"]:
         CONFIG["nom_utilisateur"] = e["prenom"]
@@ -221,7 +245,7 @@ def deconnecter():
         connecteurs.arreter(cid)
     _coffre = {}
     e = etat()
-    _sauver_etat({"importe": e.get("importe", [])})
+    _sauver_etat({"importe": e.get("importe", [])})   # retour à l'écran de choix (en ligne ou local)
     activer_dossiers()
 
 
@@ -513,7 +537,7 @@ def demarrer_synchro():
 # ---------- import de la mémoire déjà présente sur cet appareil ----------
 def _sources_appareil() -> list[Path]:
     """Tous les endroits où une ancienne version de Jarvis a pu ranger sa mémoire sur cet appareil."""
-    candidats = [RACINE / "memoire", RACINE / "partage" / "memoire"]
+    candidats = [RACINE / "comptes" / "local" / "memoire", RACINE / "memoire", RACINE / "partage" / "memoire"]
     od = config._onedrive()
     if od:
         candidats.append(od / "Jarvis" / "memoire")
@@ -557,7 +581,8 @@ def importer_appareil() -> dict:
     r = _appel("POST", "/v1/import", json={"faits": faits, "lignes": uniques}, timeout=120)
     # connecteurs et réglages communs : seulement si le compte n'en a pas encore
     for s in sources:
-        for nom, fichier in (("connecteurs", s.parent / "connecteurs.json"), ("profil", s.parent / "profil.json")):
+        for nom, fichier in (("connecteurs", s.parent / "connecteurs.json"), ("profil", s.parent / "profil.json"),
+                             ("automatisations", s.parent / "automatisations.json")):
             try:
                 contenu = json.loads(fichier.read_text(encoding="utf-8"))
             except (OSError, ValueError):

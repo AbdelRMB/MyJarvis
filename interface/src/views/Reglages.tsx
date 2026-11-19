@@ -35,12 +35,12 @@ function OngletApplication() {
   useEffect(() => {
     api<EtatAppli>("/api/appli").then(setE).catch((x) => toast(x.message, "erreur"));
   }, []);
-  const [compte, setCompte] = useState<{ email: string; prenom: string; serveur: string; machine: string } | null>(null);
+  const [compte, setCompte] = useState<{ email: string; prenom: string; serveur: string; machine: string; mode: string } | null>(null);
   const [action, setAction] = useState("");
   useEffect(() => {
-    api<{ email: string; prenom: string; serveur: string; machine: string }>("/api/compte").then(setCompte).catch(() => {});
+    api<{ email: string; prenom: string; serveur: string; machine: string; mode: string }>("/api/compte").then(setCompte).catch(() => {});
   }, []);
-  const agir = async (a: "importer" | "synchroniser" | "deconnexion") => {
+  const agir = async (a: "importer" | "synchroniser" | "deconnexion" | "changer_mode") => {
     setAction(a);
     try {
       const r = await api<{ import?: { faits: number; lignes: number } }>(`/api/compte/${a}`, { method: "POST" });
@@ -52,7 +52,7 @@ function OngletApplication() {
           "succes",
         );
       else if (a === "synchroniser") toast("Synchronisé avec ton compte.", "succes");
-      else location.reload();   // déconnecté : retour à l'écran de connexion
+      else location.reload();   // déconnexion / changement de mode : retour à l'écran de choix   // déconnecté : retour à l'écran de connexion
     } catch (x) {
       toast((x as Error).message, "erreur");
     } finally {
@@ -109,6 +109,21 @@ function OngletApplication() {
           <p className="mt-1 text-[13px] text-doux">Fermer la fenêtre la cache seulement. Pour quitter : clic sur l'icône Jarvis {os.zoneIcone}, puis « Quitter ».</p>
         </div>
       </Panneau>
+      {compte?.mode === "local" ? (
+        <Panneau titre="Jarvis en local" icone={<Cloud />}>
+          <p className="text-[13px] leading-relaxed text-doux">
+            Tout reste sur cet ordinateur : mémoire, historique, connecteurs, clés. Rien n'est envoyé à un serveur. Mais il n'y a pas de récupération ailleurs :
+            sur un autre appareil, ce sera un nouveau Jarvis qui ne sait rien de toi.
+          </p>
+          <p className="mt-3 text-[13px] leading-relaxed text-doux">
+            En passant en ligne, tu crées ton compte (ou tu te connectes) et Jarvis y envoie toute sa mémoire, ses réglages, tes connecteurs et tes clés
+            (chiffrées avec ton mot de passe).
+          </p>
+          <Bouton className="mt-4" variante="primaire" icone={<Cloud />} chargement={action === "changer_mode"} onClick={() => agir("changer_mode")}>
+            Passer en ligne
+          </Bouton>
+        </Panneau>
+      ) : (
       <Panneau titre="Mon compte" icone={<Cloud />}>
         <p className="text-sm">
           Connecté : <span className="font-mono text-hud">{compte?.email ?? "…"}</span>
@@ -135,6 +150,7 @@ function OngletApplication() {
           « Envoyer » ajoute à ton compte ce que cet appareil savait avant (anciennes versions, OneDrive). Rien n'est écrasé, les doublons sont ignorés.
         </p>
       </Panneau>
+      )}
     </div>
   );
 }

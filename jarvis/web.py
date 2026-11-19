@@ -460,8 +460,8 @@ def stop_vocal():
 def _etat_compte():
     from . import compte
     e = compte.etat()
-    return {"connecte": compte.connecte(), "email": e.get("email", ""), "prenom": e.get("prenom", ""),
-            "serveur": compte.serveur(), "machine": MACHINE}
+    return {"connecte": compte.connecte(), "mode": compte.mode(), "email": e.get("email", ""),
+            "prenom": e.get("prenom", ""), "serveur": compte.serveur(), "machine": MACHINE}
 
 
 def _apres_connexion():
@@ -499,11 +499,17 @@ async def agir_compte(action: str, req: Request):
         elif action == "synchroniser":
             await asyncio.to_thread(compte.synchroniser)
             r = {}
+        elif action == "local":   # « Utiliser Jarvis en local » : pas de compte, rien n'est envoyé
+            await asyncio.to_thread(compte.choisir_local)
+            r = {}
+        elif action == "changer_mode":   # « Passer en ligne » depuis le local (ou l'inverse)
+            await asyncio.to_thread(compte.changer_de_mode)
+            r = {}
         else:
             raise HTTPException(404, "Action inconnue.")
     except compte.ErreurCompte as e:
         raise HTTPException(400, str(e))
-    if action in ("inscription", "connexion", "deconnexion", "importer"):
+    if action in ("inscription", "connexion", "deconnexion", "importer", "local"):
         _apres_connexion()
     return {**_etat_compte(), **r}
 

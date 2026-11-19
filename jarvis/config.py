@@ -82,10 +82,11 @@ def sauver_config(cles=None):
 def _dossier_compte() -> Path:
     """Cache local du compte connecté (RACINE/comptes/<id>) ; la source de vérité est le serveur (jarvis/compte.py)."""
     try:
-        uid = json.loads((RACINE / "compte.json").read_text(encoding="utf-8")).get("id")
+        e = json.loads((RACINE / "compte.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        uid = None
-    p = RACINE / "comptes" / (str(uid) if uid else "_sans_compte")
+        e = {}
+    uid = e.get("id")
+    p = RACINE / "comptes" / ("local" if e.get("mode") == "local" else str(uid) if uid else "_sans_compte")
     (p / "memoire" / "historique").mkdir(parents=True, exist_ok=True)
     return p
 

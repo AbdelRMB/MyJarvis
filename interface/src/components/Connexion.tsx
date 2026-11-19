@@ -1,4 +1,4 @@
-import { LogIn, UserPlus } from "lucide-react";
+import { Cloud, HardDrive, LogIn, UserPlus } from "lucide-react";
 import { useState } from "react";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
@@ -6,12 +6,13 @@ import { useJarvis } from "../stores/jarvis";
 import { toast } from "../stores/toasts";
 import { Bouton, Champ } from "./ui";
 
-export type Compte = { connecte: boolean; email: string; prenom: string; serveur: string; machine: string };
+export type Compte = { connecte: boolean; mode: "" | "local" | "en_ligne"; email: string; prenom: string; serveur: string; machine: string };
 type Reponse = Compte & { import?: { faits: number; lignes: number; erreur?: string } | null };
 
 /** Écran affiché tant que personne n'est connecté : chaque utilisateur a sa mémoire, sa clé, ses connecteurs. */
-export function Connexion({ onConnecte }: { onConnecte: (c: Compte) => void }) {
-  const [mode, setMode] = useState<"connexion" | "inscription">("connexion");
+export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => void; choix: boolean }) {
+  const [etape, setEtape] = useState<"choix" | "compte">(choix ? "choix" : "compte");
+  const [mode, setMode] = useState<"connexion" | "inscription">(choix ? "inscription" : "connexion");
   const [email, setEmail] = useState("");
   const [mdp, setMdp] = useState("");
   const [mdp2, setMdp2] = useState("");
@@ -36,6 +37,49 @@ export function Connexion({ onConnecte }: { onConnecte: (c: Compte) => void }) {
       setEnvoi(false);
     }
   };
+
+  const local = async () => {
+    try {
+      onConnecte(await api<Compte>("/api/compte/local", { method: "POST", json: {} }));
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+
+  if (etape === "choix")
+    return (
+      <div className="grille-hud fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-fond p-4">
+        <div className="w-[min(760px,100%)]">
+          <h1 className="mb-2 text-center font-display text-2xl font-black tracking-[0.35em] text-hud">J.A.R.V.I.S.</h1>
+          <p className="mb-6 text-center text-sm text-doux">Où veux-tu garder ta mémoire, tes réglages et tes clés ?</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <button
+              onClick={() => setEtape("compte")}
+              className="rounded-xl border border-hud/50 bg-surface-2/80 p-5 text-left transition-colors hover:border-hud hover:bg-hud/5"
+            >
+              <Cloud className="mb-3 size-7 text-hud" />
+              <div className="font-semibold">En ligne, avec un compte</div>
+              <p className="mt-2 text-[13px] leading-relaxed text-doux">
+                Ta mémoire, ton historique, tes connecteurs et tes clés te suivent sur tous tes appareils : connecte-toi sur un autre ordinateur et Jarvis te
+                connaît déjà. Tes clés et mots de passe sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.
+              </p>
+            </button>
+            <button
+              onClick={local}
+              className="rounded-xl border border-ligne-forte bg-surface-2/80 p-5 text-left transition-colors hover:border-hud hover:bg-hud/5"
+            >
+              <HardDrive className="mb-3 size-7 text-hud" />
+              <div className="font-semibold">En local, sur cet appareil</div>
+              <p className="mt-2 text-[13px] leading-relaxed text-doux">
+                Pas de compte, rien n'est envoyé à un serveur : tout reste sur cet ordinateur. Mais aucune récupération ailleurs : sur un autre appareil, ce
+                sera un nouveau Jarvis qui ne sait rien de toi. Tu pourras passer en ligne plus tard (Réglages › Application) et tout envoyer dans ton
+                compte.
+              </p>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
 
   return (
     <div className="grille-hud fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-fond p-4">
@@ -82,6 +126,11 @@ export function Connexion({ onConnecte }: { onConnecte: (c: Compte) => void }) {
           {inscription ? "Créer mon compte" : "Se connecter"}
         </Bouton>
         {envoi && <p className="mt-3 text-center text-[12px] text-doux">Chiffrement et récupération de ta mémoire…</p>}
+        {choix && (
+          <button type="button" onClick={() => setEtape("choix")} className="mt-4 w-full text-center text-[12px] text-doux hover:text-texte">
+            ← Utiliser Jarvis en local plutôt
+          </button>
+        )}
       </form>
     </div>
   );
