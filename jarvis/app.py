@@ -165,13 +165,21 @@ def main():
         ecoute.demarrer()
     web.APPLI.update(active=True, afficher=afficher, ecoute=ecoute)
 
-    # --- raccourci clavier global
-    try:
-        from pynput import keyboard
-        keyboard.GlobalHotKeys({CONFIG.get("raccourci") or "<ctrl>+<alt>+j": afficher,
-                               "<ctrl>+<alt>+s": web.stop_vocal}).start()   # arrêt d'urgence, même fenêtre cachée
-    except Exception as e:
-        print(f"  ! Raccourci clavier : {e}")
+    # --- raccourci clavier global (relancé quand l'Accessibilité est accordée : macOS ne l'active qu'au démarrage)
+    raccourcis = {"ecouteur": None}
+
+    def demarrer_raccourcis():
+        try:
+            from pynput import keyboard
+            if raccourcis["ecouteur"]:
+                raccourcis["ecouteur"].stop()
+            raccourcis["ecouteur"] = keyboard.GlobalHotKeys({CONFIG.get("raccourci") or "<ctrl>+<alt>+j": afficher,
+                                                            "<ctrl>+<alt>+s": web.stop_vocal})   # arrêt d'urgence
+            raccourcis["ecouteur"].start()
+        except Exception as e:
+            print(f"  ! Raccourci clavier : {e}")
+    demarrer_raccourcis()
+    web.APPLI["relancer_raccourcis"] = demarrer_raccourcis
 
     # --- icône dans la zone de notification
     import pystray

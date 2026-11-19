@@ -437,7 +437,7 @@ async def supprimer_connecteur(cid: str, req: Request):
 
 
 # ---------- application de bureau (fenêtre, démarrage, écoute de fond) ----------
-APPLI = {"active": False, "afficher": None, "ecoute": None, "quitter": None}   # renseigné par jarvis/app.py
+APPLI = {"active": False, "afficher": None, "ecoute": None, "quitter": None, "relancer_raccourcis": None}   # renseigné par jarvis/app.py
 PAROLE = {"actif": False, "depuis": 0.0}   # la fenêtre signale quand Jarvis parle (pour l'écoute de fond)
 
 

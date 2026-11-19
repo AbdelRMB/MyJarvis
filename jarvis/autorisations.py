@@ -87,13 +87,32 @@ def _micro_windows():
         return "inconnu"
 
 
+def _automatisation_mac():
+    """macOS ne permet pas de lire cette autorisation sans la redemander : on retient la réponse obtenue."""
+    return CONFIG.get("autorisation_automatisation") or "inconnu"
+
+
+_accessibilite_avant = {"etat": None}
+
+
+def _surveiller_accessibilite(etat_actuel: str):
+    """Accessibilité accordée pendant que Jarvis tourne : on relance les raccourcis clavier globaux
+    (sinon ils ne marchaient qu'après un redémarrage de Jarvis)."""
+    if etat_actuel == "accorde" and _accessibilite_avant["etat"] not in (None, "accorde"):
+        from . import web
+        if web.APPLI.get("relancer_raccourcis"):
+            web.APPLI["relancer_raccourcis"]()
+    _accessibilite_avant["etat"] = etat_actuel
+
+
 def etat() -> dict:
     deja = set(CONFIG.get("autorisations_demandees") or [])
     if MAC:
         lecteurs = {"micro": _micro_mac, "accessibilite": _accessibilite_mac, "ecran": _ecran_mac,
-                    "fichiers": _fichiers_mac, "automatisation": lambda: "inconnu"}
+                    "fichiers": _fichiers_mac, "automatisation": _automatisation_mac}
         liste = [{"id": i, "nom": n, "role": r, "etat": lecteurs[i](), "demande_faite": i in deja}
                  for i, (n, r, _, _) in LISTE_MAC.items()]
+        _surveiller_accessibilite(next(a["etat"] for a in liste if a["id"] == "accessibilite"))
     else:
         liste = [
             {"id": "micro", "nom": "Micro", "role": "T'entendre quand tu dis « Jarvis ».", "etat": _micro_windows(),
@@ -104,6 +123,11 @@ def etat() -> dict:
     # à proposer au démarrage : jamais demandé ET pas déjà accordé (une seule demande, puis plus jamais)
     a_proposer = [a["id"] for a in liste if not a["demande_faite"] and a["etat"] != "accorde"]
     return {"plateforme": "mac" if MAC else "windows", "autorisations": liste, "a_proposer": a_proposer}
+
+
+def etat_un(i: str) -> str:
+    return {"micro": _micro_mac, "accessibilite": _accessibilite_mac, "ecran": _ecran_mac, "fichiers": _fichiers_mac,
+            "automatisation": _automatisation_mac}[i]() if MAC else "accorde"
 
 
 def _noter_demande(i: str):
@@ -133,6 +157,10 @@ def demander(i: str) -> str:
     if not MAC:
         ouvrir_reglages(i)
         return "reglages"
+    if i in ("accessibilite", "automatisation") and etat_un(i) != "accorde":
+        # une ancienne version de Jarvis (autre signature) peut avoir laissé une entrée « activée » qui ne
+        # s'applique plus : on l'efface pour que la demande concerne bien cette version
+        subprocess.run(["tccutil", "reset", LISTE_MAC[i][3], BUNDLE], capture_output=True)
     try:
         if i == "micro":
             import objc
@@ -151,10 +179,18 @@ def demander(i: str) -> str:
                 Quartz.CGRequestScreenCaptureAccess()
                 return "demande"
         elif i == "automatisation":
-            # une commande AppleScript vers « System Events » déclenche la demande au nom de Jarvis
-            threading.Thread(target=subprocess.run, daemon=True, kwargs={
-                "args": ["osascript", "-e", 'tell application "System Events" to get name of first process'],
-                "capture_output": True, "timeout": 120}).start()
+            # une commande AppleScript vers « System Events » déclenche la demande au nom de Jarvis ;
+            # on retient la réponse (macOS ne permet pas de la relire ensuite sans redemander)
+            def essayer():
+                try:
+                    r = subprocess.run(["osascript", "-e", 'tell application "System Events" to get name of first process'],
+                                       capture_output=True, text=True, timeout=180)
+                    resultat = "accorde" if r.returncode == 0 else "refuse" if "-1743" in r.stderr else "inconnu"
+                except subprocess.TimeoutExpired:
+                    resultat = "inconnu"
+                CONFIG["autorisation_automatisation"] = resultat
+                sauver_config(["autorisation_automatisation"])
+            threading.Thread(target=essayer, daemon=True).start()
             return "demande"
     except Exception as e:
         print(f"  ! Autorisation {i} : {e}")
@@ -169,6 +205,9 @@ def retirer(i: str) -> str:
         ouvrir_reglages(i)
         return "reglages"
     service = LISTE_MAC[i][3]
+    if i == "automatisation":
+        CONFIG["autorisation_automatisation"] = ""
+        sauver_config(["autorisation_automatisation"])
     r = subprocess.run(["tccutil", "reset", service, BUNDLE], capture_output=True, text=True)
     if r.returncode != 0:
         ouvrir_reglages(i)
