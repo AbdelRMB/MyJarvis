@@ -330,4 +330,12 @@ export const EN: Record<string, string> = {
   "Transcription impossible : {msg}": "Transcription failed: {msg}",
   "Lancer Jarvis {quand}": "Start Jarvis {quand}",
   "Textes de l'interface, réponses de Jarvis, reconnaissance vocale, voix et annonces.": "Interface texts, Jarvis's replies, speech recognition, voice and announcements.",
+  "J'ai besoin de ton accord.": "I need your approval.",
+  "Jarvis demande ton accord": "Jarvis asks for your approval",
+  "Refuser": "Deny",
+  "Commande locale (npx, uvx, python…)": "Local command (npx, uvx, python…)",
+  "Adresse web (serveur distant)": "Web address (remote server)",
+  "Confirmation : il me demande avant de modifier quoi que ce soit (conseillé)": "Confirmation: it asks me before changing anything (recommended)",
+  "Lecture seule : il peut seulement regarder": "Read-only: it can only look",
+  "Libre : il agit sans demander": "Free: it acts without asking",
 };

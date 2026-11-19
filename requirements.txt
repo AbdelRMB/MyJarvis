@@ -30,3 +30,4 @@ sounddevice
 uvicorn[standard]
 cryptography
 openai
+paramiko

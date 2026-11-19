@@ -10,6 +10,28 @@ from .config import CONFIG
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
 
+def _services() -> str:
+    """Comptes, serveurs et automatisations disponibles (pour que Jarvis choisisse le bon outil)."""
+    lignes = []
+    try:
+        from . import connecteurs
+        for cid, c in list(connecteurs.INSTANCES.items()):
+            etat = f" — en erreur : {c.erreur[:80]}" if c.erreur else ""
+            mode = f" (mode {c.mode()})" if hasattr(c, "mode") and callable(getattr(c, "mode")) and c.type == "ssh" else ""
+            prefixe = f"suffixe d'outils __{c.suffixe()}" if c.suffixe() else "outils sans suffixe"
+            lignes.append(f"- {c.nom} « {c.etiquette()} »{mode} : {prefixe}{etat}")
+    except Exception:
+        pass
+    try:
+        from . import automatisations
+        n = len([r for r in automatisations.lister() if r.get("actif")])
+        if n:
+            lignes.append(f"- {n} automatisation(s) active(s) (lister_automatisations)")
+    except Exception:
+        pass
+    return "\n".join(lignes) or "(aucun service connecté)"
+
+
 def prompt_systeme():
     faits, sysm = memoire.profil_texte()
     n = datetime.now()
@@ -32,7 +54,16 @@ Règles :
 - Dès que tu apprends un fait durable sur {CONFIG['nom_utilisateur']} (goût, projet, personne, habitude), appelle memoriser.
 - Si une action échoue, analyse l'erreur et essaie une autre approche.
 
-Nous sommes le {JOURS[n.weekday()]} {n:%d/%m/%Y}, il est {n:%H:%M}.
+Avant CHAQUE réponse, méthode :
+1. Relis ta mémoire ci-dessous (« Ce que tu sais sur… ») et la fin des conversations : sers-t'en, ne redemande pas ce que tu sais déjà.
+2. Si la demande fait référence au passé (« comme hier », « ce qu'on a fait », « tu te souviens »), consulte l'historique : historique_jours, historique_lire, chercher_memoire.
+3. Regarde la liste « Tes services » ci-dessous et choisis le bon outil (le bon compte mail, le bon serveur…). Vérifie avec un outil plutôt que supposer.
+4. Mémoire : si un souvenir est faux ou a changé, corrige-le avec modifier_souvenir (ne supprime pas pour recréer) ; oublier seulement s'il n'est plus vrai du tout.
+
+Nous sommes le {JOURS[n.weekday()]} {n:%d/%m/%Y} (pour l'heure exacte, utilise l'outil date_heure).
+
+# Tes services
+{_services()}
 
 # Ce que tu sais sur {CONFIG['nom_utilisateur']}
 {faits or '(rien encore)'}
@@ -110,6 +141,13 @@ class Jarvis:
 
     def demander(self, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
         """Envoie un message ; callbacks pour afficher le flux. Renvoie la réponse finale."""
+        # relit sa mémoire et ses services à jour avant chaque réponse (instructions inchangées si rien n'a bougé)
+        try:
+            nouveau = prompt_systeme()
+            if nouveau != self.messages[0]["content"]:
+                self.messages[0]["content"] = nouveau
+        except Exception:
+            pass
         if self.avec_claude:
             from . import claude
             return claude.demander(self, texte, sur_texte, sur_outil, sur_pensee)

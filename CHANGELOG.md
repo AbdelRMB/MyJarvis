@@ -3,6 +3,12 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.3.0
+- **Tes serveurs (VPS) dans Jarvis** : nouveau connecteur « Serveur SSH » (autant de serveurs que tu veux, clé SSH ou mot de passe, gardés chiffrés dans ton compte). Jarvis peut regarder l'état d'un serveur, lancer des commandes, lire, écrire et transférer des fichiers. Pour chaque serveur, tu choisis : **confirmation** (il te demande « Autoriser / Refuser » avant toute modification — conseillé), **lecture seule** ou **libre**. / **Your servers (VPS) in Jarvis**: new SSH connector with confirmation, read-only or free mode.
+- **Jarvis plus réfléchi** : avant chaque réponse, il relit sa mémoire à jour et la liste de ses services (comptes, serveurs, automatisations), consulte l'historique quand tu parles du passé et vérifie avec ses outils plutôt que de supposer.
+- **Il corrige sa mémoire** : nouvel outil pour modifier un souvenir directement (au lieu de supprimer puis recréer), et pour lister ses souvenirs.
+- **Accès à l'historique** : il peut lister les jours de conversation et relire une journée entière, tous appareils confondus.
+
 ## 1.2.1
 - **Corrigé : « Invalid signature in thinking block »** (cerveau Claude). L'erreur survenait souvent quand la mémoire changeait en pleine conversation (synchronisation entre appareils). Jarvis ne relit maintenant ses souvenirs que si leur texte change, et l'API ignore les anciens blocs de réflexion au lieu de refuser la demande.
 - **Le bouton STOP coupe vraiment** : l'action en cours (commande, script, souris, téléchargement…) est interrompue tout de suite et les programmes qu'elle a lancés sont fermés, au lieu d'aller jusqu'au bout. Pareil avec Échap, « Jarvis, stop » et Ctrl+Alt+S. / **STOP really stops**: the running action is interrupted immediately.

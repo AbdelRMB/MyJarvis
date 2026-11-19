@@ -555,6 +555,46 @@ async def agir_compte(action: str, req: Request):
     return {**_etat_compte(), **r}
 
 
+# ---------- confirmations (ex : commande qui modifie un serveur SSH en mode « confirmation ») ----------
+_confirmations: dict = {}
+
+
+def demander_confirmation(titre: str, detail: str = "", delai: float = 180) -> bool:
+    """Affiche « Autoriser / Refuser » dans la fenêtre de Jarvis et attend la réponse (refus si STOP ou sans réponse)."""
+    import uuid
+    cid = uuid.uuid4().hex[:10]
+    attente = {"ev": threading.Event(), "ok": False}
+    _confirmations[cid] = attente
+    if APPLI.get("afficher"):
+        try:
+            APPLI["afficher"]()   # la question doit être vue, même fenêtre cachée
+        except Exception:
+            pass
+    debut = time.time()
+    try:
+        while time.time() - debut < delai and not attente["ev"].is_set():
+            if outils.ARRET.is_set():
+                break
+            # renvoyée régulièrement : l'interface peut s'être (re)connectée entre-temps
+            diffuser(type="confirmation", id=cid, titre=titre, detail=detail[:4000])
+            attente["ev"].wait(2)
+    finally:
+        _confirmations.pop(cid, None)
+        diffuser(type="confirmation_fin", id=cid)
+    return attente["ok"]
+
+
+@app.post("/api/confirmation")
+async def repondre_confirmation(req: Request):
+    _verifier(req)
+    d = await req.json()
+    c = _confirmations.get(d.get("id"))
+    if c:
+        c["ok"] = bool(d.get("ok"))
+        c["ev"].set()
+    return {"ok": bool(c)}
+
+
 @app.post("/api/fenetre/afficher")
 async def afficher_fenetre(req: Request):
     _verifier(req)

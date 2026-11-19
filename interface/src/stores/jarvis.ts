@@ -88,6 +88,8 @@ type Evt =
   | { type: "naviguer"; vue: Vue }
   | { type: "memoire_maj"; faits: boolean; historique: number }
   | { type: "annonce"; texte: string }
+  | { type: "confirmation"; id: string; titre: string; detail: string }
+  | { type: "confirmation_fin"; id: string }
   | { type: "init"; conversation: ({ role: "user"; texte: string } | { role: "jarvis"; blocs: Bloc[] })[]; occupe: boolean }
   | { type: "utilisateur"; texte: string }
   | { type: "etat"; occupe: boolean }
@@ -208,6 +210,12 @@ function recevoir(e: Evt) {
       break;
     case "annonce":
       emettre("annonce", e.texte);
+      break;
+    case "confirmation":
+      emettre("confirmation", { id: e.id, titre: e.titre, detail: e.detail });
+      break;
+    case "confirmation_fin":
+      emettre("confirmation_fin", e.id);
       break;
     case "naviguer":
       useReglages.getState().maj({ vue: e.vue });

@@ -1,5 +1,5 @@
 import { t } from "../lib/i18n";
-import { Blocks, CalendarDays, Check, GitBranch, Loader2, Mail, NotebookPen, Plug, Plus, Power, Trash2, X, Zap } from "lucide-react";
+import { Blocks, CalendarDays, Check, Server, GitBranch, Loader2, Mail, NotebookPen, Plug, Plus, Power, Trash2, X, Zap } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -7,12 +7,20 @@ import { cx } from "../lib/format";
 import { useOS } from "../lib/os";
 import { toast } from "../stores/toasts";
 
-type ChampDef = { nom: string; libelle: string; type: "text" | "secret" | "url" | "choix"; aide?: string; requis?: boolean; choix?: string[] };
+type ChampDef = { nom: string; libelle: string; type: "text" | "secret" | "url" | "choix"; aide?: string; requis?: boolean; choix?: string[]; multiligne?: boolean };
+const LIBELLES_CHOIX: Record<string, string> = {
+  commande: "Commande locale (npx, uvx, python…)",
+  url: "Adresse web (serveur distant)",
+  confirmation: "Confirmation : il me demande avant de modifier quoi que ce soit (conseillé)",
+  lecture: "Lecture seule : il peut seulement regarder",
+  libre: "Libre : il agit sans demander",
+};
 type TypeConnecteur = { type: string; nom: string; description: string; icone: string; champs: ChampDef[]; aide: string; multiple: boolean };
 type Installe = { type: string; actif: boolean; conf: Record<string, string>; secrets: Record<string, boolean>; erreur: string; outils: string[] };
 type Donnees = { catalogue: TypeConnecteur[]; installes: Record<string, Installe> };
 
 const ICONES: Record<string, ReactNode> = {
+  server: <Server />,
   mail: <Mail />, calendar: <CalendarDays />, github: <GitBranch />, notebook: <NotebookPen />, blocks: <Blocks />,
 };
 const icone = (n: string) => ICONES[n] ?? <Plug />;
@@ -88,16 +96,16 @@ function Editeur({
                 >
                   {c.choix?.map((o) => (
                     <option key={o} value={o}>
-                      {o === "commande" ? "Commande locale (npx, uvx, python…)" : o === "url" ? "Adresse web (serveur distant)" : o}
+                      {LIBELLES_CHOIX[o] ? t(LIBELLES_CHOIX[o]) : o}
                     </option>
                   ))}
                 </select>
-              ) : c.nom === "env" ? (
+              ) : c.nom === "env" || c.multiligne ? (
                 <textarea
                   rows={3}
                   value={secrets[c.nom] ?? ""}
                   onChange={(e) => setSecrets({ ...secrets, [c.nom]: e.target.value })}
-                  placeholder={existant?.secrets[c.nom] ? "•••••• enregistré (laisse vide pour garder)" : "CLE_API=xxxx"}
+                  placeholder={existant?.secrets[c.nom] ? "•••••• enregistré (laisse vide pour garder)" : c.nom === "env" ? "CLE_API=xxxx" : ""}
                   className="w-full rounded-md border border-ligne-forte bg-surface-2 p-3 font-mono text-sm outline-none focus:border-hud"
                 />
               ) : c.type === "secret" ? (

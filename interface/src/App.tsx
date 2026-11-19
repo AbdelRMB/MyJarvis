@@ -1,3 +1,4 @@
+import { Confirmations } from "./components/Confirmation";
 import { changerLangue, LANGUE } from "./lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { micro } from "./audio/micro";
@@ -161,6 +162,7 @@ export default function App() {
       </div>
       <NavMobile />
       <Toasts />
+      <Confirmations />
     </div>
   );
 }

@@ -575,14 +575,186 @@ class MCP(Connecteur):
         return f"{len(self.outils_mcp)} outil(s) : " + ", ".join(n for n, _, _ in self.outils_mcp[:15])
 
 
+# ---------- serveurs SSH (VPS) ----------
+# Commandes sans risque (lecture) : jamais de confirmation, autorisées même en mode « lecture seule ».
+_LECTURE = re.compile(r"^\s*(ls|ll|cat|head|tail|less|more|df|du|free|uptime|whoami|id|hostname|uname|ps|pgrep|who|w|date|"
+                      r"stat|file|wc|grep|egrep|zgrep|find|which|ss|netstat|ip\s+(a|addr|route)|ping\s+-c|lsblk|nproc|lscpu|"
+                      r"top\s+-bn1|systemctl\s+(status|is-active|is-enabled|list-units|list-timers)|journalctl|"
+                      r"docker\s+(ps|logs|stats\s+--no-stream|images|inspect|volume\s+ls|network\s+ls)|"
+                      r"docker\s+compose\s+(ps|logs|config)|apache2ctl\s+(-S|-t|configtest)|nginx\s+-t|"
+                      r"certbot\s+certificates|git\s+(status|log|diff|branch|remote)|crontab\s+-l|echo|pwd)\b")
+
+
+def commande_en_lecture(commande: str) -> bool:
+    """Vraie si la commande ne fait que lire (chaque morceau d'une chaîne ; | && ||), sans redirection d'écriture."""
+    if re.search(r"(^|[^>2&])>{1,2}(?!&)|\btee\b|\bsudo\b|`|\$\(", commande):
+        return False
+    morceaux = [m for m in re.split(r"\|\||&&|;|\|", commande) if m.strip()]
+    return bool(morceaux) and all(_LECTURE.match(m) for m in morceaux)
+
+
+class SSH(Connecteur):
+    type = "ssh"
+    nom = "Serveur SSH (VPS)"
+    description = "Piloter un serveur à distance : commandes, fichiers, état (disque, mémoire, Docker, services)."
+    icone = "server"
+    prefixe = "ssh"
+    champs = [
+        {"nom": "hote", "libelle": "Adresse du serveur", "type": "text", "aide": "IP ou nom de domaine (ex : 51.38.38.18)"},
+        {"nom": "port", "libelle": "Port SSH", "type": "text", "requis": False, "aide": "22 par défaut"},
+        {"nom": "utilisateur", "libelle": "Utilisateur", "type": "text", "aide": "ex : debian, ubuntu, abdel"},
+        {"nom": "mode", "libelle": "Ce que Jarvis a le droit de faire", "type": "choix",
+         "choix": ["confirmation", "lecture", "libre"]},
+        {"nom": "cle_privee", "libelle": "Clé privée SSH", "type": "secret", "requis": False, "multiligne": True,
+         "aide": "Contenu de la clé (-----BEGIN OPENSSH PRIVATE KEY----- …). Vide : clés de cet ordinateur (~/.ssh)."},
+        {"nom": "phrase_cle", "libelle": "Phrase de passe de la clé", "type": "secret", "requis": False},
+        {"nom": "mot_de_passe", "libelle": "Mot de passe", "type": "secret", "requis": False,
+         "aide": "Seulement si le serveur se connecte par mot de passe (une clé est plus sûre)."},
+    ]
+    aide = ("Modes :\n- confirmation (conseillé) : Jarvis regarde librement, mais te demande « Autoriser / Refuser » "
+            "avant toute commande qui modifie le serveur ;\n- lecture : il ne peut que regarder (logs, état, fichiers) ;\n"
+            "- libre : il agit sans demander.\nsudo n'est jamais utilisé (ton mot de passe sudo n'est pas demandé).")
+
+    def mode(self):
+        return self.conf.get("mode") or "confirmation"
+
+    def _client(self):
+        import io
+        import paramiko
+        from .config import RACINE
+        c = paramiko.SSHClient()
+        connus = RACINE / "ssh_known_hosts"
+        if connus.exists():
+            c.load_host_keys(str(connus))
+        c.set_missing_host_key_policy(paramiko.AutoAddPolicy())   # 1re connexion : empreinte retenue ensuite
+        cle, phrase = self.v("cle_privee"), self.v("phrase_cle") or None
+        pkey = None
+        if cle:
+            for classe in (paramiko.Ed25519Key, paramiko.RSAKey, paramiko.ECDSAKey):
+                try:
+                    pkey = classe.from_private_key(io.StringIO(cle.strip() + "\n"), password=phrase)
+                    break
+                except Exception:
+                    continue
+            if pkey is None:
+                raise RuntimeError("Clé privée illisible (format ou phrase de passe).")
+        c.connect(self.v("hote"), port=int(self.v("port") or 22), username=self.v("utilisateur"), pkey=pkey,
+                  password=self.v("mot_de_passe") or None, allow_agent=not (cle or self.v("mot_de_passe")),
+                  look_for_keys=not (cle or self.v("mot_de_passe")), timeout=15, banner_timeout=15, auth_timeout=15)
+        try:
+            c.save_host_keys(str(connus))
+        except Exception:
+            pass
+        return c
+
+    def _executer(self, commande: str, delai=120) -> str:
+        c = self._client()
+        try:
+            _, sortie, erreur = c.exec_command(commande, timeout=delai)
+            code = sortie.channel.recv_exit_status()
+            out, err = sortie.read().decode(errors="replace"), erreur.read().decode(errors="replace")
+        finally:
+            c.close()
+        res = (out + (("\n[stderr]\n" + err) if err.strip() else "")).strip() or "(aucune sortie)"
+        return (f"[code {code}]\n" if code else "") + res[-12000:]
+
+    def _autorise(self, action: str, detail: str) -> str:
+        """« » si autorisé, sinon le message à renvoyer à Jarvis."""
+        if self.mode() == "libre":
+            return ""
+        if self.mode() == "lecture":
+            return f"Refusé : {self.etiquette()} est en lecture seule (Connecteurs › {self.nom}). Explique à l'utilisateur ce qu'il faudrait faire."
+        from . import web
+        if web.demander_confirmation(f"{self.etiquette()} : {action}", detail):
+            return ""
+        return "L'utilisateur a refusé cette action. Ne la relance pas sans son accord."
+
+    def fonctions(self):
+        def commande(commande: str):
+            """Exécute une commande shell sur ce serveur et renvoie sa sortie. Les commandes qui modifient le serveur peuvent demander l'accord de l'utilisateur. Pas de sudo.
+            commande: la commande à lancer (ex : df -h, docker ps, tail -n 50 /var/log/syslog)"""
+            if not commande_en_lecture(commande):
+                refus = self._autorise("exécuter une commande", commande)
+                if refus:
+                    return refus
+            return self._executer(commande)
+
+        def etat():
+            """État rapide du serveur : système, charge, mémoire, disque, conteneurs Docker, services en échec."""
+            return self._executer("uname -sr; uptime; echo; free -h; echo; df -h -x tmpfs -x devtmpfs; echo; "
+                                  "(docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null || true); echo; "
+                                  "(systemctl --failed --no-legend 2>/dev/null | head -20 || true)")
+
+        def lire_fichier(chemin: str, lignes: int = 300):
+            """Lit un fichier texte du serveur (les dernières lignes s'il est long).
+            chemin: chemin du fichier sur le serveur
+            lignes: nombre maximum de lignes (fin du fichier)"""
+            return self._executer(f"tail -n {max(1, min(int(lignes), 3000))} -- {_quote(chemin)}")
+
+        def ecrire_fichier(chemin: str, contenu: str):
+            """Écrit (remplace) un fichier texte sur le serveur. Peut demander l'accord de l'utilisateur.
+            chemin: chemin du fichier sur le serveur
+            contenu: nouveau contenu complet"""
+            refus = self._autorise(f"écrire le fichier {chemin}", contenu[:1500])
+            if refus:
+                return refus
+            c = self._client()
+            try:
+                with c.open_sftp() as sftp, sftp.open(chemin, "w") as f:
+                    f.write(contenu)
+            finally:
+                c.close()
+            return f"Fichier écrit : {chemin} ({len(contenu)} caractères)."
+
+        def envoyer_fichier(local: str, distant: str):
+            """Copie un fichier de cet ordinateur vers le serveur. Peut demander l'accord de l'utilisateur.
+            local: chemin du fichier sur cet ordinateur
+            distant: chemin de destination sur le serveur"""
+            refus = self._autorise(f"envoyer {local} vers {distant}", "")
+            if refus:
+                return refus
+            c = self._client()
+            try:
+                with c.open_sftp() as sftp:
+                    sftp.put(os.path.expanduser(local), distant)
+            finally:
+                c.close()
+            return f"Envoyé : {local} → {distant}"
+
+        def recuperer_fichier(distant: str, local: str):
+            """Copie un fichier du serveur vers cet ordinateur.
+            distant: chemin du fichier sur le serveur
+            local: chemin de destination sur cet ordinateur"""
+            c = self._client()
+            try:
+                with c.open_sftp() as sftp:
+                    sftp.get(distant, os.path.expanduser(local))
+            finally:
+                c.close()
+            return f"Récupéré : {distant} → {local}"
+
+        p = self.prefixe
+        return [(f"{p}_commande", commande), (f"{p}_etat", etat), (f"{p}_lire_fichier", lire_fichier),
+                (f"{p}_ecrire_fichier", ecrire_fichier), (f"{p}_envoyer_fichier", envoyer_fichier),
+                (f"{p}_recuperer_fichier", recuperer_fichier)]
+
+    def tester(self):
+        return "Connecté — " + self._executer("uname -sr && uptime -p", delai=20).replace("\n", " — ")
+
+
+def _quote(chemin: str) -> str:
+    import shlex
+    return shlex.quote(chemin)
+
+
 # Chaque type accepte plusieurs comptes : un nom court pour les distinguer (et pour le dire à Jarvis)
 CHAMP_COMPTE = {"nom": "compte", "libelle": "Nom de ce compte", "type": "text", "requis": False,
                 "aide": "ex : perso, travail, papa. Tu pourras dire à Jarvis « regarde mes mails travail »."}
-for _t in (Mail, Gmail, Agenda, GitHub, Notion):
+for _t in (Mail, Gmail, Agenda, GitHub, Notion, SSH):
     if not any(c["nom"] == "compte" for c in _t.__dict__.get("champs", [])):
         _t.champs = [CHAMP_COMPTE] + list(_t.champs)
 
-TYPES = {c.type: c for c in (Gmail, Mail, Agenda, GitHub, Notion, MCP)}
+TYPES = {c.type: c for c in (Gmail, Mail, Agenda, GitHub, Notion, SSH, MCP)}
 
 
 # ---------- gestion ----------
