@@ -32,15 +32,22 @@ INSTANCES: dict = {}   # cid -> instance démarrée
 
 
 # ---------- identifiants (coffre-fort Windows) ----------
+_secrets_lus: dict = {}   # lus une seule fois par lancement (chaque lecture du trousseau peut afficher une demande)
+
+
 def secret(cid, champ):
-    try:
-        import keyring
-        return keyring.get_password(SERVICE, f"{cid}:{champ}") or ""
-    except Exception:
-        return ""
+    nom = f"{cid}:{champ}"
+    if nom not in _secrets_lus:
+        try:
+            import keyring
+            _secrets_lus[nom] = keyring.get_password(SERVICE, nom) or ""
+        except Exception:
+            _secrets_lus[nom] = ""
+    return _secrets_lus[nom]
 
 
 def definir_secret(cid, champ, valeur):
+    _secrets_lus[f"{cid}:{champ}"] = valeur or ""
     import keyring
     if valeur:
         keyring.set_password(SERVICE, f"{cid}:{champ}", valeur)

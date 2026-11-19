@@ -25,16 +25,22 @@ ETAT = {"en_cours": False}
 
 
 # ---------- jeton GitHub (trousseau / gestionnaire d'identifiants de l'appareil) ----------
+_jeton_lu: list = []   # lu une seule fois par lancement (chaque lecture du trousseau peut afficher une demande)
+
+
 def jeton() -> str:
-    try:
-        import keyring
-        return keyring.get_password(SERVICE, CLE) or ""
-    except Exception:
-        return ""
+    if not _jeton_lu:
+        try:
+            import keyring
+            _jeton_lu.append(keyring.get_password(SERVICE, CLE) or "")
+        except Exception:
+            _jeton_lu.append("")
+    return _jeton_lu[0]
 
 
 def definir_jeton(valeur: str):
     import keyring
+    _jeton_lu[:] = [valeur.strip()]
     if valeur:
         keyring.set_password(SERVICE, CLE, valeur.strip())
     else:

@@ -75,7 +75,8 @@ def _secret_local(nom: str) -> str:
             import keyring
             _cache_trousseau[nom] = keyring.get_password(SERVICE, nom) or ""
         except Exception:
-            return ""
+            # accès refusé (« Deny ») : on retient la réponse pour ne pas reposer la question à chaque appel
+            _cache_trousseau[nom] = ""
     return _cache_trousseau[nom]
 
 
@@ -238,7 +239,8 @@ def charger_coffre():
 def _appliquer_coffre():
     from . import claude
     for nom, valeur in _coffre.get("trousseau", {}).items():
-        _definir_secret_local(nom, valeur)
+        if _secret_local(nom) != valeur:   # n'écrit que ce qui a changé (chaque écriture peut demander le mot de passe)
+            _definir_secret_local(nom, valeur)
     if _coffre.get("ANTHROPIC_API_KEY") and _coffre["ANTHROPIC_API_KEY"] != os.environ.get("ANTHROPIC_API_KEY"):
         claude.definir_cle(_coffre["ANTHROPIC_API_KEY"], synchro=False)
 
