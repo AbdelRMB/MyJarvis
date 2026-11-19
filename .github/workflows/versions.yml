@@ -1,12 +1,12 @@
 # Publie chaque nouvelle version de Jarvis dans l'onglet « Releases » du dépôt.
-# Déclenché à chaque push sur main : si jarvis/version.py contient une version qui n'a pas encore
+# Si jarvis/version.py contient une version qui n'a pas encore
 # de tag vX.Y.Z, on construit le .dmg (Mac puce Apple) et le JarvisSetup.exe (Windows), puis on crée
 # la release avec la description de CHANGELOG.md. L'appli la voit dans « Mises à jour ».
 name: Versions de Jarvis
 
+# Lancement MANUEL uniquement (onglet Actions > Run workflow) : la voie normale, gratuite et sans limite,
+# c'est publier-mac.sh / publier.bat sur tes machines. Ce workflow consomme des minutes GitHub (quota mensuel).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

@@ -13,21 +13,24 @@ description, et permet d'installer la dernière ou une version précise. Pour qu
 2. **Ajoute en haut de `CHANGELOG.md`** une section `## x.y.z` (exactement la nouvelle version) avec la description
    de la mise à jour : une puce par changement, en français, écrite pour l'utilisateur (ce qui change pour lui),
    pas le détail du code. **Aucune version sans description** : la CI échoue si la section manque.
-3. Commit + push sur `main` : le workflow `.github/workflows/versions.yml` construit le .dmg et le .exe,
-   puis crée la release `vx.y.z` avec cette description. Elle apparaît alors dans « Mises à jour » sur tous les appareils.
+3. Commit + push sur `main`, puis **publier** (gratuit et sans limite, rien ne passe par GitHub Actions) :
+   - sur le Mac : `./publier-mac.sh` → construit le .dmg et crée la release `vx.y.z` avec cette description ;
+   - sur le PC Windows : `publier.bat` → construit JarvisSetup.exe et l'ajoute à la même release.
+   La version apparaît alors dans « Mises à jour » sur tous les appareils (sur un appareil dont l'installateur
+   n'est pas encore envoyé, elle s'affiche « pas encore prête »). `publier.py` refuse de publier si des commits
+   ne sont pas poussés ou si la section du CHANGELOG manque.
+   Secours : `.github/workflows/versions.yml` fait les deux builds sur GitHub, mais uniquement lancé à la main
+   (Actions > Run workflow), car il consomme le quota mensuel de minutes.
 
 Plusieurs commits peuvent partager une même version tant qu'elle n'est pas poussée : regroupe-les dans la même
 section du CHANGELOG. Une version déjà publiée (tag existant) ne se modifie plus : il faut en créer une nouvelle.
 Les commits qui ne touchent pas l'appli (README, CLAUDE.md, CI seule) n'ont pas besoin de nouvelle version.
 
-Chaque build macOS est poussé sur des runners macOS (minutes GitHub ×10 sur un dépôt privé) : ne publie pas une
-version pour chaque micro-commit, regroupe.
-
 ## Installateurs
 
 - Jamais committés dans le dépôt (`installateur/` est ignoré) : ils font 250+ Mo, au-delà de la limite de 100 Mo
-  par fichier de GitHub. Ils sont publiés dans les **Releases** par la CI.
-- Build local : `bash construire-mac.sh` (Mac) ou `construire.bat` (Windows).
+  par fichier de GitHub. Ils sont publiés dans les **Releases** (`publier-mac.sh` / `publier.bat`).
+- Build seul, sans publier : `bash construire-mac.sh` (Mac) ou `construire.bat` (Windows).
 - Mise à jour sans désinstaller : Windows = même `AppId` Inno Setup, installation silencieuse par-dessus ;
   Mac = remplacement de `/Applications/Jarvis.app` depuis le .dmg (`jarvis/mises_a_jour.py`).
 - Raccourci « Mettre à jour Jarvis » (menu Démarrer / Spotlight) = `Jarvis --maj`, ouvre l'écran Mises à jour.

@@ -11,9 +11,9 @@ for /f "delims=" %%v in ('".venv\Scripts\python.exe" -c "from jarvis.version imp
 rmdir /s /q build 2>nul
 echo.
 echo Termine : installateur\ contient JarvisSetup-x.y.z.exe
-pause
+if not defined SANS_PAUSE pause
 exit /b 0
 :erreur
 echo Echec de la construction.
-pause
+if not defined SANS_PAUSE pause
 exit /b 1
