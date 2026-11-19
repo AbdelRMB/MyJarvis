@@ -48,6 +48,63 @@ def _icone():
     return img
 
 
+def _relancer_jarvis():
+    """Relance complète de Jarvis (le moteur d'affichage ne peut pas renaître dans la même fenêtre) :
+    un petit script caché attend la fin de ce processus, puis relance Jarvis avec la fenêtre ouverte."""
+    import os
+    import subprocess
+    from . import demarrage
+    from .plateforme import CACHE_FENETRE
+    args = [a for a in demarrage.arguments() if a != "--cache"]
+    liste = ", ".join("'" + a.replace("'", "''") + "'" for a in args[1:])
+    script = (f"Wait-Process -Id {os.getpid()} -Timeout 30 -ErrorAction SilentlyContinue; "
+              f"Start-Process -FilePath '{args[0]}'" + (f" -ArgumentList {liste}" if liste else ""))
+    subprocess.Popen(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                     creationflags=CACHE_FENETRE.get("creationflags", 0) | 0x00000008)   # DETACHED_PROCESS
+
+
+def _proteger_affichage_windows(quitter):
+    """Windows : si le moteur d'affichage (WebView2) plante, la fenêtre reste noire et ne répond plus.
+    On note la cause dans le journal et on récupère tout seul : rechargement de la page, ou relance de Jarvis
+    si c'est le moteur entier qui s'est arrêté."""
+    try:
+        from webview.platforms import edgechromium
+    except Exception as e:
+        print(f"  ! Surveillance de l'affichage : {e}")
+        return
+    origine = edgechromium.EdgeChrome.on_webview_ready
+    etat = {"relance": False}
+
+    def pret(self, sender, args):
+        origine(self, sender, args)
+        if not args.IsSuccess:
+            return
+
+        def echec(_expediteur, e):
+            try:
+                genre = str(e.ProcessFailedKind)
+                details = f"raison {getattr(e, 'Reason', '?')}, code {getattr(e, 'ExitCode', '?')}, " \
+                          f"{getattr(e, 'ProcessDescription', '') or ''}"
+                print(f"  ! Affichage (WebView2) en échec : {genre} ({details.strip(', ')})")
+                if "BrowserProcessExited" in genre:
+                    if not etat["relance"]:
+                        etat["relance"] = True
+                        print("  Relance de Jarvis pour retrouver l'affichage.")
+                        _relancer_jarvis()
+                        threading.Thread(target=quitter, daemon=True).start()
+                elif "GpuProcessExited" not in genre:   # le GPU repart tout seul ; le reste : on recharge
+                    sender.CoreWebView2.Reload()
+            except Exception:
+                traceback.print_exc()
+
+        try:
+            sender.CoreWebView2.ProcessFailed += echec
+        except Exception as e:
+            print(f"  ! Surveillance de l'affichage : {e}")
+
+    edgechromium.EdgeChrome.on_webview_ready = pret
+
+
 def main():
     cache = "--cache" in sys.argv
     vue_maj = "majs" if "--maj" in sys.argv else None   # raccourci « Mettre à jour Jarvis »
@@ -222,6 +279,7 @@ def main():
     import os
     if sys.platform == "win32":
         os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--autoplay-policy=no-user-gesture-required")
+        _proteger_affichage_windows(quitter)
     if cache:
         def precharger_interface():
             """Démarrage de l'ordinateur : l'interface se charge en arrière-plan, fenêtre cachée, quelques secondes

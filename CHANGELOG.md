@@ -3,6 +3,10 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.6.1
+- **Écran noir (Windows)** : si le moteur d'affichage de la fenêtre plante, Jarvis recharge l'interface tout seul, ou se relance si besoin, au lieu de rester noir. La cause est notée dans le journal. / **Black window on Windows**: Jarvis now recovers by itself when the display engine crashes.
+- **Tâches Claude Code qui échouaient** à cause de certains caractères dans la sortie de l'agent : corrigé. / **Fixed Claude Code tasks failing** on some characters.
+
 ## 1.6.0
 - **Tâches de code vraiment en arrière-plan** : Claude Code et Codex ne font plus apparaître de fenêtres noires sur Windows pendant qu'ils travaillent. / **Coding tasks run silently** on Windows, no more console windows.
 - **Notifications au premier plan** : la liste de la cloche passe au-dessus de la conversation. / **Notifications** now show above the conversation.
