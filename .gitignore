@@ -17,3 +17,10 @@ __pycache__/
 .venv/
 .venv-mac/
 interface/node_modules/
+
+# Notes privées pour Claude (accès au VPS, règles de publication) : jamais versionnées
+CLAUDE.local.md
+
+# Cache du compte et état de connexion (mode développement : données dans le dossier du projet)
+comptes/
+compte.json

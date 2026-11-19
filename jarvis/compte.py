@@ -26,7 +26,7 @@ from .config import CONFIG, MACHINE, RACINE
 SERVEUR_DEFAUT = "https://jarvis.abdelrahimriche.com"
 # Le serveur (Apache + API) ne répond qu'aux requêtes portant cette clé : le navigateur et les robots ne voient
 # qu'un 404. Ce n'est qu'un filtre : la vraie protection, ce sont le mot de passe du compte et le chiffrement.
-CLE_APPLI = "5l4xUaEzf2zcv9N56ZrvDH6Lo8MGCGgwqtTcnzeiK-w"
+CLE_APPLI_DEFAUT = "5l4xUaEzf2zcv9N56ZrvDH6Lo8MGCGgwqtTcnzeiK-w"   # serveur officiel ; autre serveur : "cle_appli" dans config.json
 ETAT_FICHIER = RACINE / "compte.json"
 SERVICE = "Jarvis"
 _verrou = threading.RLock()
@@ -106,7 +106,7 @@ class ErreurCompte(Exception):
 
 
 def _appel(methode, chemin, jeton=None, **kw):
-    h = {"Authorization": f"Bearer {jeton or _secret_local('compte:jeton')}", "X-Jarvis-Appli": CLE_APPLI,
+    h = {"Authorization": f"Bearer {jeton or _secret_local('compte:jeton')}", "X-Jarvis-Appli": CONFIG.get("cle_appli") or CLE_APPLI_DEFAUT,
          "User-Agent": "Jarvis"}
     try:
         r = requests.request(methode, serveur() + chemin, headers=h, timeout=kw.pop("timeout", 20), **kw)

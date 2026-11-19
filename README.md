@@ -1,95 +1,166 @@
-# J.A.R.V.I.S. — assistant local (Ollama + qwen3.5:9b)
+# J.A.R.V.I.S. — ton assistant personnel de bureau
 
-Lancer :
-- **Application** : `lanceur.pyw` (développement) ou Jarvis installé (voir plus bas)
-- **Interface web** : double-clic sur `jarvis-web.bat` → ouvre http://127.0.0.1:7777 (démarre Ollama si besoin)
-- Terminal : `jarvis.bat` (ou `jarvis.bat --voix`)
+Jarvis est un assistant qui **pilote ton ordinateur** à ta place : il ouvre tes applis, gère tes fichiers, clique et
+tape pour toi, regarde ton écran, code dans VS Code, cherche sur le web… Tu lui parles à la voix (« Jarvis, ouvre
+Discord ») ou par écrit, et il te répond à voix haute.
 
-## Interface web (React + TypeScript + Tailwind)
-Code source dans `interface/`, compilé dans `jarvis/static/` et servi par `jarvis/web.py` (FastAPI).
+- **macOS** (puce Apple) et **Windows 10/11**.
+- **Cerveau au choix** : Claude (API Anthropic, le plus intelligent) ou Ollama (gratuit, 100 % local).
+- **Un compte par personne** : ta mémoire, ton historique, tes connecteurs et tes réglages te suivent sur tous tes
+  appareils. Ta clé API et tes mots de passe sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.
+- **Mises à jour intégrées** : l'appli affiche les nouvelles versions et ce qu'elles contiennent, et s'installe en un clic.
 
-Écrans : **Assistant** (chat en streaming, cartes d'outils dépliables, réacteur animé, panneau audio et actions en direct), **Historique**, **Mémoire** (ajouter / oublier des souvenirs), **Activité** (journal `logs/actions.log`), **Arsenal** (les 52 outils), **Système** (jauges, courbes, VRAM d'Ollama), **Réglages** (micro, voix, cerveau, interface).
+---
 
-- Micro : périphérique, gain, seuil (VU-mètre), silence, anti-bruit/écho, test avec réécoute + transcription
-- Modes : **Appui** (Espace maintenu), **Auto** (mains libres), **« Jarvis »** (mot d'activation, « Jarvis, stop »)
-- Raccourcis : Échap = stop · Ctrl+K = saisie · Alt+1…7 = écrans
-- Sécurité : 127.0.0.1 uniquement, Host vérifié (anti DNS-rebinding), jeton par session, Origin vérifiée sur la WebSocket
+## Installer Jarvis avec Claude (le plus simple)
 
-Développer l'interface :
+Ce dépôt contient un guide d'installation pour [Claude Code](https://claude.com/claude-code) (`CLAUDE.md`) :
+**Claude peut installer Jarvis tout seul**, de bout en bout.
+
+1. Installe Claude Code, puis récupère le projet :
+   ```bash
+   git clone https://github.com/AbdelRMB/Jarvis-real.git
+   cd Jarvis-real
+   claude
+   ```
+2. Dis-lui simplement : **« Installe Jarvis »**.
+
+Claude détecte ton système et te demande si tu veux juste utiliser Jarvis ou le développer. Il télécharge et
+installe tout, puis te guide pour les autorisations et la création de ton compte. Il te demande ton accord avant
+d'installer un logiciel sur ton ordinateur, et c'est toi qui tapes les mots de passe éventuels.
+
+---
+
+## Installer Jarvis à la main
+
+### 1. Télécharger
+
+Va dans l'onglet **[Releases](https://github.com/AbdelRMB/Jarvis-real/releases)** et prends la dernière version :
+
+| Ton ordinateur | Fichier |
+|---|---|
+| Mac avec puce Apple (M1, M2, M3…) | `Jarvis-<version>-mac-arm64.dmg` |
+| PC Windows 10/11 | `JarvisSetup-<version>.exe` |
+
+### 2. Installer
+
+**Sur Mac**
+1. Ouvre le `.dmg` et glisse **Jarvis** dans **Applications**.
+2. La première fois : **clic droit sur Jarvis › Ouvrir**, puis « Ouvrir » (l'appli n'est pas signée par Apple).
+   Si macOS dit qu'elle est « endommagée », tape dans le Terminal :
+   `xattr -dr com.apple.quarantine /Applications/Jarvis.app`
+3. Dans **Réglages Système › Confidentialité et sécurité**, autorise Jarvis pour le **Micro**, l'**Accessibilité**
+   (raccourcis, souris, clavier) et l'**Enregistrement de l'écran** (pour qu'il voie ton écran).
+
+Jarvis vit dans la **barre des menus**, en haut à droite. Il se lance tout seul à l'ouverture de ta session.
+
+**Sur Windows**
+1. Lance `JarvisSetup-<version>.exe` (pas besoin de droits administrateur).
+2. Coche **« Lancer Jarvis au démarrage de Windows »** si tu veux qu'il soit toujours prêt.
+
+Jarvis vit près de l'**horloge** (zone de notification).
+
+### 3. Premier lancement
+
+1. **Crée ton compte** (prénom, e-mail, mot de passe) ou connecte-toi.
+   - Si cet ordinateur avait déjà une mémoire Jarvis (ancienne version, OneDrive), elle est ajoutée à ton compte
+     automatiquement, sans doublon.
+2. **Choisis le cerveau** dans **Réglages › Cerveau** :
+   - **Claude** : colle ta clé API, à créer sur [platform.claude.com](https://platform.claude.com) › API keys.
+     C'est payant à l'usage, et l'abonnement Claude Pro n'inclut pas de crédit API.
+   - **Ollama** : gratuit et local. Installe [Ollama](https://ollama.com), puis tape `ollama pull qwen3.5:9b`.
+     Il faut une carte graphique avec environ 8 Go de mémoire.
+3. C'est prêt. Dis **« Jarvis, … »**.
+
+### Mettre à jour
+
+- Dans l'appli : écran **Mises à jour**. Tu vois chaque nouvelle version avec sa description, et tu installes la
+  dernière ou une version précise. Pas besoin de désinstaller.
+- Ou cherche **« Mettre à jour Jarvis »** dans le menu Démarrer (Windows) ou Spotlight (Mac).
+
+---
+
+## Utiliser Jarvis
+
+| Action | Comment |
+|---|---|
+| L'appeler | Dis **« Jarvis, ouvre Discord »** d'une traite, ou « Jarvis » puis ta demande. Ou `Ctrl+Alt+J` (Windows) / `⌃ Ctrl + ⌥ Option + J` (Mac), ou clic sur l'icône. |
+| Le faire taire | **« Jarvis, stop »** (même pendant qu'il parle), ou `Ctrl+Alt+S` / `⌃⌥S`, même fenêtre cachée. |
+| Fermer la fenêtre | Elle se cache seulement. Pour quitter : icône Jarvis › Quitter. |
+| Raccourcis dans la fenêtre | `Échap` = stop · `Ctrl+K` = écrire · `Alt+1…9` = écrans |
+
+- **Démarrage discret** : à l'allumage, Jarvis tourne en fond sans ouvrir son interface ; elle apparaît quand tu l'appelles.
+- **Écoute 100 % locale** : le mot « Jarvis » est reconnu sur ton ordinateur (openWakeWord + petit Whisper).
+  Rien n'est envoyé tant qu'il n'a pas entendu son nom.
+- **Voix** : Microsoft neuronal (Henri, très naturel, en ligne) ou Piper (100 % local). Réglages › Voix.
+
+### Ce qu'il sait faire (52 outils)
+- **Système** : terminal (PowerShell / zsh), scripts Python, ouvrir n'importe quelle appli, fichier ou URL, processus, verrouiller/éteindre
+- **Fichiers** : lire, écrire, modifier, chercher (nom + contenu), déplacer, copier, supprimer (→ corbeille)
+- **Souris et clavier** : déplacer, cliquer, glisser, défiler, taper, raccourcis, média/volume, presse-papier
+- **Fenêtres** : lister, activer, maximiser, fermer, cliquer un bouton par son texte
+- **Vision** : regarder l'écran, trouver un élément et cliquer dessus, analyser une image
+- **Code** : ouvrir dans VS Code (fichier:ligne), git, créer un projet (Vite / Next / Node / Python)
+- **Web** : recherche, actualités, lire une page, météo, télécharger
+- **Mémoire** : retient ce qu'il apprend sur toi, avec un historique de vos conversations sur tous tes appareils
+- **Connecteurs** : Gmail, autre messagerie IMAP, agenda (iCal), GitHub, Notion, et **n'importe quel serveur MCP**
+  (Spotify, Slack, Home Assistant…)
+
+### Écrans
+**Assistant** (chat, cartes d'outils, réacteur animé) · **Historique** · **Mémoire** · **Connecteurs** ·
+**Activité** (journal des actions) · **Arsenal** (les outils) · **Système** (jauges, VRAM) · **Réglages** ·
+**Mises à jour**.
+
+### Sécurité et vie privée
+- L'interface locale n'écoute que sur `127.0.0.1` (Host vérifié, jeton par session, Origin vérifiée).
+- **Compte** : ton mot de passe ne quitte jamais l'appareil. Il sert à dériver une clé de connexion et une clé de
+  coffre, qui chiffre ta clé API et tes mots de passe avant l'envoi.
+- Le serveur de comptes n'accepte que l'appli Jarvis, et bloque les essais de mot de passe en rafale.
+- Avec le cerveau Claude, tes messages, souvenirs et résultats d'outils sont envoyés à Anthropic. Avec Ollama, rien
+  ne sort de ton ordinateur.
+- **Arrêt d'urgence** : souris dans le coin haut-gauche de l'écran (pyautogui coupe l'action). Toutes les actions
+  sont journalisées (`logs/actions.log`).
+
+---
+
+## Développer
+
+Le détail des commandes est dans [`CLAUDE.md`](CLAUDE.md), qui sert aussi de guide pour Claude. En bref :
+
+**Prérequis** : Python **3.12**, Node.js **22+**, git. Optionnel : Ollama.
+
+```bash
+# Mac
+python3.12 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.txt
+(cd interface && npm ci && npm run build)
+.venv-mac/bin/python lanceur.pyw
 ```
+```powershell
+# Windows
+py -3.12 -m venv .venv; .venv\Scripts\pip install -r requirements.txt -r requirements-voix.txt
+cd interface; npm ci; npm run build; cd ..
+.venv\Scripts\pythonw lanceur.pyw          # ou jarvis-web.bat (navigateur) / jarvis.bat (terminal)
+```
+
+### Structure
+| Dossier / fichier | Rôle |
+|---|---|
+| `jarvis/` | Le cœur en Python : agent, outils (`outils/`), voix, écoute, serveur local (`web.py`), compte (`compte.py`), mises à jour |
+| `interface/` | Interface React + TypeScript + Tailwind, compilée dans `jarvis/static/` |
+| `serveur/` | Serveur des comptes (FastAPI + SQLite, Docker) |
+| `jarvis.spec` / `jarvis-mac.spec` | Recettes PyInstaller (Windows / Mac) |
+| `installateur.iss` | Installateur Windows (Inno Setup) |
+| `construire.bat` / `construire-mac.sh` | Construire les installateurs |
+| `jarvis/version.py` + `CHANGELOG.md` | Version, et description de chaque mise à jour |
+
+### Interface en direct
+```bash
 cd interface
-npm run dev        # http://localhost:5173, branché sur le serveur Python (lancer jarvis-web.bat à côté)
+npm run dev        # http://localhost:5173, branchée sur le serveur Python lancé à côté
 npm run build      # recompile jarvis/static
 ```
 
-## Application de bureau (installée)
-- **Installer** : `installateur\JarvisSetup-1.0.0.exe` (sans droits admin). Coche « Lancer au démarrage de Windows ».
-- **Au démarrage du PC** : Jarvis se lance caché (icône près de l'horloge), sans fenêtre.
-- **Le faire taire** : « Jarvis, stop » (même pendant qu'il parle) ou `Ctrl+Alt+S`, même fenêtre cachée.
-- **L'appeler** : dis « Jarvis, ouvre Discord » (d'une traite) ou « Jarvis » puis ta demande — ou `Ctrl+Alt+J`, ou double-clic sur l'icône. La fenêtre apparaît.
-- **Fermer la fenêtre** la cache seulement. Quitter : clic droit sur l'icône > Quitter.
-- Écoute de fond 100 % locale : openWakeWord (« Hey Jarvis » à l'anglaise) + petit Whisper qui reconnaît « Jarvis » en français. Rien n'est envoyé avant que le nom soit reconnu.
-- Données de ce PC : `%LOCALAPPDATA%\Jarvis` (config, clé API `.env`, journaux `logs\jarvis.log`).
-
-## macOS
-Le même code tourne sur Mac (outils adaptés : terminal zsh, applis de /Applications, fenêtres via AppleScript, Cmd au lieu de Ctrl, LaunchAgent au démarrage, Trousseau pour les mots de passe).
-- **Construire sur un Mac** : copie le dossier du projet (sans `.venv`, `dist`, `node_modules`), puis `bash construire-mac.sh` -> `installateur/Jarvis-<version>-mac-<arm64|x86_64>.dmg`.
-- **Ou sans Mac** : pousse le projet sur un dépôt GitHub privé, onglet Actions > « Jarvis macOS » > Run workflow -> le .dmg (puce Apple et Intel) est dans les Artifacts.
-- **Installer** : ouvre le .dmg, glisse Jarvis dans Applications, puis **clic droit > Ouvrir** la première fois (appli non signée par Apple). Autorise ensuite le micro, l'Accessibilité (raccourcis, souris, clavier) et l'Enregistrement de l'écran (vision) dans Réglages Système > Confidentialité et sécurité.
-- Icône dans la barre des menus ; appel : « Jarvis, … » ou ⌃ Ctrl + ⌥ Option + J ; arrêt : « Jarvis, stop » ou ⌃ Ctrl + ⌥ Option + S.
-
-## Comptes : une mémoire par personne, sur tous ses appareils
-- Au lancement : créer un compte ou se connecter. Mémoire, historique, connecteurs et réglages sont dans le compte (serveur `serveur/`, hébergé sur le VPS : https://jarvis.abdelrahimriche.com, réservé à l'appli).
-- Clé API et mots de passe des connecteurs : chiffrés sur l'appareil avec le mot de passe du compte (le serveur ne peut pas les lire).
-- 1re connexion sur un appareil : sa mémoire existante (ancienne version, OneDrive) est versée dans le compte, sans doublon.
-- Serveur : `serveur/app.py` (FastAPI + SQLite, Docker). Redéployer : `rsync` de `serveur/` vers `~/jarvis-serveur/` sur le VPS puis `docker compose up -d --build`.
-
-## Connecteurs
-Écran **Connecteurs** : Gmail (mot de passe d'application), autre messagerie IMAP, agenda (lien iCal secret), GitHub, Notion, et **n'importe quel serveur MCP** (Spotify, Slack, Home Assistant…). Leurs outils s'ajoutent à Jarvis.
-
-## Reconstruire l'installateur
-`construire.bat` (interface Vite -> PyInstaller `jarvis.spec` -> Inno Setup `installateur.iss`). Pour une nouvelle version, change `#define Version` dans `installateur.iss`.
-
-## Cerveau : Claude (API) ou Ollama (local)
-Réglages > Cerveau, bascule en un clic (nouvelle conversation à chaque changement).
-- **Claude** (par défaut : Sonnet 5.5, effort bas) : plus intelligent, ne charge pas la carte graphique (la vision passe aussi par Claude). Payant à l'usage ; messages, souvenirs et résultats d'outils sont envoyés à Anthropic.
-  - Clé API : platform.claude.com > API keys, à coller dans Réglages > Cerveau (enregistrée dans `.env`, jamais ailleurs). L'abonnement Claude Pro n'inclut pas de crédit API.
-  - Cache de prompt activé (instructions + outils relus ~10x moins cher), secours automatique si le modèle refuse une demande.
-  - Dépenses estimées : Réglages > Cerveau et `logs/couts.json`.
-- **Ollama** : gratuit, 100 % privé, sur la carte graphique.
-
-## Vitesse & voix
-- **Voix** : Microsoft neuronal (Henri par défaut, en ligne, très naturel) ou **Piper** 100 % local (`voix/fr_FR-tom-medium`). Réglages > Voix. Jarvis parle phrase par phrase pendant qu'il écrit ; sans Internet il bascule sur Piper.
-- **Rapidité** : le modèle reste chargé en VRAM tant que Jarvis tourne (`garder_modele: -1`) et le prompt est pré-lu au démarrage → premier mot en ~0,2-0,6 s. À la fermeture, la VRAM est rendue.
-- **Un seul Jarvis à la fois** : deux instances s'écrasent le cache d'Ollama (chaque question relit tout le prompt). `jarvis-web.bat` ouvre l'instance existante au lieu d'en lancer une 2e.
-- **Carte graphique pleine** (jeux, LDPlayer, Wallpaper Engine…) : le modèle déborde sur le CPU. Système > « Libérer la VRAM » avant de jouer ; Réglages > Interface > animations « Désactivées » si besoin.
-- Diagnostic : `logs/perf.log` (une ligne par appel au modèle : tokens relus, durées, vitesse).
-
-## Ce qu'il sait faire (52 outils, sans demander de permission)
-- **Système** : PowerShell, scripts Python, ouvrir n'importe quelle appli/fichier/URL, processus, infos PC, verrouiller/éteindre
-- **Fichiers** : lire, écrire, modifier, chercher (nom + contenu), déplacer, copier, supprimer (→ corbeille)
-- **Souris/clavier** : déplacer, cliquer, glisser, défiler, taper du texte, raccourcis, média/volume, presse-papier
-- **Fenêtres** : lister, activer, maximiser, fermer, cliquer un bouton par son texte (UI Automation)
-- **Vision** : regarder l'écran, trouver un élément et cliquer dessus, analyser une image
-- **Code** : ouvrir dans VS Code (fichier:ligne), palette de commandes, git, créer un projet (Vite/Next/Node/Python)
-- **Web** : recherche DuckDuckGo, actus, lire une page, météo, télécharger
-- **Mémoire** : faits sur toi (`memoire/faits.json`), scan du PC (`memoire/systeme.md`), historique des conversations (`memoire/historique/`). À la sortie (`/quit`), il extrait tout seul ce qu'il a appris.
-- **Divers** : date/heure, rappels, notifications, calculs
-
-## Commandes
-`/voix` `/think` `/memoire` `/scan` `/reset` `/quit` `/aide`
-
-## Sécurité
-- **Arrêt d'urgence** : souris dans le coin haut-gauche de l'écran → pyautogui coupe l'action. `Ctrl+C` interrompt la tâche en cours.
-- Toutes les actions sont journalisées dans `logs/actions.log`.
-
-## Voix (optionnel)
-```
-.venv\Scripts\python.exe -m pip install -r requirements-voix.txt
-```
-Reconnaissance : faster-whisper (local, CPU). Synthèse : voix Windows (installe une voix française dans Paramètres > Heure et langue > Voix si besoin).
-
-## Ajouter un outil
+### Ajouter un outil
 Dans `jarvis/outils/*.py` :
 ```python
 @outil
@@ -99,5 +170,32 @@ def mon_outil(param: str):
     return "résultat"
 ```
 
-## Config (`config.json`)
-`modele`, `num_ctx`, `reflexion` (thinking qwen), `max_etapes_outils`, `voix_tts`, `whisper_modele`.
+### Construire les installateurs
+- Mac : `bash construire-mac.sh` → `installateur/Jarvis-<version>-mac-arm64.dmg`
+- Windows : `construire.bat` (Inno Setup 6 requis) → `installateur\JarvisSetup-<version>.exe`
+- Ou sur GitHub : **Actions › Versions de Jarvis › Run workflow** (case Windows et/ou Mac).
+
+### Publier une version
+1. Incrémente `jarvis/version.py`.
+2. Décris la version en haut de `CHANGELOG.md` (section `## x.y.z`, écrite pour l'utilisateur).
+3. Pousse sur `main`, puis lance `./publier-mac.sh` (Mac) ou `publier.bat` (Windows). Le script construit
+   l'installateur de ta machine, crée la version dans les Releases, et demande à GitHub de construire celui de
+   l'autre système.
+
+### Héberger ton propre serveur de comptes
+Voir la partie 4 de [`CLAUDE.md`](CLAUDE.md). En bref : `docker compose up -d --build` dans `serveur/` avec un
+`.env` contenant `JARVIS_CLE_APPLI`, un proxy HTTPS devant (exemple Apache fourni), puis dans le `config.json` de
+l'appli : `"serveur_comptes"` et `"cle_appli"`.
+
+---
+
+## Où sont mes données ?
+
+| | Mac | Windows |
+|---|---|---|
+| Réglages de l'appareil, journaux, cache du compte | `~/Library/Application Support/Jarvis` | `%LOCALAPPDATA%\Jarvis` |
+| Mémoire, historique, connecteurs, réglages communs | dans ton **compte** (et en cache local) | idem |
+| Clé API, mots de passe des connecteurs | Trousseau macOS + coffre chiffré du compte | Gestionnaire d'identifiants + coffre chiffré du compte |
+
+Diagnostic : `logs/jarvis.log` (démarrage, erreurs), `logs/perf.log` (vitesse du modèle), `logs/couts.json`
+(dépenses estimées de l'API Claude).

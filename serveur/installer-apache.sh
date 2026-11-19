@@ -1,6 +1,6 @@
 #!/bin/bash
 # À lancer UNE fois sur le VPS avec sudo : certificat HTTPS + site Apache pour jarvis.abdelrahimriche.com
-# Prérequis : enregistrement DNS « jarvis » (A -> serveur) créé chez Cloudflare.
+# Prérequis : enregistrement DNS du sous-domaine (type A) pointant vers l'IP du serveur.
 set -euo pipefail
 DOM=jarvis.abdelrahimriche.com
 cd "$(dirname "$0")"

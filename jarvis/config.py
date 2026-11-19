@@ -60,7 +60,8 @@ DEFAUT = {
     "cerveau": "claude",          # "claude" (API Anthropic) ou "ollama" (local)
     "claude_modele": "claude-sonnet-5-5",
     "claude_effort": "low",       # low = le plus réactif à l'oral ; medium pour les tâches longues avec outils
-    "serveur_comptes": "",        # vide = serveur Jarvis par défaut (jarvis/compte.py)
+    "serveur_comptes": "",        # vide = serveur de comptes officiel ; sinon l'adresse HTTPS de ton propre serveur
+    "cle_appli": "",              # clé d'appli de ton propre serveur (JARVIS_CLE_APPLI dans serveur/.env)
     "ecoute_fond": True,          # appli de bureau : écoute « Hey Jarvis » même fenêtre cachée
     "seuil_eveil": 0.5,           # sensibilité du mot d'activation (0-1, plus bas = plus sensible)
     "silence_fin": 2.5,           # s de silence avant d'envoyer ta demande (il écoute en continu jusque-là)
