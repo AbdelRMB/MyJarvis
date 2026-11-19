@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import connecteurs, memoire, outils, tts
+from .modeles import charger_whisper
 from .plateforme import CACHE_FENETRE, MAC, WIN
 from .agent import Jarvis
 from .config import CONFIG, MACHINE, PARTAGE, RACINE, sauver_config, sauver_profil
@@ -273,8 +274,7 @@ def OUTILS_TRIES():
 def _modele_whisper():
     global _whisper, _whisper_nom
     if _whisper is None or _whisper_nom != CONFIG["whisper_modele"]:
-        from faster_whisper import WhisperModel
-        _whisper = WhisperModel(CONFIG["whisper_modele"], device="cpu", compute_type="int8")
+        _whisper = charger_whisper(CONFIG["whisper_modele"])
         _whisper_nom = CONFIG["whisper_modele"]
     return _whisper
 
@@ -294,8 +294,7 @@ def transcrire_rapide(audio: np.ndarray) -> str:
     global _rapide
     with _rapide_verrou:
         if _rapide is None:
-            from faster_whisper import WhisperModel
-            _rapide = WhisperModel("base", device="cpu", compute_type="int8", cpu_threads=4)
+            _rapide = charger_whisper("base", cpu_threads=4)
         segs, _ = _rapide.transcribe(audio, language="fr", beam_size=1, vad_filter=False,
                                      initial_prompt="Jarvis, ouvre Discord.", condition_on_previous_text=False)
         return " ".join(s.text for s in segs).strip()
@@ -797,6 +796,16 @@ def _demarrer_ollama():
 def preparer():
     global jarvis
     from . import compte
+
+    def apres_synchro(changements):
+        """Un autre appareil a modifié le compte : Jarvis tient compte des nouveaux souvenirs dès maintenant."""
+        if jarvis is not None and (changements["faits"] or changements["reglages"]):
+            from .agent import prompt_systeme
+            jarvis.messages[0]["content"] = prompt_systeme()
+        if changements["connecteurs"]:
+            threading.Thread(target=connecteurs.demarrer_tous, daemon=True).start()
+        diffuser(type="memoire_maj", **changements)
+    compte.ecouteurs.append(apres_synchro)
     compte.au_demarrage()   # mémoire, connecteurs et profil du compte connecté (cache local + synchro)
     if CONFIG.get("cerveau") != "claude":
         _demarrer_ollama()

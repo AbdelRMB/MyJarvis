@@ -4,6 +4,7 @@ import { Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import type { Fait } from "../lib/types";
+import { bus } from "../stores/jarvis";
 import { toast } from "../stores/toasts";
 
 const CATEGORIES = ["identite", "preference", "projet", "contact", "habitude", "general"];
@@ -45,6 +46,10 @@ export function VueMemoire() {
   const charger = () => api<Fait[]>("/api/memoire").then(setFaits).catch((e) => toast(e.message, "erreur"));
   useEffect(() => {
     charger();
+    // un autre appareil a ajouté, modifié ou supprimé un souvenir : la liste se met à jour toute seule
+    const sur = () => charger();
+    bus.addEventListener("memoire_maj", sur);
+    return () => bus.removeEventListener("memoire_maj", sur);
   }, []);
 
   const categories = useMemo(() => {

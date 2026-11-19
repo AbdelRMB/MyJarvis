@@ -86,6 +86,7 @@ export function ajouterSysteme(role: "info" | "erreur", texte: string) {
 type Evt =
   | { type: "maj"; etape: string; pct: number; texte: string }
   | { type: "naviguer"; vue: Vue }
+  | { type: "memoire_maj"; faits: boolean; historique: number }
   | { type: "init"; conversation: ({ role: "user"; texte: string } | { role: "jarvis"; blocs: Bloc[] })[]; occupe: boolean }
   | { type: "utilisateur"; texte: string }
   | { type: "etat"; occupe: boolean }
@@ -200,6 +201,9 @@ function recevoir(e: Evt) {
       break;
     case "maj":
       emettre("maj", e);
+      break;
+    case "memoire_maj":
+      emettre("memoire_maj", e);
       break;
     case "naviguer":
       useReglages.getState().maj({ vue: e.vue });

@@ -27,6 +27,8 @@ from . import config
 # basculer en IPv4 (créer un compte prenait plusieurs minutes). Jarvis passe donc directement par l'IPv4.
 urllib3.util.connection.HAS_IPV6 = False
 _http = requests.Session()   # connexion réutilisée entre les appels (plus rapide)
+_http_attente = requests.Session()   # connexion dédiée à l'attente des changements (temps réel)
+ecouteurs: list = []   # fonctions appelées quand la synchro rapporte des changements (web.py : prompt + interface)
 from .config import CONFIG, MACHINE, RACINE
 
 SERVEUR_DEFAUT = "https://jarvis.abdelrahimriche.com"
@@ -118,11 +120,11 @@ class ErreurCompte(Exception):
     pass
 
 
-def _appel(methode, chemin, jeton=None, **kw):
+def _appel(methode, chemin, jeton=None, http=None, **kw):
     h = {"Authorization": f"Bearer {jeton or _secret_local('compte:jeton')}", "X-Jarvis-Appli": CONFIG.get("cle_appli") or CLE_APPLI_DEFAUT,
          "User-Agent": "Jarvis"}
     try:
-        r = _http.request(methode, serveur() + chemin, headers=h, timeout=(8, kw.pop("timeout", 20)), **kw)
+        r = (http or _http).request(methode, serveur() + chemin, headers=h, timeout=(8, kw.pop("timeout", 20)), **kw)
     except requests.RequestException as e:
         raise ErreurCompte(f"Serveur Jarvis injoignable ({type(e).__name__}).") from e
     if r.status_code == 401 and chemin not in ("/v1/connexion", "/v1/inscription"):
@@ -171,10 +173,13 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
     if e["prenom"]:
         CONFIG["nom_utilisateur"] = e["prenom"]
     resultat = {"import": None}
-    if str(e["id"]) not in importe:   # 1re connexion sur cet appareil : sa mémoire rejoint le compte
+    # L'ancienne mémoire de cet appareil (avant les comptes) rejoint UNE seule fois le PREMIER compte connecté ici :
+    # un autre utilisateur qui se connecterait ensuite sur cet appareil ne la récupère pas.
+    # (Bouton « Envoyer la mémoire de cet appareil » pour le faire volontairement.)
+    if not importe:
         try:
             resultat["import"] = importer_appareil()
-            e["importe"] = importe + [str(e["id"])]
+            e["importe"] = [str(e["id"])]
             _sauver_etat(e)
         except ErreurCompte as x:
             resultat["import"] = {"erreur": str(x)}
@@ -381,17 +386,24 @@ def document_modifie(nom: str, contenu):
 
 
 # ---------- synchronisation descendante ----------
-def synchroniser():
-    """Récupère du serveur ce que les autres appareils ont ajouté (après avoir envoyé nos propres écritures)."""
+_dernier_coffre = {"blob": None}
+
+
+def synchroniser() -> dict:
+    """Récupère du serveur l'état du compte : souvenirs ajoutés, modifiés ou supprimés sur un autre appareil,
+    nouvel historique, réglages, connecteurs, secrets. Renvoie ce qui a changé ici."""
+    changements = {"faits": False, "historique": 0, "reglages": False, "connecteurs": False, "coffre": False}
     if not connecte():
-        return
+        return changements
     from . import memoire
     vider_attente()
     if _lire_attente():
-        return   # hors ligne : on garde le cache tel quel
+        return changements   # hors ligne : on garde le cache tel quel
     try:
         faits = _appel("GET", "/v1/faits")
-        memoire._sauver(faits)
+        if faits != memoire._charger():   # ajout, suppression ou modification : le serveur fait foi
+            memoire._sauver(faits)
+            changements["faits"] = True
         d = dossier()
         curseur_f = d / "historique.curseur"
         depuis = int(curseur_f.read_text()) if curseur_f.exists() else 0
@@ -407,39 +419,74 @@ def synchroniser():
             if ajout:
                 with open(f, "a", encoding="utf-8") as h:
                     h.write("\n".join(ajout) + "\n")
+                changements["historique"] += len(ajout)
         curseur_f.write_text(str(depuis))
         for nom in ("profil", "connecteurs"):
             doc = _appel("GET", f"/v1/documents/{nom}")["contenu"]
             if doc is None:
                 continue
             if nom == "profil":
+                cles = [k for k in config.CLES_PARTAGEES if k != "nom_utilisateur"]   # le prénom vient du compte
+                ancien = {k: CONFIG.get(k) for k in cles}
                 config.PROFIL.write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
-                CONFIG.update({k: v for k, v in doc.items() if k in config.CLES_PARTAGEES and v})
+                CONFIG.update({k: v for k, v in doc.items() if k in cles and v})
+                changements["reglages"] = ancien != {k: CONFIG.get(k) for k in cles}
             else:
                 from . import connecteurs
                 if doc != connecteurs._lire():
                     connecteurs._ecrire(doc, synchro=False)
+                    changements["connecteurs"] = True
         moi = _appel("GET", "/v1/moi")
-        if moi.get("prenom"):
+        if moi.get("prenom") and moi["prenom"] != CONFIG.get("nom_utilisateur"):
             CONFIG["nom_utilisateur"] = moi["prenom"]
+            changements["reglages"] = True
+        if moi.get("coffre") != _dernier_coffre["blob"]:   # clé API / mot de passe changé sur un autre appareil
+            if _dernier_coffre["blob"] is not None:
+                global _coffre
+                try:
+                    _coffre = _dechiffrer(moi["coffre"], _cle_coffre())
+                    _appliquer_coffre()
+                    changements["coffre"] = True
+                except Exception:
+                    pass
+            _dernier_coffre["blob"] = moi.get("coffre")
     except ErreurCompte as e:
         print(f"  ! Synchro du compte : {e}")
+    if any(changements.values()):
+        for f in ecouteurs:
+            try:
+                f(changements)
+            except Exception as e:
+                print(f"  ! Après synchro : {e}")
+    return changements
 
 
 def demarrer_synchro():
-    """Synchro en fond toutes les 2 minutes (nouveaux souvenirs appris sur un autre appareil)."""
+    """Temps réel : le serveur répond dès qu'un appareil change quelque chose dans le compte (attente longue).
+    Chaque ajout, suppression ou modification arrive sur tous tes appareils en ~1 seconde."""
     global _synchro_lancee
     if _synchro_lancee:
         return
     _synchro_lancee = True
 
     def boucle():
+        revision = 0
         while True:
-            time.sleep(120)
+            if not connecte():
+                time.sleep(5)
+                revision = 0
+                continue
             try:
-                synchroniser()
+                vider_attente()   # écritures faites hors ligne : elles repartent dès que le réseau revient
+                r = _appel("GET", f"/v1/attendre?depuis={revision}", http=_http_attente, timeout=45)
+                if r["change"]:
+                    synchroniser()
+                revision = r["revision"]
+            except ErreurCompte:
+                time.sleep(10)   # pas de réseau ou serveur indisponible : on réessaie
             except Exception as e:
-                print(f"  ! Synchro : {e}")
+                print(f"  ! Synchro temps réel : {e}")
+                time.sleep(10)
     threading.Thread(target=boucle, daemon=True, name="synchro-compte").start()
 
 

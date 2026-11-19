@@ -35,7 +35,8 @@ def ecouter():
     import sounddevice as sd
     from faster_whisper import WhisperModel
     if _whisper is None:
-        _whisper = WhisperModel(CONFIG["whisper_modele"], device="cpu", compute_type="int8")
+        from .modeles import charger_whisper
+        _whisper = charger_whisper(CONFIG["whisper_modele"])
     morceaux = []
     flux = sd.InputStream(samplerate=16000, channels=1, dtype="float32",
                           callback=lambda d, *_: morceaux.append(d.copy()))

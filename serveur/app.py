@@ -7,6 +7,7 @@
 - Toutes les données sont filtrées par l'utilisateur du jeton de session : personne ne voit celles des autres.
 - Base SQLite (fichier /donnees/jarvis.db, volume Docker).
 """
+import asyncio
 import hashlib
 import hmac
 import json
@@ -72,6 +73,14 @@ def _connexion():
 
 with _connexion() as _c:
     _c.executescript(SCHEMA)
+    # compteur de changements par compte : les appareils le surveillent pour se mettre à jour en temps réel
+    if "revision" not in [r[1] for r in _c.execute("PRAGMA table_info(utilisateurs)")]:
+        _c.execute("ALTER TABLE utilisateurs ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+
+
+def _toucher(c, uid):
+    """Quelque chose a changé dans ce compte (mémoire, historique, réglages, coffre) : les autres appareils le verront."""
+    c.execute("UPDATE utilisateurs SET revision = revision + 1 WHERE id = ?", (uid,))
 
 
 @contextmanager
@@ -140,8 +149,8 @@ class Connexion(BaseModel):
 
 
 def _profil(c, uid):
-    u = c.execute("SELECT id, email, prenom, coffre FROM utilisateurs WHERE id = ?", (uid,)).fetchone()
-    return {"id": u["id"], "email": u["email"], "prenom": u["prenom"], "coffre": u["coffre"]}
+    u = c.execute("SELECT id, email, prenom, coffre, revision FROM utilisateurs WHERE id = ?", (uid,)).fetchone()
+    return {"id": u["id"], "email": u["email"], "prenom": u["prenom"], "coffre": u["coffre"], "revision": u["revision"]}
 
 
 @app.post("/v1/inscription")
@@ -194,6 +203,7 @@ class Prenom(BaseModel):
 def changer_prenom(d: Prenom, uid: int = Depends(utilisateur)):
     with db() as c:
         c.execute("UPDATE utilisateurs SET prenom = ? WHERE id = ?", (d.prenom.strip(), uid))
+        _toucher(c, uid)
     return {"ok": True}
 
 
@@ -205,6 +215,7 @@ class Coffre(BaseModel):
 def sauver_coffre(d: Coffre, uid: int = Depends(utilisateur)):
     with db() as c:
         c.execute("UPDATE utilisateurs SET coffre = ? WHERE id = ?", (d.coffre, uid))
+        _toucher(c, uid)
     return {"ok": True}
 
 
@@ -233,7 +244,10 @@ def lister_faits(uid: int = Depends(utilisateur)):
 @app.post("/v1/faits")
 def ajouter_fait(f: Fait, uid: int = Depends(utilisateur)):
     with db() as c:
-        return {"ajoute": _ajouter_faits(c, uid, [f]) == 1}
+        ajoute = _ajouter_faits(c, uid, [f]) == 1
+        if ajoute:
+            _toucher(c, uid)
+        return {"ajoute": ajoute}
 
 
 class Oubli(BaseModel):
@@ -244,6 +258,8 @@ class Oubli(BaseModel):
 def oublier(d: Oubli, uid: int = Depends(utilisateur)):
     with db() as c:
         cur = c.execute("DELETE FROM faits WHERE utilisateur = ? AND instr(cle, ?) > 0", (uid, d.texte.strip().lower()))
+        if cur.rowcount:
+            _toucher(c, uid)
         return {"supprimes": cur.rowcount}
 
 
@@ -284,7 +300,10 @@ def lire_historique(depuis: int = 0, uid: int = Depends(utilisateur)):
 @app.post("/v1/historique")
 def ecrire_historique(d: Lignes, uid: int = Depends(utilisateur)):
     with db() as c:
-        return {"ajoutees": _ajouter_lignes(c, uid, d.lignes)}
+        n = _ajouter_lignes(c, uid, d.lignes)
+        if n:
+            _toucher(c, uid)
+        return {"ajoutees": n}
 
 
 # ---------- documents (réglages partagés, connecteurs) ----------
@@ -311,6 +330,7 @@ async def ecrire_doc(nom: str, req: Request, uid: int = Depends(utilisateur)):
     with db() as c:
         c.execute("INSERT INTO documents VALUES (?, ?, ?, ?) ON CONFLICT (utilisateur, nom) DO UPDATE SET contenu = excluded.contenu, modifie = excluded.modifie",
                   (uid, nom, json.dumps(contenu, ensure_ascii=False), time.time()))
+        _toucher(c, uid)
     return {"ok": True}
 
 
@@ -323,7 +343,31 @@ class Import(BaseModel):
 @app.post("/v1/import")
 def importer(d: Import, uid: int = Depends(utilisateur)):
     with db() as c:
-        return {"faits": _ajouter_faits(c, uid, d.faits), "lignes": _ajouter_lignes(c, uid, d.lignes, import_appareil=True)}
+        r = {"faits": _ajouter_faits(c, uid, d.faits), "lignes": _ajouter_lignes(c, uid, d.lignes, import_appareil=True)}
+        if r["faits"] or r["lignes"]:
+            _toucher(c, uid)
+        return r
+
+
+# ---------- temps réel : l'appareil attend qu'un autre appareil change quelque chose ----------
+def _revision(uid: int) -> int:
+    c = _connexion()
+    try:
+        return c.execute("SELECT revision FROM utilisateurs WHERE id = ?", (uid,)).fetchone()["revision"]
+    finally:
+        c.close()
+
+
+@app.get("/v1/attendre")
+async def attendre(depuis: int = 0, uid: int = Depends(utilisateur)):
+    """Répond dès que le compte change (révision > depuis), ou au bout de 25 s sans changement.
+    Les appareils rappellent aussitôt : chaque changement arrive partout en ~1 s."""
+    for _ in range(50):
+        r = await asyncio.to_thread(_revision, uid)
+        if r > depuis:
+            return {"revision": r, "change": True}
+        await asyncio.sleep(0.5)
+    return {"revision": await asyncio.to_thread(_revision, uid), "change": False}
 
 
 @app.get("/v1/sante")
