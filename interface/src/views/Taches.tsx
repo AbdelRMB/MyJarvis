@@ -117,7 +117,8 @@ export function VueTaches() {
               className="mt-2 h-10 w-full rounded-md border border-ligne-forte bg-surface-2 px-3 text-sm"
             >
               <option value="claude_code">{t("Claude Code, piloté par Jarvis")}</option>
-              <option value="jarvis">{t("Jarvis code lui-même")}</option>
+              <option value="codex">{t("Codex (OpenAI), piloté par Jarvis")}</option>
+              <option value="jarvis">{t("Jarvis code lui-même (cerveau choisi)")}</option>
             </select>
             <Bouton className="mt-2" variante="primaire" icone={<Play />} disabled={!nouvelle.consigne.trim() || !nouvelle.projet.trim()} onClick={creer}>
               {t("Lancer")}
@@ -153,7 +154,7 @@ export function VueTaches() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-base font-semibold">{detail.titre}</h2>
                   <Pastille s={detail.statut} />
-                  <Badge ton="doux">{detail.outil === "claude_code" ? "Claude Code" : "Jarvis"}</Badge>
+                  <Badge ton="doux">{detail.outil === "claude_code" ? "Claude Code" : detail.outil === "codex" ? "Codex" : "Jarvis"}</Badge>
                   <Badge ton="doux">
                     {t("étape")} {detail.etape}
                   </Badge>

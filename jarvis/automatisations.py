@@ -45,11 +45,26 @@ def _ecrire(regles: list, synchro=True):
         compte.document_modifie("automatisations", regles)
 
 
-def creer(nom: str, expediteur="", sujet="", contient="", connecteur="", action="prevenir", consigne="") -> dict:
+TYPES = ("mail", "horaire", "intervalle", "demarrage")
+JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+
+
+def creer(nom: str, expediteur="", sujet="", contient="", connecteur="", action="prevenir", consigne="",
+          type_declencheur="mail", heure="", jours=None, minutes=0, appareil=None, message="") -> dict:
+    """type_declencheur : mail | horaire (heure HH:MM, jours 0=lundi…6=dimanche, vide = tous) | intervalle (minutes)
+    | demarrage (à chaque lancement de Jarvis). appareil : nom de l'appareil qui l'exécute (« » = tous)."""
+    from .config import MACHINE
+    type_declencheur = type_declencheur if type_declencheur in TYPES else "mail"
     regle = {"id": uuid.uuid4().hex[:10], "nom": nom.strip() or "Automatisation", "actif": True,
-             "declencheur": {"type": "mail", "expediteur": expediteur.strip(), "sujet": sujet.strip(),
-                             "contient": contient.strip(), "connecteur": connecteur.strip()},
-             "action": {"type": action if action in ("prevenir", "jarvis") else "prevenir", "consigne": consigne.strip()},
+             "declencheur": {"type": type_declencheur, "expediteur": expediteur.strip(), "sujet": sujet.strip(),
+                             "contient": contient.strip(), "connecteur": connecteur.strip(), "heure": heure.strip(),
+                             "jours": sorted({int(j) for j in (jours or []) if 0 <= int(j) <= 6}),
+                             "minutes": max(1, int(minutes or 0)) if type_declencheur == "intervalle" else 0},
+             "action": {"type": action if action in ("prevenir", "jarvis") else "prevenir", "consigne": consigne.strip(),
+                        "message": message.strip()},
+             # les règles « à heure fixe » ne s'exécutent par défaut que sur l'appareil où elles ont été créées
+             # (sinon chaque ordinateur allumé dirait la même chose) ; les règles mail aussi sur tous
+             "appareil": (MACHINE if type_declencheur != "mail" else "") if appareil is None else appareil,
              "cree": datetime.now().isoformat(timespec="seconds")}
     with _verrou:
         _ecrire(lister() + [regle])
@@ -81,12 +96,56 @@ def supprimer(rid: str) -> bool:
 
 def decrire(r: dict) -> str:
     d, a = r["declencheur"], r["action"]
-    conditions = [f"de « {d['expediteur']} »" if d.get("expediteur") else "",
-                  f"sujet contenant « {d['sujet']} »" if d.get("sujet") else "",
-                  f"texte contenant « {d['contient']} »" if d.get("contient") else ""]
-    quoi = "Quand un e-mail arrive " + (", ".join(c for c in conditions if c) or "(n'importe lequel)")
-    faire = "te prévenir à voix haute" if a["type"] == "prevenir" else f"Jarvis : « {a['consigne']} »"
-    return f"{quoi} → {faire}"
+    t = d.get("type", "mail")
+    if t == "horaire":
+        jours = d.get("jours") or []
+        quand = ("Tous les jours" if not jours or len(jours) == 7 else "Le " + ", ".join(JOURS[j] for j in jours)) + f" à {d.get('heure') or '?'}"
+    elif t == "intervalle":
+        quand = f"Toutes les {d.get('minutes')} min"
+    elif t == "demarrage":
+        quand = "Au démarrage de Jarvis"
+    else:
+        conditions = [f"de « {d['expediteur']} »" if d.get("expediteur") else "",
+                      f"sujet contenant « {d['sujet']} »" if d.get("sujet") else "",
+                      f"texte contenant « {d['contient']} »" if d.get("contient") else ""]
+        quand = "Quand un e-mail arrive " + (", ".join(c for c in conditions if c) or "(n'importe lequel)")
+    if a["type"] == "jarvis":
+        faire = f"Jarvis : « {a['consigne']} »"
+    else:
+        faire = f"te dire « {a['message']} »" if a.get("message") else "te prévenir à voix haute"
+    ou = f" (sur {r['appareil']})" if r.get("appareil") else " (sur tous tes appareils)"
+    return f"{quand} → {faire}{ou}"
+
+
+def _pour_cet_appareil(r) -> bool:
+    from .config import MACHINE
+    return not r.get("appareil") or r["appareil"] == MACHINE
+
+
+def _jarvis_execute(r: dict, contexte: str = ""):
+    """Action « demander à Jarvis » : une instance séparée (ta conversation n'est pas dérangée) ; le résultat
+    est dit à voix haute et rangé dans les notifications."""
+    from . import annonces
+    from .agent import Jarvis
+
+    def travail():
+        try:
+            j = Jarvis()
+            reponse = j.demander(f"[Automatisation « {r['nom']} » déclenchée automatiquement — réponds pour être "
+                                 f"lu à voix haute à l'utilisateur]\n{contexte}\n\nConsigne : {r['action']['consigne']}")
+            annonces.annoncer(reponse.strip() or "C'est fait.", titre=r["nom"], vue="automatisations", detail=reponse)
+        except Exception as e:
+            annonces.annoncer(f"L'automatisation « {r['nom']} » a échoué : {e}", titre=r["nom"], vue="automatisations",
+                              genre="erreur")
+    threading.Thread(target=travail, daemon=True, name=f"automatisation-{r['id']}").start()
+
+
+def _executer_regle(r: dict, contexte: str = "", resume: str = ""):
+    from . import annonces
+    if r["action"]["type"] == "jarvis" and r["action"].get("consigne"):
+        _jarvis_execute(r, contexte)
+    else:
+        annonces.annoncer(r["action"].get("message") or resume or r["nom"], titre=r["nom"], vue="automatisations")
 
 
 # ---------- moteur ----------
@@ -121,10 +180,12 @@ def _declencher(r: dict, boite, expediteur: str, sujet: str, texte: str):
     from . import annonces, web
     nom_exp = re.sub(r"\s*<[^>]+>", "", expediteur).strip().strip('"') or expediteur
     if r["action"]["type"] == "jarvis" and r["action"].get("consigne"):
-        consigne = (f"[Automatisation « {r['nom']} »] Nouvel e-mail reçu sur {boite.etiquette()}.\n"
-                    f"De : {expediteur}\nSujet : {sujet}\n\n{texte[:3000]}\n\nConsigne : {r['action']['consigne']}")
-        annonces.annoncer(f"New email from {nom_exp}: {sujet}" if _en() else f"Nouveau mail de {nom_exp} : {sujet}")
-        threading.Thread(target=web.executer, args=(consigne,), daemon=True).start()
+        contexte = f"Nouvel e-mail reçu sur {boite.etiquette()}.\nDe : {expediteur}\nSujet : {sujet}\n\n{texte[:3000]}"
+        annonces.annoncer(f"New email from {nom_exp}: {sujet}" if _en() else f"Nouveau mail de {nom_exp} : {sujet}",
+                          vue="automatisations")
+        _jarvis_execute(r, contexte)
+    elif r["action"].get("message"):
+        annonces.annoncer(r["action"]["message"], titre=r["nom"], vue="automatisations", detail=f"{nom_exp} : {sujet}")
     else:
         if _en():
             annonces.annoncer(f"You've got an email from {nom_exp}" + (f": {sujet}" if sujet else "."))
@@ -134,7 +195,7 @@ def _declencher(r: dict, boite, expediteur: str, sujet: str, texte: str):
 
 def verifier():
     """Un passage : regarde les nouveaux e-mails de chaque boîte et applique les règles."""
-    regles = [r for r in lister() if r.get("actif") and r["declencheur"]["type"] == "mail"]
+    regles = [r for r in lister() if r.get("actif") and r["declencheur"]["type"] == "mail" and _pour_cet_appareil(r)]
     if not regles:
         return
     from .connecteurs import _dec, _texte
@@ -182,6 +243,32 @@ def verifier():
     _vus_fichier().write_text(json.dumps(vus), encoding="utf-8")
 
 
+_dernieres: dict = {}   # id -> dernière exécution (heure fixe : date du jour ; intervalle : horodatage)
+
+
+def verifier_temps():
+    """Règles à heure fixe et à intervalle (appelée toutes les 20 s)."""
+    maintenant = datetime.now()
+    for r in lister():
+        d = r["declencheur"]
+        if not r.get("actif") or not _pour_cet_appareil(r):
+            continue
+        if d.get("type") == "horaire" and d.get("heure"):
+            jours = d.get("jours") or []
+            cle = maintenant.strftime("%Y-%m-%d")
+            if maintenant.strftime("%H:%M") == d["heure"].zfill(5) and (not jours or maintenant.weekday() in jours) \
+                    and _dernieres.get(r["id"]) != cle:
+                _dernieres[r["id"]] = cle
+                _executer_regle(r)
+        elif d.get("type") == "intervalle" and d.get("minutes"):
+            derniere = _dernieres.get(r["id"])
+            if derniere is None:
+                _dernieres[r["id"]] = time.time()   # 1re exécution après un intervalle complet
+            elif time.time() - derniere >= d["minutes"] * 60:
+                _dernieres[r["id"]] = time.time()
+                _executer_regle(r)
+
+
 def demarrer():
     global _lance
     if _lance:
@@ -190,10 +277,17 @@ def demarrer():
 
     def boucle():
         time.sleep(20)   # laisse les connecteurs démarrer
+        for r in lister():   # règles « au démarrage »
+            if r.get("actif") and r["declencheur"].get("type") == "demarrage" and _pour_cet_appareil(r):
+                _executer_regle(r)
+        dernier_mail = 0.0
         while True:
             try:
-                verifier()
+                verifier_temps()
+                if time.time() - dernier_mail >= INTERVALLE:
+                    dernier_mail = time.time()
+                    verifier()
             except Exception:
                 traceback.print_exc()
-            time.sleep(INTERVALLE)
+            time.sleep(20)
     threading.Thread(target=boucle, daemon=True, name="automatisations").start()

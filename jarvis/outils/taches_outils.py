@@ -7,11 +7,12 @@ def lancer_tache_code(consigne: str, projet: str, outil: str = "claude_code", ti
     """Lance une tâche de code EN ARRIÈRE-PLAN : une branche est créée, Claude Code (ou Jarvis) code et tu le pilotes jusqu'au bout pendant que l'utilisateur continue à te parler. Utilise-le dès qu'on te demande de coder / développer / corriger quelque chose dans un projet.
     consigne: la demande complète et précise de l'utilisateur
     projet: chemin du dossier du projet (voir « Projets détectés » dans ta mémoire ; demande-le s'il est ambigu)
-    outil: « claude_code » (par défaut) ou « jarvis » si l'utilisateur veut que tu codes toi-même
+    outil: « claude_code » (par défaut), « codex » (agent de code d'OpenAI) ou « jarvis » si l'utilisateur veut que tu codes toi-même
     titre: titre court de la tâche"""
     from .. import taches
     t = taches.creer(consigne, projet, outil, titre)
-    return (f"Tâche [{t['id']}] lancée en arrière-plan ({'Claude Code' if t['outil'] == 'claude_code' else 'Jarvis'}). "
+    nom = {"claude_code": "Claude Code", "codex": "Codex"}.get(t["outil"], "Jarvis")
+    return (f"Tâche [{t['id']}] lancée en arrière-plan ({nom}). "
             "Elle crée sa branche et travaille ; suivi dans l'onglet Tâches.")
 
 

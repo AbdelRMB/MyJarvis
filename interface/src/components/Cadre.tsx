@@ -1,3 +1,4 @@
+import { Cloche } from "./Notifications";
 import { t } from "../lib/i18n";
 import {
   Activity,
@@ -202,6 +203,7 @@ export function BarreHaut() {
       </button>
 
       <div className="ml-auto flex items-center gap-5">
+        <Cloche />
         {modele && (
           <span className="hidden items-center gap-2 rounded-md border border-ligne px-2.5 py-1 font-mono text-xs text-doux lg:flex">
             <Brain className="size-3.5 text-hud" />

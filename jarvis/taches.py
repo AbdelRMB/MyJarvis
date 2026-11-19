@@ -90,11 +90,16 @@ def creer(consigne: str, projet: str, outil: str = "claude_code", titre: str = "
     chemin = Path(os.path.expanduser(projet.strip())).resolve()
     if not chemin.is_dir():
         raise ValueError(f"Dossier de projet introuvable : {chemin}")
-    if outil == "claude_code" and not shutil.which("claude") and not (Path.home() / ".local/bin/claude").exists():
-        raise ValueError("Claude Code n'est pas installé sur cet ordinateur (commande « claude »).")
+    outil = outil if outil in ("claude_code", "codex", "jarvis") else "claude_code"
+    if outil != "jarvis":
+        from . import agents_code, notifications
+        msg = agents_code.probleme(agents_code.etat(outil))
+        if msg and "expire dans" not in msg:   # pas installé / pas connecté / expiré : on prévient au lieu d'échouer
+            notifications.ajouter(f"Tâche non lancée : {titre or consigne[:60]}", msg, genre="alerte", vue="reglages", systeme=True)
+            raise ValueError(msg)
     tid = uuid.uuid4().hex[:8]
     t = {"id": tid, "titre": titre.strip() or consigne.strip()[:60], "consigne": consigne.strip(), "projet": str(chemin),
-         "outil": outil if outil in ("claude_code", "jarvis") else "claude_code", "statut": "en_cours",
+         "outil": outil, "statut": "en_cours",
          "cree": time.time(), "etape": 0, "session": "", "branche": "", "dossier": "", "ajouts": [], "bilan": "",
          "journal": []}
     _sauver(t)
@@ -212,13 +217,14 @@ def _premier_message(t):
 
 def _claude(t, a, message) -> dict:
     """Une étape de Claude Code (mode automatique). Renvoie {texte, erreur, refus, interrompu}."""
-    exe = shutil.which("claude") or str(Path.home() / ".local/bin/claude")
+    from . import agents_code
+    exe = agents_code.executable("claude_code") or str(Path.home() / ".local/bin/claude")
     cmd = [exe, "-p", message, "--output-format", "stream-json", "--verbose",
            "--permission-mode", "acceptEdits", "--allowedTools", OUTILS_CLAUDE]
     if t.get("session"):
         cmd += ["--resume", t["session"]]
     p = subprocess.Popen(cmd, cwd=t["dossier"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
-                         text=True, bufsize=1, start_new_session=True)
+                         text=True, bufsize=1, start_new_session=True, env=agents_code._env())
     a["proc"] = p
     res = {"texte": "", "erreur": False, "refus": [], "interrompu": False}
     for ligne in p.stdout:
@@ -241,9 +247,65 @@ def _claude(t, a, message) -> dict:
             res.update(texte=str(e.get("result") or ""), erreur=bool(e.get("is_error")),
                        refus=[d.get("tool_name", "") for d in (e.get("permission_denials") or [])])
             t["session"] = e.get("session_id") or t.get("session", "")
+            if e.get("is_error") and any(m in str(e.get("result", "")).lower() for m in ("login", "auth", "credential", "/login")):
+                from . import notifications
+                notifications.ajouter("Connexion Claude Code", "Claude Code n'est plus connecté : reconnecte-le dans Réglages › Code.",
+                                      genre="alerte", vue="reglages", systeme=True)
     p.wait()
     a["proc"] = None
     res["interrompu"] = a.get("interrompu", False)
+    return res
+
+
+def _codex(t, a, message) -> dict:
+    """Une étape de Codex (OpenAI) en mode automatique. Reprend la session si possible."""
+    import tempfile
+    from . import agents_code
+    exe = agents_code.executable("codex")
+    sortie = Path(tempfile.mkstemp(suffix=".txt")[1])
+    base = [exe, "exec", "--json", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox",
+            "-C", t["dossier"], "-o", str(sortie)]
+    cmd = base + (["resume", t["session"], message] if t.get("session") else [message])
+    res = {"texte": "", "erreur": False, "refus": [], "interrompu": False}
+    for essai in (1, 2):
+        p = subprocess.Popen(cmd, cwd=t["dossier"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             stdin=subprocess.DEVNULL, text=True, bufsize=1, start_new_session=True, env=agents_code._env())
+        a["proc"] = p
+        lignes_brutes = []
+        for ligne in p.stdout:
+            try:
+                e = json.loads(ligne)
+            except ValueError:
+                lignes_brutes.append(ligne)
+                continue
+            for cle in ("thread_id", "session_id", "conversation_id"):
+                if isinstance(e.get(cle), str):
+                    t["session"] = e[cle]
+            it = e.get("item") or {}
+            if e.get("type", "").endswith("completed") and it:
+                if it.get("type") in ("agent_message", "assistant_message") and it.get("text"):
+                    _noter(t, "claude", it["text"])
+                elif it.get("type") == "command_execution":
+                    _noter(t, "outil", f"Bash {it.get('command', '')[:300]}")
+                elif it.get("type") == "file_change":
+                    _noter(t, "outil", "Fichiers : " + ", ".join(c.get("path", "") for c in it.get("changes", []))[:300])
+        p.wait()
+        a["proc"] = None
+        res["texte"] = sortie.read_text(encoding="utf-8", errors="replace") if sortie.exists() else ""
+        if p.returncode == 0 or a.get("interrompu") or essai == 2 or not t.get("session"):
+            res["erreur"] = p.returncode != 0
+            if p.returncode and not res["texte"]:
+                res["texte"] = "".join(lignes_brutes)[-3000:]
+            break
+        # reprise impossible : nouvelle session avec tout le contexte
+        t["session"] = ""
+        cmd = base + [f"{_consignes(t)}\n\nOù en est le travail (bilan) : {t.get('bilan') or '—'}\n\n{message}"]
+    sortie.unlink(missing_ok=True)
+    res["interrompu"] = a.get("interrompu", False)
+    if res["erreur"] and ("login" in res["texte"].lower() or "auth" in res["texte"].lower()):
+        from . import notifications
+        notifications.ajouter("Connexion Codex", "Codex n'est plus connecté : reconnecte-le dans Réglages › Code.",
+                              genre="alerte", vue="reglages", systeme=True)
     return res
 
 
@@ -304,9 +366,11 @@ def _piloter(tid: str):
             if a["stop"] or (lire(tid) or {}).get("statut") == "arretee":
                 return
             t["etape"] += 1
-            _noter(t, "jarvis", message if t["etape"] > 1 else f"Lancement de {'Claude Code' if t['outil'] == 'claude_code' else 'Jarvis'} : {message[:500]}")
+            nom_agent = {"claude_code": "Claude Code", "codex": "Codex"}.get(t["outil"], "Jarvis")
+            _noter(t, "jarvis", message if t["etape"] > 1 else f"Lancement de {nom_agent} : {message[:500]}")
             a["interrompu"] = False
-            res = _claude(t, a, message) if t["outil"] == "claude_code" else _jarvis_etape(t, a, message)
+            res = (_claude(t, a, message) if t["outil"] == "claude_code" else _codex(t, a, message) if t["outil"] == "codex"
+                   else _jarvis_etape(t, a, message))
             t = {**(lire(tid) or t), "session": t.get("session", ""), "etape": t["etape"], "dossier": t["dossier"],
                  "branche": t["branche"]}
             if a["stop"] or t.get("statut") == "arretee":
@@ -348,8 +412,10 @@ def _finir(t, statut, raison=""):
     try:
         from . import annonces
         if statut == "terminee":
-            annonces.annoncer(("Task finished: " if CONFIG.get("langue") == "en" else "Tâche terminée : ") + t["titre"])
+            annonces.annoncer(("Task finished: " if CONFIG.get("langue") == "en" else "Tâche terminée : ") + t["titre"],
+                              vue="taches", genre="succes", detail=t.get("bilan", ""))
         elif statut == "echec":
-            annonces.annoncer(("Task failed: " if CONFIG.get("langue") == "en" else "La tâche a échoué : ") + t["titre"])
+            annonces.annoncer(("Task failed: " if CONFIG.get("langue") == "en" else "La tâche a échoué : ") + t["titre"],
+                              vue="taches", genre="erreur", detail=raison or t.get("bilan", ""))
     except Exception:
         pass

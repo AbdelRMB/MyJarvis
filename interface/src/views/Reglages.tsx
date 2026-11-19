@@ -1,5 +1,5 @@
 import { changerLangue, LANGUE, t, type Langue } from "../lib/i18n";
-import { AppWindow, Brain, Cloud, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Volume2, Zap } from "lucide-react";
+import { AppWindow, Brain, Cloud, Code2, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Volume2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { crete, micro } from "../audio/micro";
 import { sons } from "../audio/bips";
@@ -18,7 +18,7 @@ import { DEFAUT, reglages, useReglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { rafraichirSysteme } from "../stores/systeme";
 
-type Onglet = "micro" | "voix" | "cerveau" | "application" | "autorisations" | "interface";
+type Onglet = "micro" | "voix" | "cerveau" | "code" | "application" | "autorisations" | "interface";
 
 type EtatAppli = {
   appli: boolean;
@@ -29,6 +29,96 @@ type EtatAppli = {
   seuil_eveil: number;
   raccourci: string;
 };
+
+type AgentCode = { agent: string; nom: string; installe: boolean; connecte: boolean; compte: string; plan: string; expiration: string; renouvellement_auto: boolean; erreur: string; probleme: string };
+
+function dans(iso: string) {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms)) return "";
+  if (ms <= 0) return t("expirée");
+  const j = Math.floor(ms / 86400000);
+  return j >= 1 ? t("expire dans {n} jour(s)", { n: j }) : t("expire dans {n} h", { n: Math.max(1, Math.floor(ms / 3600000)) });
+}
+
+/** Réglages › Code : les agents de code que Jarvis pilote dans les tâches de fond, et leur connexion. */
+function OngletCode() {
+  const [agents, setAgents] = useState<AgentCode[] | null>(null);
+  const [action, setAction] = useState("");
+  const charger = () => api<AgentCode[]>("/api/agents_code").then(setAgents).catch(() => {});
+  useEffect(() => {
+    charger();
+    const i = setInterval(charger, 5000);   // la connexion se termine dans le navigateur : on relit l'état
+    return () => clearInterval(i);
+  }, []);
+  const agir = async (a: AgentCode, act: string) => {
+    setAction(a.agent + act);
+    try {
+      const r = await api<{ message: string }>(`/api/agents_code/${a.agent}/${act}`, { method: "POST", json: {} });
+      toast(r.message, "info");
+      charger();
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setAction("");
+    }
+  };
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      {agents?.map((a) => (
+        <Panneau key={a.agent} titre={a.nom} icone={<Code2 />}>
+          <div className="space-y-1.5 text-sm">
+            <p>
+              {t("État")} :{" "}
+              {!a.installe ? <span className="text-ambre">{t("pas installé")}</span> : a.connecte ? <span className="text-vert">{t("connecté")}</span> : <span className="text-rouge">{t("pas connecté")}</span>}
+            </p>
+            {a.compte && (
+              <p>
+                {t("Compte")} : <span className="font-mono text-hud">{a.compte}</span> {a.plan && <span className="text-doux">({a.plan})</span>}
+              </p>
+            )}
+            {a.connecte && a.expiration && (
+              <p>
+                {t("Connexion")} : {dans(a.expiration)}{" "}
+                <span className="text-[12px] text-doux">
+                  ({new Date(a.expiration).toLocaleString()}){a.renouvellement_auto ? ` — ${t("renouvelée automatiquement")}` : ""}
+                </span>
+              </p>
+            )}
+            {a.probleme && <p className="text-[13px] text-ambre">{a.probleme}</p>}
+            {a.erreur && <p className="text-[12px] text-rouge">{a.erreur}</p>}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {!a.installe ? (
+              <Bouton variante="primaire" chargement={action === a.agent + "installer"} onClick={() => agir(a, "installer")}>
+                {t("Installer")}
+              </Bouton>
+            ) : (
+              <>
+                <Bouton variante={a.connecte ? "contour" : "primaire"} chargement={action === a.agent + "connecter"} onClick={() => agir(a, "connecter")}>
+                  {a.connecte ? t("Se reconnecter") : t("Connecter mon compte")}
+                </Bouton>
+                {a.connecte && (
+                  <Bouton variante="fantome" onClick={() => agir(a, "deconnecter")}>
+                    {t("Déconnecter")}
+                  </Bouton>
+                )}
+              </>
+            )}
+          </div>
+          <p className="mt-3 text-[12px] text-doux">
+            {a.agent === "claude_code"
+              ? t("Utilise ton compte Claude (abonnement Pro / Max) ou un compte de la console Anthropic.")
+              : t("Utilise ton compte ChatGPT (Plus / Pro) ou une clé API OpenAI.")}{" "}
+            {t("Jarvis te prévient par une notification si la connexion expire ou ne marche plus.")}
+          </p>
+        </Panneau>
+      ))}
+      <Panneau titre={t("Jarvis code lui-même")} icone={<Brain />}>
+        <p className="text-[13px] text-doux">{t("Sans agent externe : Jarvis code avec ses propres outils et le cerveau choisi dans l'onglet Cerveau (Claude, OpenAI ou Ollama). Rien à connecter.")}</p>
+      </Panneau>
+    </div>
+  );
+}
 
 function OngletApplication() {
   const os = useOS();
@@ -791,6 +881,7 @@ export function VueReglages() {
           { id: "micro", libelle: t("Micro"), icone: <Mic /> },
           { id: "voix", libelle: t("Voix"), icone: <Volume2 /> },
           { id: "cerveau", libelle: t("Cerveau"), icone: <Brain /> },
+          { id: "code", libelle: t("Code"), icone: <Code2 /> },
           { id: "application", libelle: t("Application"), icone: <AppWindow /> },
           { id: "autorisations", libelle: t("Autorisations"), icone: <ShieldCheck /> },
           { id: "interface", libelle: t("Interface"), icone: <Monitor /> },
@@ -800,6 +891,7 @@ export function VueReglages() {
         {onglet === "micro" && <OngletMicro />}
         {onglet === "voix" && <OngletVoix />}
         {onglet === "cerveau" && <OngletCerveau />}
+        {onglet === "code" && <OngletCode />}
         {onglet === "application" && <OngletApplication />}
         {onglet === "autorisations" && <OngletAutorisations />}
         {onglet === "interface" && <OngletInterface />}

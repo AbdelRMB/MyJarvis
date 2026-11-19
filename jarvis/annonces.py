@@ -60,10 +60,11 @@ def _parler_en_fond(texte: str):
             subprocess.run(["say", "-v", "Daniel" if CONFIG.get("langue") == "en" else "Thomas", texte], timeout=120)
 
 
-def annoncer(texte: str, titre: str = "Jarvis"):
-    """Prévient l'utilisateur : notification + voix. Non bloquant."""
-    from . import web
+def annoncer(texte: str, titre: str = "Jarvis", vue: str = "", genre: str = "info", detail: str = ""):
+    """Prévient l'utilisateur : voix + notification du système + centre de notifications (cloche). Non bloquant."""
+    from . import notifications, web
     _notification(texte, titre)
+    notifications.ajouter(texte if titre == "Jarvis" else titre, detail or ("" if titre == "Jarvis" else texte), genre=genre, vue=vue)
     if web._clients:   # interface ouverte et branchée : elle parle avec la voix réglée par l'utilisateur
         web.diffuser(type="annonce", texte=texte)
     else:

@@ -91,6 +91,7 @@ type Evt =
   | { type: "confirmation"; id: string; titre: string; detail: string }
   | { type: "confirmation_fin"; id: string }
   | { type: "tache_maj"; id: string }
+  | { type: "notifications"; non_lues: number }
   | { type: "init"; conversation: ({ role: "user"; texte: string } | { role: "jarvis"; blocs: Bloc[] })[]; occupe: boolean }
   | { type: "utilisateur"; texte: string }
   | { type: "etat"; occupe: boolean }
@@ -220,6 +221,9 @@ function recevoir(e: Evt) {
       break;
     case "tache_maj":
       emettre("tache_maj", e.id);
+      break;
+    case "notifications":
+      emettre("notifications", e.non_lues);
       break;
     case "naviguer":
       useReglages.getState().maj({ vue: e.vue });

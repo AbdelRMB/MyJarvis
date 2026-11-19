@@ -607,6 +607,47 @@ async def afficher_fenetre(req: Request):
     return {"ok": bool(APPLI["afficher"])}
 
 
+# ---------- notifications (cloche) ----------
+@app.get("/api/notifications")
+def lire_notifications(req: Request):
+    _verifier(req)
+    from . import notifications
+    return list(reversed(notifications.lister()))
+
+
+@app.post("/api/notifications/{action}")
+async def agir_notifications(action: str, req: Request):
+    _verifier(req)
+    from . import notifications
+    if action == "lues":
+        d = await req.json()
+        notifications.marquer_lues(d.get("ids"))
+    elif action == "effacer":
+        notifications.effacer()
+    return {"ok": True}
+
+
+# ---------- agents de code (Claude Code, Codex) ----------
+@app.get("/api/agents_code")
+async def etat_agents_code(req: Request):
+    _verifier(req)
+    from . import agents_code
+    etats = await asyncio.gather(*(asyncio.to_thread(agents_code.etat, a) for a in agents_code.NOMS))
+    return [{**e, "probleme": agents_code.probleme(e)} for e in etats]
+
+
+@app.post("/api/agents_code/{agent}/{action}")
+async def agir_agent_code(agent: str, action: str, req: Request):
+    _verifier(req)
+    from . import agents_code
+    if agent not in agents_code.NOMS:
+        raise HTTPException(404, "Agent inconnu.")
+    fn = {"connecter": agents_code.connecter, "deconnecter": agents_code.deconnecter, "installer": agents_code.installer}.get(action)
+    if not fn:
+        raise HTTPException(404, "Action inconnue.")
+    return {"message": await asyncio.to_thread(fn, agent)}
+
+
 # ---------- tâches de fond (code avec Claude Code / Jarvis) ----------
 @app.get("/api/taches")
 def lister_taches(req: Request):
@@ -674,7 +715,8 @@ def lister_automatisations(req: Request):
     _verifier(req)
     from . import automatisations
     boites = [{"cid": cid, "nom": f"{c.nom} — {c.etiquette()}"} for cid, c in automatisations._boites().items()]
-    return {"regles": [{**r, "description": automatisations.decrire(r)} for r in automatisations.lister()], "boites": boites}
+    return {"regles": [{**r, "description": automatisations.decrire(r)} for r in automatisations.lister()], "boites": boites,
+            "machine": MACHINE}
 
 
 @app.post("/api/automatisations")
@@ -682,10 +724,19 @@ async def creer_automatisation(req: Request):
     _verifier(req)
     from . import automatisations
     d = await req.json()
-    if not (d.get("expediteur") or d.get("sujet") or d.get("contient")):
+    typ = d.get("type", "mail")
+    if typ == "mail" and not (d.get("expediteur") or d.get("sujet") or d.get("contient")):
         raise HTTPException(400, "Indique au moins un expéditeur, un mot du sujet ou un mot du texte.")
+    if typ == "horaire" and not d.get("heure"):
+        raise HTTPException(400, "Indique l'heure.")
+    if typ == "intervalle" and not d.get("minutes"):
+        raise HTTPException(400, "Indique l'intervalle en minutes.")
+    if d.get("action") == "jarvis" and not d.get("consigne", "").strip():
+        raise HTTPException(400, "Indique ce que Jarvis doit faire.")
     automatisations.creer(d.get("nom", ""), d.get("expediteur", ""), d.get("sujet", ""), d.get("contient", ""),
-                          d.get("connecteur", ""), d.get("action", "prevenir"), d.get("consigne", ""))
+                          d.get("connecteur", ""), d.get("action", "prevenir"), d.get("consigne", ""), typ,
+                          d.get("heure", ""), d.get("jours") or [], int(d.get("minutes") or 0),
+                          None if d.get("appareil") is None else d.get("appareil"), d.get("message", ""))
     return lister_automatisations(req)
 
 
@@ -1038,6 +1089,8 @@ def preparer():
     from . import automatisations, taches
     automatisations.demarrer()   # surveille tes boîtes mail pour les règles « quand je reçois… »
     taches.au_demarrage()        # tâches de fond coupées par la fermeture : « interrompues » (bouton Reprendre)
+    from . import agents_code
+    agents_code.surveiller()     # prévient si Claude Code / Codex ne sont plus connectés
     if CONFIG.get("cerveau") not in ("claude", "openai"):
         _demarrer_ollama()
     if not memoire.SYSTEME.exists():
