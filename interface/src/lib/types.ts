@@ -51,7 +51,7 @@ export type ConfigServeur = {
   claude_effort: string;
 };
 
-export type Fait = { fait: string; categorie: string; date?: string };
+export type Fait = { fait: string; categorie: string; date?: string; fid?: string; modifie?: number };
 export type JourHistorique = { jour: string; nb: number; apercu: string; pcs?: string[] };
 export type EntreeHistorique = { heure: string; role: "user" | "jarvis"; texte: string; pc?: string };
 export type Action = { date: string; outil: string; args: Record<string, unknown>; resultat: string | null };

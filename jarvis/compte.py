@@ -353,8 +353,11 @@ def vider_attente():
             for op in a:
                 if op["type"] == "fait":
                     _appel("POST", "/v1/faits", json=op["fait"])
-                elif op["type"] == "oubli":
+                elif op["type"] == "oubli":   # file d'attente laissée par une version précédente
                     _appel("POST", "/v1/faits/oublier", json={"texte": op["texte"]})
+                elif op["type"] == "suppression":
+                    _appel("POST", "/v1/faits/supprimer", json={"fid": op["fid"], "texte": op["texte"],
+                                                              "ts": op["ts"], "appareil": MACHINE})
                 elif op["type"] == "doc":
                     _appel("PUT", f"/v1/documents/{op['nom']}", json={"contenu": op["contenu"]})
             if lignes:
@@ -366,13 +369,21 @@ def vider_attente():
 
 # appelés par memoire.py / connecteurs.py / config.py
 def fait_ajoute(f: dict):
+    """Ajout, modification, utilisation ou restauration d'un souvenir (avec la date de l'action)."""
     if connecte():
-        _mettre_en_attente({"type": "fait", "fait": f})
+        _mettre_en_attente({"type": "fait", "fait": {
+            "fait": f["fait"], "categorie": f.get("categorie", "general"), "date": f.get("date", ""),
+            "fid": f.get("fid", ""), "ts": f.get("modifie") or time.time(), "appareil": MACHINE,
+            "action": f.get("action", "")}})
 
 
-def fait_oublie(texte: str):
+def fait_supprime(fid: str, texte: str, ts: float):
     if connecte():
-        _mettre_en_attente({"type": "oubli", "texte": texte})
+        _mettre_en_attente({"type": "suppression", "fid": fid, "texte": texte if not fid else "", "ts": ts})
+
+
+def journal_memoire() -> list:
+    return _appel("GET", "/v1/memoire/journal")
 
 
 def ligne_ajoutee(jour: str, ligne: str):
@@ -400,10 +411,12 @@ def synchroniser() -> dict:
     if _lire_attente():
         return changements   # hors ligne : on garde le cache tel quel
     try:
-        faits = _appel("GET", "/v1/faits")
-        if faits != memoire._charger():   # ajout, suppression ou modification : le serveur fait foi
-            memoire._sauver(faits)
-            changements["faits"] = True
+        faits = [{k: x[k] for k in ("fait", "categorie", "date", "fid", "modifie") if k in x}
+                 for x in _appel("GET", "/v1/faits")]
+        with _verrou:   # une modification faite ici pendant l'appel n'est pas écrasée : on la laisse partir d'abord
+            if not _lire_attente() and faits != memoire._charger():
+                memoire._sauver(faits)   # ajout, suppression ou modification : le serveur fait foi
+                changements["faits"] = True
         d = dossier()
         curseur_f = d / "historique.curseur"
         depuis = int(curseur_f.read_text()) if curseur_f.exists() else 0

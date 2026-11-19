@@ -56,6 +56,11 @@ CREATE TABLE IF NOT EXISTS historique (
     id INTEGER PRIMARY KEY, utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
     jour TEXT NOT NULL, machine TEXT NOT NULL, ligne TEXT NOT NULL, empreinte TEXT NOT NULL,
     UNIQUE (utilisateur, jour, machine, empreinte));
+CREATE TABLE IF NOT EXISTS journal_memoire (
+    id INTEGER PRIMARY KEY, utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    fid TEXT NOT NULL, action TEXT NOT NULL, fait TEXT NOT NULL, categorie TEXT NOT NULL DEFAULT '',
+    appareil TEXT NOT NULL DEFAULT '', ts REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS journal_par_utilisateur ON journal_memoire (utilisateur, ts);
 CREATE TABLE IF NOT EXISTS documents (
     utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE, nom TEXT NOT NULL,
     contenu TEXT NOT NULL, modifie REAL NOT NULL, PRIMARY KEY (utilisateur, nom));
@@ -76,6 +81,18 @@ with _connexion() as _c:
     # compteur de changements par compte : les appareils le surveillent pour se mettre à jour en temps réel
     if "revision" not in [r[1] for r in _c.execute("PRAGMA table_info(utilisateurs)")]:
         _c.execute("ALTER TABLE utilisateurs ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+    # souvenirs : identifiant stable, date de dernière action, suppression conservée (« pierre tombale »)
+    colonnes = [r[1] for r in _c.execute("PRAGMA table_info(faits)")]
+    for col, decl in (("fid", "TEXT"), ("modifie", "REAL NOT NULL DEFAULT 0"), ("supprime", "INTEGER NOT NULL DEFAULT 0"),
+                      ("appareil", "TEXT NOT NULL DEFAULT ''")):
+        if col not in colonnes:
+            _c.execute(f"ALTER TABLE faits ADD COLUMN {col} {decl}")
+    _c.execute("UPDATE faits SET fid = lower(hex(randomblob(8))) WHERE fid IS NULL OR fid = ''")
+    _c.execute("CREATE UNIQUE INDEX IF NOT EXISTS faits_fid ON faits (utilisateur, fid)")
+    # journal de départ : l'état actuel de chaque souvenir
+    if not _c.execute("SELECT 1 FROM journal_memoire LIMIT 1").fetchone():
+        _c.execute("INSERT INTO journal_memoire (utilisateur, fid, action, fait, categorie, appareil, ts) "
+                   "SELECT utilisateur, fid, 'ajout', fait, categorie, '', strftime('%s','now') FROM faits WHERE supprime = 0")
 
 
 def _toucher(c, uid):
@@ -219,48 +236,126 @@ def sauver_coffre(d: Coffre, uid: int = Depends(utilisateur)):
     return {"ok": True}
 
 
-# ---------- mémoire ----------
+# ---------- mémoire : chaque souvenir a un identifiant, une date de dernière action et un journal ----------
+# Règle : la DERNIÈRE action gagne, quel que soit l'appareil. Une suppression efface le souvenir partout ;
+# mais si un autre appareil l'a ajouté, modifié ou réutilisé APRÈS cette suppression, il reste.
+# Une suppression n'efface pas la ligne (« pierre tombale ») : elle garde la date qui permet de trancher.
 class Fait(BaseModel):
     fait: str = Field(min_length=1, max_length=2000)
     categorie: str = Field("general", max_length=40)
     date: str = Field("", max_length=20)
+    fid: str = Field("", max_length=40)          # identifiant du souvenir (vide = retrouvé par son texte)
+    ts: float = 0                                 # moment de l'action sur l'appareil (0 = maintenant)
+    appareil: str = Field("", max_length=80)
+    action: str = Field("", max_length=20)        # ajout | modification | utilisation | restauration
+
+
+def _journal(c, uid, fid, action, fait, categorie, appareil, ts):
+    c.execute("INSERT INTO journal_memoire (utilisateur, fid, action, fait, categorie, appareil, ts) VALUES (?, ?, ?, ?, ?, ?, ?)",
+              (uid, fid, action, fait, categorie, appareil, ts))
+
+
+def _appliquer_fait(c, uid, f: Fait, import_ancien=False) -> str:
+    """Ajoute / modifie / restaure / réutilise un souvenir si cette action est la plus récente. Renvoie l'action
+    retenue, ou "" si une action plus récente (ex. une suppression faite après) l'emporte."""
+    texte, cle = f.fait.strip(), f.fait.strip().lower()
+    ts = 0.0 if import_ancien else (f.ts or time.time())   # l'import d'une vieille mémoire ne ressuscite rien
+    ligne = None
+    if f.fid:
+        ligne = c.execute("SELECT * FROM faits WHERE utilisateur = ? AND fid = ?", (uid, f.fid)).fetchone()
+    if ligne is None:
+        ligne = c.execute("SELECT * FROM faits WHERE utilisateur = ? AND cle = ?", (uid, cle)).fetchone()
+    if ligne is None:
+        fid = f.fid or secrets.token_hex(8)
+        c.execute("INSERT INTO faits (utilisateur, fait, cle, categorie, date, fid, modifie, supprime, appareil) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)", (uid, texte, cle, f.categorie, f.date, fid, ts, f.appareil))
+        _journal(c, uid, fid, "ajout", texte, f.categorie, f.appareil, ts or time.time())
+        return "ajout"
+    if ts <= (ligne["modifie"] or 0):
+        return ""   # une action plus récente existe déjà
+    if cle != ligne["cle"] and c.execute("SELECT 1 FROM faits WHERE utilisateur = ? AND cle = ? AND fid != ?",
+                                         (uid, cle, ligne["fid"])).fetchone():
+        return ""   # ce texte existe déjà comme autre souvenir
+    if ligne["supprime"]:
+        action = "restauration"
+    elif cle != ligne["cle"] or f.categorie != ligne["categorie"]:
+        action = "modification"
+    else:
+        action = f.action or "utilisation"
+    c.execute("UPDATE faits SET fait = ?, cle = ?, categorie = ?, modifie = ?, supprime = 0, appareil = ? WHERE id = ?",
+              (texte, cle, f.categorie, ts, f.appareil, ligne["id"]))
+    _journal(c, uid, ligne["fid"], action, texte, f.categorie, f.appareil, ts)
+    return action
+
+
+def _supprimer_fait(c, uid, ligne, ts, appareil) -> bool:
+    if ligne["supprime"] or ts < (ligne["modifie"] or 0):
+        return False   # déjà supprimé, ou réutilisé / modifié après cette suppression : il reste
+    c.execute("UPDATE faits SET supprime = 1, modifie = ?, appareil = ? WHERE id = ?", (ts, appareil, ligne["id"]))
+    _journal(c, uid, ligne["fid"], "suppression", ligne["fait"], ligne["categorie"], appareil, ts)
+    return True
 
 
 def _ajouter_faits(c, uid, faits) -> int:
-    n = 0
-    for f in faits:
-        cur = c.execute("INSERT OR IGNORE INTO faits (utilisateur, fait, cle, categorie, date) VALUES (?, ?, ?, ?, ?)",
-                        (uid, f.fait.strip(), f.fait.strip().lower(), f.categorie, f.date))
-        n += cur.rowcount
-    return n
+    """Import de l'ancienne mémoire d'un appareil : ajoute ce qui manque, ne ressuscite rien de supprimé."""
+    return sum(1 for f in faits if _appliquer_fait(c, uid, f, import_ancien=True) == "ajout")
 
 
 @app.get("/v1/faits")
 def lister_faits(uid: int = Depends(utilisateur)):
     with db() as c:
-        return [dict(r) for r in c.execute("SELECT fait, categorie, date FROM faits WHERE utilisateur = ? ORDER BY id", (uid,))]
+        return [dict(r) for r in c.execute(
+            "SELECT fait, categorie, date, fid, modifie FROM faits WHERE utilisateur = ? AND supprime = 0 ORDER BY id", (uid,))]
 
 
 @app.post("/v1/faits")
 def ajouter_fait(f: Fait, uid: int = Depends(utilisateur)):
     with db() as c:
-        ajoute = _ajouter_faits(c, uid, [f]) == 1
-        if ajoute:
+        action = _appliquer_fait(c, uid, f)
+        if action:
             _toucher(c, uid)
-        return {"ajoute": ajoute}
+        return {"ajoute": action == "ajout", "action": action}
+
+
+class Suppression(BaseModel):
+    fid: str = Field("", max_length=40)
+    texte: str = Field("", max_length=2000)        # anciens appareils : supprime ce qui contient ce texte
+    ts: float = 0
+    appareil: str = Field("", max_length=80)
+
+
+@app.post("/v1/faits/supprimer")
+def supprimer(d: Suppression, uid: int = Depends(utilisateur)):
+    ts = d.ts or time.time()
+    with db() as c:
+        if d.fid:
+            lignes = c.execute("SELECT * FROM faits WHERE utilisateur = ? AND fid = ?", (uid, d.fid)).fetchall()
+        else:
+            lignes = c.execute("SELECT * FROM faits WHERE utilisateur = ? AND supprime = 0 AND instr(cle, ?) > 0",
+                               (uid, d.texte.strip().lower())).fetchall() if d.texte.strip() else []
+        n = sum(_supprimer_fait(c, uid, l, ts, d.appareil) for l in lignes)
+        if n:
+            _toucher(c, uid)
+        return {"supprimes": n}
 
 
 class Oubli(BaseModel):
     texte: str = Field(min_length=1, max_length=2000)
 
 
-@app.post("/v1/faits/oublier")
+@app.post("/v1/faits/oublier")   # compatibilité avec les versions 1.1.0
 def oublier(d: Oubli, uid: int = Depends(utilisateur)):
+    return supprimer(Suppression(texte=d.texte), uid)
+
+
+@app.get("/v1/memoire/journal")
+def journal(limite: int = 300, uid: int = Depends(utilisateur)):
+    """Tout ce qui est arrivé à ta mémoire : ajouts, modifications, réutilisations, suppressions, restaurations."""
     with db() as c:
-        cur = c.execute("DELETE FROM faits WHERE utilisateur = ? AND instr(cle, ?) > 0", (uid, d.texte.strip().lower()))
-        if cur.rowcount:
-            _toucher(c, uid)
-        return {"supprimes": cur.rowcount}
+        return [dict(r) for r in c.execute(
+            "SELECT j.fid, j.action, j.fait, j.categorie, j.appareil, j.ts, f.supprime AS supprime_actuellement "
+            "FROM journal_memoire j LEFT JOIN faits f ON f.utilisateur = j.utilisateur AND f.fid = j.fid "
+            "WHERE j.utilisateur = ? ORDER BY j.ts DESC, j.id DESC LIMIT ?", (uid, max(1, min(limite, 2000))))]
 
 
 # ---------- historique des conversations ----------

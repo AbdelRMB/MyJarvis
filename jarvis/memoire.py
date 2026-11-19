@@ -33,31 +33,121 @@ def _sauver(f):
     os.replace(tmp, FAITS)
 
 
+# Chaque souvenir : {"fait", "categorie", "date", "fid" (identifiant stable), "modifie" (date de la dernière action)}.
+# Toute action (ajout, modification, réutilisation, suppression) part au serveur avec sa date : sur tous les
+# appareils, c'est la dernière action qui gagne (voir serveur/app.py).
+def _maintenant():
+    import time
+    return time.time()
+
+
+def _envoyer(f: dict, action: str):
+    from . import compte
+    compte.fait_ajoute({**f, "action": action})
+
+
+def _verrou():
+    """Même verrou que la synchro : une modification locale et une mise à jour venue du serveur ne se croisent pas."""
+    from .compte import _verrou as v
+    return v
+
+
 def ajouter(fait, categorie="general"):
+    with _verrou():
+        return _ajouter(fait, categorie)
+
+
+def _ajouter(fait, categorie):
     f = _charger()
-    if any(x["fait"].lower() == fait.lower() for x in f):
+    existant = next((x for x in f if x["fait"].lower() == fait.lower()), None)
+    if existant:   # le redire, c'est s'en servir : compte comme une utilisation (le garde s'il a été supprimé ailleurs)
+        existant["modifie"] = _maintenant()
+        _sauver(f)
+        _envoyer(existant, "utilisation")
         return "Déjà en mémoire."
-    nouveau = {"fait": fait, "categorie": categorie, "date": datetime.now().strftime("%Y-%m-%d")}
+    import uuid
+    nouveau = {"fait": fait, "categorie": categorie, "date": datetime.now().strftime("%Y-%m-%d"),
+               "fid": uuid.uuid4().hex[:16], "modifie": _maintenant()}
     f.append(nouveau)
     _sauver(f)
-    from . import compte
-    compte.fait_ajoute(nouveau)
+    _envoyer(nouveau, "ajout")
     return f"Mémorisé : {fait}"
 
 
-def supprimer(texte):
+def modifier(fid, fait, categorie=None):
+    with _verrou():
+        return _modifier(fid, fait, categorie)
+
+
+def _modifier(fid, fait, categorie):
     f = _charger()
-    reste = [x for x in f if texte.lower() not in x["fait"].lower()]
-    _sauver(reste)
-    if len(reste) != len(f):
-        from . import compte
-        compte.fait_oublie(texte)
-    return f"{len(f) - len(reste)} fait(s) oublié(s)."
+    x = next((x for x in f if x.get("fid") == fid), None)
+    if not x:
+        return False
+    x.update(fait=fait.strip(), categorie=categorie or x["categorie"], modifie=_maintenant())
+    _sauver(f)
+    _envoyer(x, "modification")
+    return True
+
+
+def _supprimer_ou(condition) -> int:
+    with _verrou():
+        return _supprimer_ou_(condition)
+
+
+def _supprimer_ou_(condition) -> int:
+    f = _charger()
+    retires = [x for x in f if condition(x)]
+    _sauver([x for x in f if not condition(x)])
+    from . import compte
+    for x in retires:
+        compte.fait_supprime(x.get("fid", ""), x["fait"], _maintenant())
+    return len(retires)
+
+
+def supprimer(texte):
+    """Outil « oublier » de Jarvis : tous les souvenirs qui contiennent ce texte."""
+    return f"{_supprimer_ou(lambda x: texte.lower() in x['fait'].lower())} fait(s) oublié(s)."
+
+
+def supprimer_un(fid="", fait=""):
+    """Bouton « Oublier » de l'écran Mémoire : ce souvenir-là, et lui seul."""
+    return _supprimer_ou(lambda x: (fid and x.get("fid") == fid) or (not fid and x["fait"] == fait))
+
+
+def restaurer(fid, fait, categorie):
+    with _verrou():
+        _restaurer(fid, fait, categorie)
+
+
+def _restaurer(fid, fait, categorie):
+    f = _charger()
+    if not any(x.get("fid") == fid for x in f):
+        x = {"fait": fait, "categorie": categorie, "date": datetime.now().strftime("%Y-%m-%d"), "fid": fid,
+             "modifie": _maintenant()}
+        f.append(x)
+        _sauver(f)
+        _envoyer(x, "restauration")
+
+
+_utilises: dict = {}   # fid -> dernière utilisation signalée (au plus une fois par heure et par souvenir)
+
+
+def _signaler_utilisation(faits):
+    """Jarvis vient de se servir de ces souvenirs : s'ils ont été supprimés ailleurs juste avant, ils restent."""
+    t = _maintenant()
+    for x in faits:
+        fid = x.get("fid")
+        if fid and t - _utilises.get(fid, 0) > 3600:
+            _utilises[fid] = t
+            _envoyer({**x, "modifie": t}, "utilisation")
 
 
 def chercher(req):
     mots = [m for m in req.lower().split() if len(m) > 2]
-    res = [f"[mémoire] {x['fait']}" for x in _charger() if any(m in x["fait"].lower() for m in mots)]
+    trouves = [x for x in _charger() if any(m in x["fait"].lower() for m in mots)]
+    _signaler_utilisation(trouves)
+    res = [f"[mémoire] {x['fait']}" for x in trouves]
     for fic in sorted(HIST.glob("*.md"), reverse=True)[:60]:
         for l in fic.read_text(encoding="utf-8").splitlines():
             if any(m in l.lower() for m in mots):

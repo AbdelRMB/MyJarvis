@@ -167,12 +167,40 @@ async def ajouter_fait(req: Request):
 
 @app.delete("/api/memoire")
 async def supprimer_fait(req: Request):
+    """Bouton « Oublier » : supprimé partout (sauf si un autre appareil l'utilise après)."""
     _verifier(req)
-    fait = (await req.json()).get("fait", "")
-    faits = memoire._charger()
-    reste = [x for x in faits if x["fait"] != fait]
-    memoire._sauver(reste)
-    return {"supprimes": len(faits) - len(reste)}
+    d = await req.json()
+    return {"supprimes": memoire.supprimer_un(d.get("fid", ""), d.get("fait", ""))}
+
+
+@app.put("/api/memoire")
+async def modifier_fait(req: Request):
+    _verifier(req)
+    d = await req.json()
+    if not str(d.get("fait", "")).strip():
+        raise HTTPException(400, "Fait vide")
+    if not memoire.modifier(d.get("fid", ""), d["fait"], d.get("categorie")):
+        raise HTTPException(404, "Souvenir introuvable (actualise la mémoire).")
+    return {"ok": True}
+
+
+@app.get("/api/memoire/journal")
+async def journal_memoire(req: Request):
+    """Historique de ta mémoire gardé par le serveur : qui a ajouté, modifié, utilisé ou supprimé quoi, et quand."""
+    _verifier(req)
+    from . import compte
+    try:
+        return await asyncio.to_thread(compte.journal_memoire)
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/memoire/restaurer")
+async def restaurer_fait(req: Request):
+    _verifier(req)
+    d = await req.json()
+    memoire.restaurer(d["fid"], d["fait"], d.get("categorie") or "general")
+    return {"ok": True}
 
 
 @app.post("/api/memoriser_session")

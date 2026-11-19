@@ -9,6 +9,10 @@ Chaque section `## x.y.z` devient la description de la mise à jour affichée da
 - **Pas de doublon d'historique** quand la même ancienne mémoire est trouvée à deux endroits sur un appareil.
 - **Bouton « Actualiser » dans l'écran Mémoire** : récupère tout de suite ce que tes autres appareils ont appris, sans attendre la synchronisation automatique.
 - **Autorisations demandées une seule fois** (Mac) : l'appli est maintenant signée avec un certificat Apple, donc macOS garde le micro, l'écran, l'accessibilité et l'accès aux fichiers d'une mise à jour à l'autre. Au premier lancement, Jarvis les demande une fois (tu acceptes ou non) et ne redemande plus. Après cette mise à jour, il faudra les accorder une dernière fois.
+- **La dernière action gagne, sur tous tes appareils** : chaque souvenir garde la date de sa dernière action (ajout, modification, utilisation par Jarvis, suppression). Supprimé sur un appareil, il disparaît partout ; mais si un autre appareil s'en sert ou le modifie après, il reste. Ça marche même si un appareil était hors ligne.
+- **Corrigé** : un souvenir supprimé depuis l'écran Mémoire revenait à la synchronisation suivante.
+- **Historique de ta mémoire** : bouton « Historique » dans l'écran Mémoire, avec tout ce qui est arrivé à chaque souvenir (quoi, quand, sur quel appareil), et un bouton pour restaurer un souvenir supprimé.
+- **Modifier un souvenir** : icône crayon sur chaque souvenir.
 - **Mémoire en temps réel sur tous tes appareils** : un souvenir ajouté, modifié ou supprimé sur un appareil apparaît sur les autres en environ 1 seconde (avant : jusqu'à 2 minutes). Jarvis en tient compte tout de suite, même en pleine conversation, et l'écran Mémoire se met à jour tout seul.
 - **Confidentialité** : l'ancienne mémoire d'un appareil n'est versée automatiquement que dans le premier compte qui s'y connecte. Une autre personne qui se connecte ensuite sur le même ordinateur ne la récupère pas.
 - **Whisper ne tourne plus à l'infini** : un modèle déjà téléchargé se charge directement depuis le disque, et toutes les connexions de Jarvis évitent l'IPv6 défaillant de certaines box.
