@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import {
   Activity,
   Brain,
@@ -29,16 +30,16 @@ import { useToasts } from "../stores/toasts";
 import { Pastille } from "./ui";
 
 const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
-  { id: "assistant", libelle: "Assistant", icone: MessageSquare },
-  { id: "historique", libelle: "Historique", icone: History },
-  { id: "memoire", libelle: "Mémoire", icone: Brain },
-  { id: "connecteurs", libelle: "Connecteurs", icone: Plug },
-  { id: "automatisations", libelle: "Automatisations", icone: Zap },
-  { id: "activite", libelle: "Activité", icone: Activity },
-  { id: "arsenal", libelle: "Arsenal", icone: Wrench },
-  { id: "systeme", libelle: "Système", icone: Cpu },
-  { id: "reglages", libelle: "Réglages", icone: Settings },
-  { id: "majs", libelle: "Mises à jour", icone: Download },
+  { id: "assistant", libelle: t("Assistant"), icone: MessageSquare },
+  { id: "historique", libelle: t("Historique"), icone: History },
+  { id: "memoire", libelle: t("Mémoire"), icone: Brain },
+  { id: "connecteurs", libelle: t("Connecteurs"), icone: Plug },
+  { id: "automatisations", libelle: t("Automatisations"), icone: Zap },
+  { id: "activite", libelle: t("Activité"), icone: Activity },
+  { id: "arsenal", libelle: t("Arsenal"), icone: Wrench },
+  { id: "systeme", libelle: t("Système"), icone: Cpu },
+  { id: "reglages", libelle: t("Réglages"), icone: Settings },
+  { id: "majs", libelle: t("Mises à jour"), icone: Download },
 ];
 
 function MiniReacteur({ actif }: { actif: boolean }) {
@@ -70,8 +71,8 @@ export function BarreLaterale() {
         <MiniReacteur actif={occupe} />
         {!menuReduit && (
           <div className="min-w-0">
-            <div className="font-display text-[15px] font-black tracking-[0.3em] text-hud [text-shadow:0_0_14px_rgb(60_232_255/.5)]">JARVIS</div>
-            <div className="truncate text-[10px] tracking-wider text-tres-doux">ASSISTANT PERSONNEL</div>
+            <div className="font-display text-[15px] font-black tracking-[0.3em] text-hud [text-shadow:0_0_14px_rgb(60_232_255/.5)]">{t("JARVIS")}</div>
+            <div className="truncate text-[10px] tracking-wider text-tres-doux">{t("ASSISTANT PERSONNEL")}</div>
           </div>
         )}
       </div>
@@ -105,10 +106,10 @@ export function BarreLaterale() {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            <Pastille ok={connecte}>Liaison serveur</Pastille>
-            <Pastille ok={ollama}>Ollama</Pastille>
-            <Pastille ok={micActif}>Micro</Pastille>
-            {nom && <div className="pt-1 text-xs text-tres-doux">Connecté en tant que <span className="text-doux">{nom}</span></div>}
+            <Pastille ok={connecte}>{t("Liaison serveur")}</Pastille>
+            <Pastille ok={ollama}>{t("Ollama")}</Pastille>
+            <Pastille ok={micActif}>{t("Micro")}</Pastille>
+            {nom && <div className="pt-1 text-xs text-tres-doux">{t("Connecté en tant que ")}<span className="text-doux">{nom}</span></div>}
           </div>
         )}
         <button
@@ -116,7 +117,7 @@ export function BarreLaterale() {
           className="mt-1 flex items-center gap-2 text-xs text-tres-doux hover:text-doux"
           aria-label={menuReduit ? "Déplier le menu" : "Replier le menu"}
         >
-          {menuReduit ? <ChevronsRight className="size-4" /> : <><ChevronsLeft className="size-4" /> Replier</>}
+          {menuReduit ? <ChevronsRight className="size-4" /> : <><ChevronsLeft className="size-4" />{t(" Replier")}</>}
         </button>
       </div>
     </nav>
@@ -143,9 +144,9 @@ export function NavMobile() {
 }
 
 const MODES: { id: ModeMicro; libelle: string; aide: string }[] = [
-  { id: "ptt", libelle: "Appui", aide: "Maintiens Espace ou le bouton micro pour parler" },
-  { id: "auto", libelle: "Auto", aide: "Mains libres : ta phrase part quand tu te tais" },
-  { id: "eveil", libelle: "« Jarvis »", aide: "Ne réagit qu'aux phrases qui commencent par « Jarvis »" },
+  { id: "ptt", libelle: t("Appui"), aide: t("Maintiens Espace ou le bouton micro pour parler") },
+  { id: "auto", libelle: t("Auto"), aide: t("Mains libres : ta phrase part quand tu te tais") },
+  { id: "eveil", libelle: t("« Jarvis »"), aide: t("Ne réagit qu'aux phrases qui commencent par « Jarvis »") },
 ];
 
 export function BarreHaut() {
@@ -160,7 +161,7 @@ export function BarreHaut() {
 
   return (
     <header className="flex h-16 flex-none items-center gap-3 border-b border-ligne bg-surface/50 px-4 backdrop-blur md:px-6">
-      <div className="flex items-center rounded-md border border-ligne bg-surface-2 p-0.5" role="radiogroup" aria-label="Mode du micro">
+      <div className="flex items-center rounded-md border border-ligne bg-surface-2 p-0.5" role="radiogroup" aria-label={t("Mode du micro")}>
         {MODES.map((m) => (
           <button
             key={m.id}

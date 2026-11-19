@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { Blocks, CalendarDays, Check, GitBranch, Loader2, Mail, NotebookPen, Plug, Plus, Power, Trash2, X, Zap } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Vide } from "../components/ui";
@@ -12,11 +13,7 @@ type Installe = { type: string; actif: boolean; conf: Record<string, string>; se
 type Donnees = { catalogue: TypeConnecteur[]; installes: Record<string, Installe> };
 
 const ICONES: Record<string, ReactNode> = {
-  mail: <Mail />,
-  calendar: <CalendarDays />,
-  github: <GitBranch />,
-  notebook: <NotebookPen />,
-  blocks: <Blocks />,
+  mail: <Mail />, calendar: <CalendarDays />, github: <GitBranch />, notebook: <NotebookPen />, blocks: <Blocks />,
 };
 const icone = (n: string) => ICONES[n] ?? <Plug />;
 
@@ -70,7 +67,7 @@ function Editeur({
         <header className="flex items-center gap-3 border-b border-ligne px-5 py-4">
           <span className="text-hud [&>svg]:size-5">{icone(def.icone)}</span>
           <h2 className="titre-hud text-sm text-hud">{def.nom}</h2>
-          <button onClick={onFermer} className="ml-auto text-doux hover:text-texte" aria-label="Fermer">
+          <button onClick={onFermer} className="ml-auto text-doux hover:text-texte" aria-label={t("Fermer")}>
             <X className="size-5" />
           </button>
         </header>
@@ -81,7 +78,7 @@ function Editeur({
             <label key={c.nom} className="block">
               <span className="mb-1.5 block text-sm">
                 {c.libelle}
-                {c.requis === false && <span className="text-tres-doux"> (facultatif)</span>}
+                {c.requis === false && <span className="text-tres-doux">{t(" (facultatif)")}</span>}
               </span>
               {c.type === "choix" ? (
                 <select
@@ -123,10 +120,10 @@ function Editeur({
         </div>
         <footer className="flex gap-2 border-t border-ligne p-4">
           <Bouton variante="primaire" chargement={envoi} onClick={enregistrer} icone={<Check className="size-4" />}>
-            Connecter
+            {t("Connecter")}
           </Bouton>
           <Bouton variante="fantome" onClick={onFermer}>
-            Annuler
+            {t("Annuler")}
           </Bouton>
         </footer>
       </aside>
@@ -160,7 +157,7 @@ function CarteInstalle({ cid, c, def, onModifier, onMaj }: { cid: string; c: Ins
     }
   };
   const supprimer = async () => {
-    if (!confirm(`Déconnecter ${titre} ? Ses identifiants seront effacés de ce PC.`)) return;
+    if (!confirm(t("Déconnecter {titre} ? Ses identifiants seront effacés de ce PC.", { titre }))) return;
     await api(`/api/connecteurs/${encodeURIComponent(cid)}`, { method: "DELETE" });
     toast(`${titre} déconnecté.`);
     onMaj();
@@ -192,15 +189,15 @@ function CarteInstalle({ cid, c, def, onModifier, onMaj }: { cid: string; c: Ins
       {test && <p className={cx("mt-3 text-[13px]", test.ok ? "text-vert" : "text-rouge")}>{test.ok ? "✓ " : "✗ "}{test.texte}</p>}
       <div className="mt-4 flex flex-wrap gap-2">
         <Bouton taille="sm" onClick={tester} chargement={enCours} icone={<Zap className="size-3.5" />} disabled={!c.actif}>
-          Tester
+          {t("Tester")}
         </Bouton>
         <Bouton taille="sm" variante="fantome" onClick={onModifier}>
-          Modifier
+          {t("Modifier")}
         </Bouton>
         <Bouton taille="sm" variante="fantome" onClick={basculer} icone={<Power className="size-3.5" />}>
           {c.actif ? "Désactiver" : "Activer"}
         </Bouton>
-        <button onClick={supprimer} className="ml-auto rounded p-1.5 text-tres-doux hover:text-rouge" aria-label="Déconnecter" title="Déconnecter">
+        <button onClick={supprimer} className="ml-auto rounded p-1.5 text-tres-doux hover:text-rouge" aria-label={t("Déconnecter")} title={t("Déconnecter")}>
           <Trash2 className="size-4" />
         </button>
       </div>
@@ -230,14 +227,14 @@ export function VueConnecteurs() {
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
-        titre="Connecteurs"
-        sousTitre="Branche tes services : leurs outils s'ajoutent à Jarvis. La liste est partagée entre tes PC ; les mots de passe restent sur chaque PC."
+        titre={t("Connecteurs")}
+        sousTitre={t("Branche tes services : leurs outils s'ajoutent à Jarvis. La liste est partagée entre tes PC ; les mots de passe restent sur chaque PC.")}
       />
 
-      <h2 className="titre-hud mb-3 text-[11px] text-hud">Connectés</h2>
+      <h2 className="titre-hud mb-3 text-[11px] text-hud">{t("Connectés")}</h2>
       {installes.length === 0 ? (
         <div className="coins mb-8 border border-ligne bg-surface/40">
-          <Vide icone={<Plug />} titre="Aucun service connecté" texte="Choisis un service ci-dessous. Par exemple Gmail pour que Jarvis lise et envoie tes mails." />
+          <Vide icone={<Plug />} titre={t("Aucun service connecté")} texte={t("Choisis un service ci-dessous. Par exemple Gmail pour que Jarvis lise et envoie tes mails.")} />
         </div>
       ) : (
         <div className="mb-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -247,24 +244,24 @@ export function VueConnecteurs() {
         </div>
       )}
 
-      <h2 className="titre-hud mb-3 text-[11px] text-hud">Ajouter un service</h2>
+      <h2 className="titre-hud mb-3 text-[11px] text-hud">{t("Ajouter un service")}</h2>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {d.catalogue.map((t) => {
-          const indispo = !t.multiple && dejaLa(t.type);
+        {d.catalogue.map((ty) => {
+          const indispo = !ty.multiple && dejaLa(ty.type);
           return (
             <button
-              key={t.type}
+              key={ty.type}
               disabled={indispo}
-              onClick={() => setEdition({ def: t, cid: null })}
+              onClick={() => setEdition({ def: ty, cid: null })}
               className="group flex gap-3 rounded-md border border-ligne bg-surface/40 p-4 text-left transition-colors hover:border-hud/50 hover:bg-hud/5 disabled:opacity-40"
             >
-              <span className="grid size-10 flex-none place-items-center rounded-md border border-ligne text-hud [&>svg]:size-5">{icone(t.icone)}</span>
+              <span className="grid size-10 flex-none place-items-center rounded-md border border-ligne text-hud [&>svg]:size-5">{icone(ty.icone)}</span>
               <span className="min-w-0">
                 <span className="flex items-center gap-2 font-medium">
-                  {t.nom}
-                  {indispo ? <Badge ton="vert">connecté</Badge> : <Plus className="size-4 text-tres-doux group-hover:text-hud" />}
+                  {ty.nom}
+                  {indispo ? <Badge ton="vert">{t("connecté")}</Badge> : <Plus className="size-4 text-tres-doux group-hover:text-hud" />}
                 </span>
-                <span className="mt-1 block text-[13px] leading-snug text-doux">{t.description}</span>
+                <span className="mt-1 block text-[13px] leading-snug text-doux">{ty.description}</span>
               </span>
             </button>
           );
@@ -272,7 +269,7 @@ export function VueConnecteurs() {
       </div>
 
       <p className="mt-8 max-w-3xl text-[13px] text-tres-doux">
-        Un service n'est pas dans la liste (Spotify, Slack, Home Assistant, Google Drive…) ? Utilise « Serveur MCP ». C'est un standard que des centaines d'outils proposent. Sur la page du serveur MCP, copie la commande ou l'adresse indiquée.
+        {t("Un service n'est pas dans la liste (Spotify, Slack, Home Assistant, Google Drive…) ? Utilise « Serveur MCP ». C'est un standard que des centaines d'outils proposent. Sur la page du serveur MCP, copie la commande ou l'adresse indiquée.")}
       </p>
 
       {edition && (

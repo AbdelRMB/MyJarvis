@@ -1,3 +1,4 @@
+import { changerLangue, LANGUE } from "./lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { micro } from "./audio/micro";
 import { sons } from "./audio/bips";
@@ -81,6 +82,15 @@ export default function App() {
       .then((s) => {
         useJarvis.setState({ session: s });
         api<Compte>("/api/compte").then(setCompte).catch(() => {});
+        api<{ config: { langue?: string } }>("/api/config")
+          .then((c) => {
+            const l = c.config.langue === "en" ? "en" : "fr";
+            if (c.config.langue && l !== LANGUE) {
+              changerLangue(l);   // langue choisie sur un autre appareil (réglage du compte)
+              location.reload();
+            }
+          })
+          .catch(() => {});
         connecter();
         rafraichirSysteme();
         api<{ appli: boolean; ecoute_active: boolean; silence_fin: number }>("/api/appli")

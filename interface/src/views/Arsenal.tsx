@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { Code2, Cpu, FolderOpen, Globe, Brain, Monitor, MousePointer2, Search, Sparkles, Wrench } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Champ, EnTetePage } from "../components/ui";
@@ -7,14 +8,14 @@ import { useReglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 
 const MODULES: Record<string, { libelle: string; icone: typeof Wrench }> = {
-  systeme: { libelle: "Système", icone: Cpu },
-  fichiers: { libelle: "Fichiers", icone: FolderOpen },
-  controle: { libelle: "Souris, clavier & fenêtres", icone: MousePointer2 },
-  ecran: { libelle: "Vision", icone: Monitor },
-  code: { libelle: "Code", icone: Code2 },
-  web: { libelle: "Web", icone: Globe },
-  memoire_outils: { libelle: "Mémoire", icone: Brain },
-  divers: { libelle: "Divers", icone: Sparkles },
+  systeme: { libelle: t("Système"), icone: Cpu },
+  fichiers: { libelle: t("Fichiers"), icone: FolderOpen },
+  controle: { libelle: t("Souris, clavier & fenêtres"), icone: MousePointer2 },
+  ecran: { libelle: t("Vision"), icone: Monitor },
+  code: { libelle: t("Code"), icone: Code2 },
+  web: { libelle: t("Web"), icone: Globe },
+  memoire_outils: { libelle: t("Mémoire"), icone: Brain },
+  divers: { libelle: t("Divers"), icone: Sparkles },
 };
 
 export function VueArsenal() {
@@ -43,12 +44,12 @@ export function VueArsenal() {
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
-        titre="Arsenal"
-        sousTitre={`${outils.length} outils que Jarvis peut utiliser sur ton PC, sans demander la permission.`}
+        titre={t("Arsenal")}
+        sousTitre={t("{n} outils que Jarvis peut utiliser sur ton PC, sans demander la permission.", { n: outils.length })}
         actions={
           <div className="relative w-64">
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-doux" />
-            <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder="Chercher un outil…" className="h-9 pl-9" />
+            <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder={t("Chercher un outil…")} className="h-9 pl-9" />
           </div>
         }
       />
@@ -80,7 +81,7 @@ export function VueArsenal() {
                       </div>
                     )}
                     <button onClick={() => essayer(o)} className="mt-3 self-start text-xs text-hud opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100">
-                      Utiliser →
+                      {t("Utiliser →")}
                     </button>
                   </article>
                 ))}

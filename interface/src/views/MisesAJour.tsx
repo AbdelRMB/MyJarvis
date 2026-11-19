@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { CheckCircle2, Download, KeyRound, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Markdown } from "../components/Markdown";
@@ -51,7 +52,7 @@ export function VueMisesAJour() {
   };
 
   const installer = async (version: string) => {
-    setProg({ etape: "telechargement", pct: 0, texte: `Préparation de Jarvis ${version}…` });
+    setProg({ etape: "telechargement", pct: 0, texte: t("Préparation de Jarvis {version}…", { version }) });
     try {
       await api("/api/majs/installer", { method: "POST", json: { version } });
     } catch (x) {
@@ -66,11 +67,11 @@ export function VueMisesAJour() {
   return (
     <div className="h-full overflow-y-auto p-4 sm:p-6">
       <EnTetePage
-        titre="Mises à jour"
-        sousTitre={e ? `Version installée : ${e.version}` : "Recherche…"}
+        titre={t("Mises à jour")}
+        sousTitre={e ? t("Version installée : {version}", { version: e.version }) : t("Recherche…")}
         actions={
           <Bouton icone={<RefreshCw />} chargement={verif} disabled={!!enCours} onClick={verifier}>
-            Vérifier les mises à jour
+            {t("Vérifier les mises à jour")}
           </Bouton>
         }
       />
@@ -87,15 +88,14 @@ export function VueMisesAJour() {
       )}
 
       {e && e.erreur.startsWith("Jeton") && (
-        <Panneau titre="Accès aux mises à jour" icone={<KeyRound />} className="mb-4">
+        <Panneau titre={t("Accès aux mises à jour")} icone={<KeyRound />} className="mb-4">
           <p className="text-sm leading-relaxed text-doux">
-            Ton jeton GitHub n'est plus valide. Les mises à jour n'en ont pas besoin (le dépôt est public) : laisse le champ vide et enregistre pour le
-            retirer, ou colle un nouveau jeton.
+            {t("Ton jeton GitHub n'est plus valide. Les mises à jour n'en ont pas besoin (le dépôt est public) : laisse le champ vide et enregistre pour le retirer, ou colle un nouveau jeton.")}
           </p>
           <div className="mt-3 flex gap-2">
-            <Champ type="password" placeholder="github_pat_…" value={jeton} onChange={(x) => setJeton(x.target.value)} className="flex-1" />
+            <Champ type="password" placeholder={t("github_pat_…")} value={jeton} onChange={(x) => setJeton(x.target.value)} className="flex-1" />
             <Bouton variante="primaire" onClick={enregistrerJeton}>
-              Enregistrer
+              {t("Enregistrer")}
             </Bouton>
           </div>
         </Panneau>
@@ -104,13 +104,13 @@ export function VueMisesAJour() {
       {e?.erreur && <p className="mb-4 rounded-md border border-rouge/40 bg-rouge/5 p-3 text-sm text-rouge">{e.erreur}</p>}
       {e && !e.installee && (
         <p className="mb-4 rounded-md border border-ambre/40 bg-ambre/5 p-3 text-sm text-ambre">
-          Jarvis tourne depuis le code source : tu peux voir les versions ici, mais pour mettre à jour fais « git pull ».
+          {t("Jarvis tourne depuis le code source : tu peux voir les versions ici, mais pour mettre à jour fais « git pull ».")}
         </p>
       )}
 
       {e && !e.erreur && e.majs.length === 0 && (
         <div className="flex items-center gap-3 rounded-md border border-vert/40 bg-vert/5 p-4 text-sm">
-          <CheckCircle2 className="size-5 text-vert" /> Jarvis est à jour.
+          <CheckCircle2 className="size-5 text-vert" />{t(" Jarvis est à jour.")}
         </div>
       )}
 
@@ -127,8 +127,7 @@ export function VueMisesAJour() {
             )}
           </div>
           <p className="mb-4 text-[13px] text-doux">
-            Chaque version contient aussi les précédentes : installer une version applique tout ce qui est listé en dessous d'elle. Ta mémoire et tes réglages ne
-            bougent pas, rien n'est désinstallé.
+            {t("Chaque version contient aussi les précédentes : installer une version applique tout ce qui est listé en dessous d'elle. Ta mémoire et tes réglages ne bougent pas, rien n'est désinstallé.")}
           </p>
           <div className="space-y-3">
             {e.majs.map((m) => (
@@ -139,14 +138,14 @@ export function VueMisesAJour() {
                 actions={
                   <div className="flex items-center gap-2">
                     {m.date && <Badge ton="doux">{m.date}</Badge>}
-                    {m === derniere && <Badge ton="vert">dernière</Badge>}
+                    {m === derniere && <Badge ton="vert">{t("dernière")}</Badge>}
                     <Bouton taille="sm" disabled={!m.disponible || !!enCours || !e.installee} onClick={() => installer(m.version)}>
-                      {m.disponible ? `Installer celle-ci${m.taille ? ` (${Math.round(m.taille / 1048576)} Mo)` : ""}` : "Pas encore prête pour cet appareil"}
+                      {m.disponible ? t("Installer celle-ci") + (m.taille ? ` (${Math.round(m.taille / 1048576)} ${t("Mo")})` : "") : t("Pas encore prête pour cet appareil")}
                     </Bouton>
                   </div>
                 }
               >
-                <div className="text-sm">{m.description ? <Markdown texte={m.description} /> : <span className="text-doux">Pas de description.</span>}</div>
+                <div className="text-sm">{m.description ? <Markdown texte={m.description} /> : <span className="text-doux">{t("Pas de description.")}</span>}</div>
               </Panneau>
             ))}
           </div>
@@ -155,17 +154,17 @@ export function VueMisesAJour() {
 
       {e && e.journal.length > 0 && (
         <div className="mt-8">
-          <h2 className="titre-hud mb-3 text-[11px] text-ambre">Journal des mises à jour</h2>
+          <h2 className="titre-hud mb-3 text-[11px] text-ambre">{t("Journal des mises à jour")}</h2>
           <div className="space-y-3">
             {e.journal.map((v) => (
               <details key={v.version} open={v.installee} className="rounded-md border border-ligne bg-surface/60 px-4 py-3">
                 <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
                   Jarvis {v.version}
                   {v.date && <Badge ton="doux">{v.date}</Badge>}
-                  {v.installee && <Badge ton="vert">installée</Badge>}
+                  {v.installee && <Badge ton="vert">{t("installée")}</Badge>}
                   {v.plus_recente && <Badge ton="hud">disponible</Badge>}
                 </summary>
-                <div className="mt-2 text-sm">{v.description ? <Markdown texte={v.description} /> : <span className="text-doux">Pas de description.</span>}</div>
+                <div className="mt-2 text-sm">{v.description ? <Markdown texte={v.description} /> : <span className="text-doux">{t("Pas de description.")}</span>}</div>
               </details>
             ))}
           </div>

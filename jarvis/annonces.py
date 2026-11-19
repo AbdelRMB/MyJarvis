@@ -34,13 +34,20 @@ def _parler_en_fond(texte: str):
     """Synthèse vocale jouée directement par Jarvis (sans l'interface)."""
     from . import tts
     try:
+        from .config import CONFIG
+        en = CONFIG.get("langue") == "en"
         if MAC:
-            audio, mime, _ = asyncio.run(tts.synthese(texte, "edge", "", 1.0))
+            audio, mime, _ = asyncio.run(tts.synthese(texte, "edge", "en-GB-RyanNeural" if en else "", 1.0))
             ext = ".mp3" if mime == "audio/mpeg" else ".wav"
             with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
                 f.write(audio)
             subprocess.run(["afplay", f.name], timeout=120)
             os.unlink(f.name)
+        elif WIN and en:   # la voix locale Piper est française : voix anglaise de Windows
+            import pyttsx3
+            moteur = pyttsx3.init()
+            moteur.say(texte)
+            moteur.runAndWait()
         elif WIN:
             import winsound
             voix = tts.voix_piper()
@@ -49,7 +56,8 @@ def _parler_en_fond(texte: str):
     except Exception as e:
         print(f"  ! Voix de fond : {e}")
         if MAC:   # dernier recours : la voix du système
-            subprocess.run(["say", "-v", "Thomas", texte], timeout=120)
+            from .config import CONFIG
+            subprocess.run(["say", "-v", "Daniel" if CONFIG.get("langue") == "en" else "Thomas", texte], timeout=120)
 
 
 def annoncer(texte: str, titre: str = "Jarvis"):

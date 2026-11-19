@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { Brain, Check, History, Pencil, Plus, RefreshCw, RotateCcw, Search, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Bouton, Champ, EnTetePage, Vide } from "../components/ui";
@@ -83,7 +84,7 @@ export function VueMemoire() {
     try {
       await api("/api/memoire", { method: "DELETE", json: { fid: f.fid ?? "", fait: f.fait } });
       setFaits((x) => x.filter((y) => (f.fid ? y.fid !== f.fid : y.fait !== f.fait)));
-      toast("Souvenir effacé sur tous tes appareils.");
+      toast(t("Souvenir effacé sur tous tes appareils."));
     } catch (e) {
       toast((e as Error).message, "erreur");
     }
@@ -119,18 +120,18 @@ export function VueMemoire() {
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
-        titre="Mémoire"
-        sousTitre={`${faits.length} souvenirs sur toi — Jarvis les relit à chaque conversation.`}
+        titre={t("Mémoire")}
+        sousTitre={t("{n} souvenirs sur toi — Jarvis les relit à chaque conversation.", { n: faits.length })}
         actions={
           <div className="flex flex-wrap gap-2">
             <Bouton variante="fantome" icone={<RefreshCw className="size-4" />} chargement={actualisation} onClick={actualiser}>
-              Actualiser
+              {t("Actualiser")}
             </Bouton>
             <Bouton variante="fantome" icone={<History className="size-4" />} onClick={() => setJournalOuvert((x) => !x)}>
-              Historique
+              {t("Historique")}
             </Bouton>
             <Bouton icone={<Sparkles className="size-4" />} chargement={analyse} onClick={memoriserSession}>
-              Mémoriser la session
+              {t("Mémoriser la session")}
             </Bouton>
           </div>
         }
@@ -143,14 +144,14 @@ export function VueMemoire() {
           value={nouveau}
           onChange={(e) => setNouveau(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && ajouter()}
-          placeholder="Apprendre quelque chose à Jarvis… (ex : je bosse surtout le soir)"
+          placeholder={t("Apprendre quelque chose à Jarvis… (ex : je bosse surtout le soir)")}
           className="min-w-[240px] flex-1"
         />
         <select
           value={nouvelleCat}
           onChange={(e) => setNouvelleCat(e.target.value)}
           className="h-10 rounded-md border border-ligne-forte bg-surface-2 px-3 text-sm"
-          aria-label="Catégorie"
+          aria-label={t("Catégorie")}
         >
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
@@ -159,14 +160,14 @@ export function VueMemoire() {
           ))}
         </select>
         <Bouton variante="primaire" icone={<Plus className="size-4" />} onClick={ajouter} disabled={!nouveau.trim()}>
-          Ajouter
+          {t("Ajouter")}
         </Bouton>
       </div>
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <div className="relative mr-2 w-full sm:w-64">
           <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-doux" />
-          <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder="Rechercher…" className="h-9 pl-9" />
+          <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder={t("Rechercher…")} className="h-9 pl-9" />
         </div>
         {[["", faits.length] as [string, number], ...categories].map(([c, n]) => (
           <button
@@ -183,7 +184,7 @@ export function VueMemoire() {
       </div>
 
       {groupes.length === 0 ? (
-        <Vide icone={<Brain />} titre={faits.length ? "Aucun résultat" : "Mémoire vide"} texte="Jarvis mémorise tout seul ce qu'il apprend sur toi au fil des conversations." />
+        <Vide icone={<Brain />} titre={faits.length ? "Aucun résultat" : "Mémoire vide"} texte={t("Jarvis mémorise tout seul ce qu'il apprend sur toi au fil des conversations.")} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
           {groupes.map(([c, fs]) => (
@@ -203,10 +204,10 @@ export function VueMemoire() {
                             onKeyDown={(e) => (e.key === "Enter" ? enregistrerEdition() : e.key === "Escape" && setEdition(null))}
                             className="h-8 flex-1 text-sm"
                           />
-                          <button onClick={enregistrerEdition} aria-label="Enregistrer" className="rounded p-1 text-vert hover:bg-white/5">
+                          <button onClick={enregistrerEdition} aria-label={t("Enregistrer")} className="rounded p-1 text-vert hover:bg-white/5">
                             <Check className="size-4" />
                           </button>
-                          <button onClick={() => setEdition(null)} aria-label="Annuler" className="rounded p-1 text-doux hover:bg-white/5">
+                          <button onClick={() => setEdition(null)} aria-label={t("Annuler")} className="rounded p-1 text-doux hover:bg-white/5">
                             <X className="size-4" />
                           </button>
                         </div>
@@ -218,8 +219,8 @@ export function VueMemoire() {
                     {f.fid && !edition && (
                       <button
                         onClick={() => setEdition({ fid: f.fid!, texte: f.fait })}
-                        aria-label="Modifier"
-                        title="Modifier"
+                        aria-label={t("Modifier")}
+                        title={t("Modifier")}
                         className="rounded p-1 text-tres-doux opacity-0 transition-opacity group-hover:opacity-100 hover:text-hud focus:opacity-100"
                       >
                         <Pencil className="size-4" />
@@ -227,8 +228,8 @@ export function VueMemoire() {
                     )}
                     <button
                       onClick={() => supprimer(f)}
-                      aria-label="Oublier"
-                      title="Oublier"
+                      aria-label={t("Oublier")}
+                      title={t("Oublier")}
                       className="rounded p-1 text-tres-doux opacity-0 transition-opacity group-hover:opacity-100 hover:text-rouge focus:opacity-100"
                     >
                       <Trash2 className="size-4" />
@@ -266,7 +267,7 @@ function JournalMemoire({ onRestaure }: { onRestaure: () => void }) {
   const restaurer = async (e: EntreeJournal) => {
     try {
       await api("/api/memoire/restaurer", { method: "POST", json: { fid: e.fid, fait: e.fait, categorie: e.categorie } });
-      toast("Souvenir restauré sur tous tes appareils.", "succes");
+      toast(t("Souvenir restauré sur tous tes appareils."), "succes");
       onRestaure();
       setTimeout(charger, 1500);
     } catch (x) {
@@ -275,11 +276,11 @@ function JournalMemoire({ onRestaure }: { onRestaure: () => void }) {
   };
   return (
     <div className="coins mb-6 max-h-[360px] overflow-y-auto border border-ligne bg-surface/60 p-3">
-      <h2 className="titre-hud mb-2 text-[11px] text-ambre">Historique de ta mémoire (tous tes appareils)</h2>
+      <h2 className="titre-hud mb-2 text-[11px] text-ambre">{t("Historique de ta mémoire (tous tes appareils)")}</h2>
       {!j ? (
-        <p className="text-sm text-doux">Chargement…</p>
+        <p className="text-sm text-doux">{t("Chargement…")}</p>
       ) : j.length === 0 ? (
-        <p className="text-sm text-doux">Rien pour l'instant.</p>
+        <p className="text-sm text-doux">{t("Rien pour l'instant.")}</p>
       ) : (
         <ul className="divide-y divide-ligne text-sm">
           {j.map((e, i) => {
@@ -295,7 +296,7 @@ function JournalMemoire({ onRestaure }: { onRestaure: () => void }) {
                 </span>
                 {e.appareil && <span className="hidden flex-none font-mono text-[11px] text-tres-doux sm:inline">{e.appareil}</span>}
                 {e.action === "suppression" && e.supprime_actuellement === 1 && (
-                  <button onClick={() => restaurer(e)} title="Restaurer" className="flex-none rounded p-1 text-doux hover:text-vert">
+                  <button onClick={() => restaurer(e)} title={t("Restaurer")} className="flex-none rounded p-1 text-doux hover:text-vert">
                     <RotateCcw className="size-4" />
                   </button>
                 )}

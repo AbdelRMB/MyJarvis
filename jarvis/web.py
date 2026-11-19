@@ -35,7 +35,7 @@ JETON = secrets.token_urlsafe(24)
 HOTES_OK = {"127.0.0.1", "localhost"}
 CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
                "max_etapes_outils", "whisper_modele", "nom_utilisateur",
-               "cerveau", "claude_modele", "claude_effort", "openai_modele"]
+               "cerveau", "claude_modele", "claude_effort", "openai_modele", "langue"]
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 jarvis: Jarvis | None = None
@@ -311,7 +311,7 @@ def _modele_whisper():
 def _transcrire(audio: np.ndarray, langue: str) -> str:
     with _whisper_verrou:
         segs, _ = _modele_whisper().transcribe(audio, language=langue or None, vad_filter=True, beam_size=1,
-                                               initial_prompt="Jarvis, ouvre VS Code.")
+                                               initial_prompt="Jarvis, open VS Code." if langue == "en" else "Jarvis, ouvre VS Code.")
         return " ".join(s.text for s in segs).strip()
 
 
@@ -324,8 +324,10 @@ def transcrire_rapide(audio: np.ndarray) -> str:
     with _rapide_verrou:
         if _rapide is None:
             _rapide = charger_whisper("base", cpu_threads=4)
-        segs, _ = _rapide.transcribe(audio, language="fr", beam_size=1, vad_filter=False,
-                                     initial_prompt="Jarvis, ouvre Discord.", condition_on_previous_text=False)
+        en = CONFIG.get("langue") == "en"
+        segs, _ = _rapide.transcribe(audio, language="en" if en else "fr", beam_size=1, vad_filter=False,
+                                     initial_prompt="Jarvis, open Discord." if en else "Jarvis, ouvre Discord.",
+                                     condition_on_previous_text=False)
         return " ".join(s.text for s in segs).strip()
 
 
@@ -606,7 +608,8 @@ async def tester_annonce(req: Request):
     """Bouton « Tester la voix » : Jarvis parle comme il le fera pour une automatisation."""
     _verifier(req)
     from . import annonces
-    annonces.annoncer("Ceci est un test : c'est comme ça que je te préviendrai.")
+    annonces.annoncer("This is a test: this is how I'll let you know." if CONFIG.get("langue") == "en"
+                      else "Ceci est un test : c'est comme ça que je te préviendrai.")
     return {"ok": True}
 
 
@@ -708,7 +711,7 @@ def commande_vocale(audio: np.ndarray):
         return
     diffuser(type="vocal", etat="transcription")
     try:
-        texte = _transcrire(audio, "fr")
+        texte = _transcrire(audio, CONFIG.get("langue") or "fr")
     except Exception as e:
         diffuser(type="vocal", etat="fin")
         diffuser(type="erreur", texte=f"Transcription impossible : {e}")

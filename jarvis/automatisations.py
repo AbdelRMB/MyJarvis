@@ -113,16 +113,23 @@ def _correspond(r: dict, expediteur: str, sujet: str, texte_fn) -> bool:
     return True
 
 
+def _en() -> bool:
+    return config.CONFIG.get("langue") == "en"
+
+
 def _declencher(r: dict, boite, expediteur: str, sujet: str, texte: str):
     from . import annonces, web
     nom_exp = re.sub(r"\s*<[^>]+>", "", expediteur).strip().strip('"') or expediteur
     if r["action"]["type"] == "jarvis" and r["action"].get("consigne"):
         consigne = (f"[Automatisation « {r['nom']} »] Nouvel e-mail reçu sur {boite.etiquette()}.\n"
                     f"De : {expediteur}\nSujet : {sujet}\n\n{texte[:3000]}\n\nConsigne : {r['action']['consigne']}")
-        annonces.annoncer(f"Nouveau mail de {nom_exp} : {sujet}")
+        annonces.annoncer(f"New email from {nom_exp}: {sujet}" if _en() else f"Nouveau mail de {nom_exp} : {sujet}")
         threading.Thread(target=web.executer, args=(consigne,), daemon=True).start()
     else:
-        annonces.annoncer(f"Tu as reçu un mail de {nom_exp}" + (f" : {sujet}" if sujet else "."))
+        if _en():
+            annonces.annoncer(f"You've got an email from {nom_exp}" + (f": {sujet}" if sujet else "."))
+        else:
+            annonces.annoncer(f"Tu as reçu un mail de {nom_exp}" + (f" : {sujet}" if sujet else "."))
 
 
 def verifier():

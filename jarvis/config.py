@@ -60,7 +60,8 @@ DEFAUT = {
     "cerveau": "claude",          # "claude" (API Anthropic) ou "ollama" (local)
     "claude_modele": "claude-sonnet-5-5",
     "claude_effort": "low",
-    "openai_modele": "",        # vide = le meilleur modèle disponible avec ta clé OpenAI       # low = le plus réactif à l'oral ; medium pour les tâches longues avec outils
+    "openai_modele": "",
+    "langue": "fr",               # « fr » ou « en » : réponses de Jarvis, reconnaissance vocale, voix, interface        # vide = le meilleur modèle disponible avec ta clé OpenAI       # low = le plus réactif à l'oral ; medium pour les tâches longues avec outils
     "serveur_comptes": "",        # vide = serveur de comptes officiel ; sinon l'adresse HTTPS de ton propre serveur
     "cle_appli": "",              # clé d'appli de ton propre serveur (JARVIS_CLE_APPLI dans serveur/.env)
     "ecoute_fond": True,          # appli de bureau : écoute « Hey Jarvis » même fenêtre cachée
@@ -95,7 +96,7 @@ def _dossier_compte() -> Path:
 PARTAGE = _dossier_compte()   # remplacé par compte.activer_dossiers() à la connexion
 
 # Réglages communs à tous tes appareils (prénom, cerveau) : rangés dans ton compte
-CLES_PARTAGEES = ["nom_utilisateur", "cerveau", "claude_modele", "claude_effort", "openai_modele", "silence_fin"]
+CLES_PARTAGEES = ["nom_utilisateur", "cerveau", "claude_modele", "claude_effort", "openai_modele", "langue", "silence_fin"]
 PROFIL = PARTAGE / "profil.json"
 try:
     CONFIG.update({k: v for k, v in json.loads(PROFIL.read_text(encoding="utf-8")).items() if k in CLES_PARTAGEES and v})

@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { History, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Markdown } from "../components/Markdown";
@@ -33,9 +34,9 @@ export function VueHistorique() {
 
   return (
     <div className="flex h-full min-h-0 flex-col p-4 md:p-8">
-      <EnTetePage titre="Historique" sousTitre="Toutes tes conversations avec Jarvis, jour par jour." />
+      <EnTetePage titre={t("Historique")} sousTitre={t("Toutes tes conversations avec Jarvis, jour par jour.")} />
       {jours.length === 0 ? (
-        <Vide icone={<History />} titre="Aucune conversation" texte="Les échanges apparaîtront ici dès ta première demande." />
+        <Vide icone={<History />} titre={t("Aucune conversation")} texte={t("Les échanges apparaîtront ici dès ta première demande.")} />
       ) : (
         <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[260px_1fr]">
           <ul className="space-y-1 overflow-y-auto max-md:max-h-40">
@@ -60,7 +61,7 @@ export function VueHistorique() {
           <div className="coins flex min-h-0 flex-col border border-ligne bg-surface/60">
             <div className="flex items-center gap-3 border-b border-ligne p-3">
               <Search className="size-4 text-doux" />
-              <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder="Chercher dans cette journée…" className="h-8 border-0 bg-transparent px-0" />
+              <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder={t("Chercher dans cette journée…")} className="h-8 border-0 bg-transparent px-0" />
             </div>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 md:p-6">
               {visibles.map((e, i) => (
@@ -79,7 +80,7 @@ export function VueHistorique() {
                   </div>
                 </div>
               ))}
-              {visibles.length === 0 && <p className="text-center text-sm text-doux">Rien ne correspond.</p>}
+              {visibles.length === 0 && <p className="text-center text-sm text-doux">{t("Rien ne correspond.")}</p>}
             </div>
           </div>
         </div>

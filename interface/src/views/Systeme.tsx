@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { HardDrive, Layers, Power, Server, Thermometer } from "lucide-react";
 import { JaugeRonde, Sparkline } from "../components/Sparkline";
 import { Badge, Bouton, EnTetePage, Panneau, Pastille } from "../components/ui";
@@ -21,27 +22,27 @@ export function VueSysteme() {
   const vram = s.gpu ? (s.gpu.vram_used / s.gpu.vram_total) * 100 : 0;
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
-      <EnTetePage titre="Système" sousTitre="État de ton PC en temps réel (rafraîchi toutes les 2 secondes)." />
+      <EnTetePage titre={t("Système")} sousTitre={t("État de ton PC en temps réel (rafraîchi toutes les 2 secondes).")} />
 
       <div className="coins mb-6 grid grid-cols-2 gap-6 border border-ligne bg-surface/60 p-6 md:grid-cols-4">
-        <JaugeRonde valeur={s.cpu} libelle="Processeur" />
-        <JaugeRonde valeur={s.ram} libelle="Mémoire" detail={`${s.ram_used.toFixed(1)} / ${s.ram_total.toFixed(0)} Go`} />
-        <JaugeRonde valeur={s.gpu?.util ?? 0} libelle="GPU" detail={s.gpu ? `${s.gpu.temp.toFixed(0)} °C` : "—"} />
-        <JaugeRonde valeur={vram} libelle="VRAM" detail={s.gpu ? `${s.gpu.vram_used.toFixed(1)} / ${s.gpu.vram_total.toFixed(0)} Go` : "—"} />
+        <JaugeRonde valeur={s.cpu} libelle={t("Processeur")} />
+        <JaugeRonde valeur={s.ram} libelle={t("Mémoire")} detail={`${s.ram_used.toFixed(1)} / ${s.ram_total.toFixed(0)} Go`} />
+        <JaugeRonde valeur={s.gpu?.util ?? 0} libelle={t("GPU")} detail={s.gpu ? `${s.gpu.temp.toFixed(0)} °C` : "—"} />
+        <JaugeRonde valeur={vram} libelle={t("VRAM")} detail={s.gpu ? `${s.gpu.vram_used.toFixed(1)} / ${s.gpu.vram_total.toFixed(0)} Go` : "—"} />
       </div>
 
       <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Carte titre="CPU" valeur={s.cpu} serie={serie.cpu} detail="Charge processeur" />
-        <Carte titre="RAM" valeur={s.ram} serie={serie.ram} detail={`${s.ram_used.toFixed(1)} Go utilisés`} />
-        <Carte titre="GPU" valeur={s.gpu?.util ?? 0} serie={serie.gpu} detail={s.gpu?.nom ?? "Pas de GPU NVIDIA"} couleur="var(--color-ambre)" />
-        <Carte titre="VRAM" valeur={vram} serie={serie.vram} detail="Mémoire vidéo" couleur="var(--color-ambre)" />
+        <Carte titre={t("CPU")} valeur={s.cpu} serie={serie.cpu} detail={t("Charge processeur")} />
+        <Carte titre={t("RAM")} valeur={s.ram} serie={serie.ram} detail={`${s.ram_used.toFixed(1)} Go utilisés`} />
+        <Carte titre={t("GPU")} valeur={s.gpu?.util ?? 0} serie={serie.gpu} detail={s.gpu?.nom ?? "Pas de GPU NVIDIA"} couleur="var(--color-ambre)" />
+        <Carte titre={t("VRAM")} valeur={vram} serie={serie.vram} detail={t("Mémoire vidéo")} couleur="var(--color-ambre)" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <Panneau titre="Noyau IA" icone={<Server />} corpsClassName="space-y-3">
+        <Panneau titre={t("Noyau IA")} icone={<Server />} corpsClassName="space-y-3">
           <Pastille ok={s.ollama}>{s.ollama ? "Ollama en ligne" : "Ollama arrêté"}</Pastille>
           <div className="text-sm">
-            Modèle actif : <span className="font-mono text-hud">{s.modele}</span>
+            {t("Modèle actif : ")}<span className="font-mono text-hud">{s.modele}</span>
           </div>
           {s.charges.length ? (
             <ul className="space-y-2">
@@ -61,23 +62,23 @@ export function VueSysteme() {
               })}
             </ul>
           ) : (
-            <p className="text-sm text-doux">Aucun modèle chargé : la prochaine question prendra ~15 s.</p>
+            <p className="text-sm text-doux">{t("Aucun modèle chargé : la prochaine question prendra ~15 s.")}</p>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
             {s.charges.length ? (
-              <Bouton taille="sm" onClick={() => api("/api/modele/liberer", { method: "POST" }).then(() => toast("VRAM libérée — pratique avant un jeu.", "succes")).catch((e) => toast(e.message, "erreur"))}>
-                Libérer la VRAM
+              <Bouton taille="sm" onClick={() => api("/api/modele/liberer", { method: "POST" }).then(() => toast(t("VRAM libérée — pratique avant un jeu."), "succes")).catch((e) => toast(e.message, "erreur"))}>
+                {t("Libérer la VRAM")}
               </Bouton>
             ) : (
-              <Bouton taille="sm" variante="primaire" onClick={() => api("/api/modele/charger", { method: "POST" }).then(() => toast("Chargement du modèle…")).catch((e) => toast(e.message, "erreur"))}>
-                Charger le modèle
+              <Bouton taille="sm" variante="primaire" onClick={() => api("/api/modele/charger", { method: "POST" }).then(() => toast(t("Chargement du modèle…"))).catch((e) => toast(e.message, "erreur"))}>
+                {t("Charger le modèle")}
               </Bouton>
             )}
           </div>
         </Panneau>
-        <Panneau titre="Stockage" icone={<HardDrive />} corpsClassName="space-y-3">
+        <Panneau titre={t("Stockage")} icone={<HardDrive />} corpsClassName="space-y-3">
           <div className="flex items-baseline justify-between text-sm">
-            <span>Disque principal</span>
+            <span>{t("Disque principal")}</span>
             <span className={cx("font-mono", s.disque > 90 ? "text-rouge" : "text-doux")}>{s.disque.toFixed(0)} %</span>
           </div>
           <div className="h-2 overflow-hidden rounded bg-hud/10">
@@ -85,9 +86,9 @@ export function VueSysteme() {
           </div>
           <p className="text-sm text-doux">{s.disque_libre.toFixed(1)} Go libres{s.disque > 90 && " — pense à faire de la place."}</p>
         </Panneau>
-        <Panneau titre="Machine" icone={<Layers />} corpsClassName="space-y-3 text-sm">
+        <Panneau titre={t("Machine")} icone={<Layers />} corpsClassName="space-y-3 text-sm">
           <div className="flex items-center gap-2">
-            <Power className="size-4 text-hud" /> Allumé depuis <span className="font-mono text-hud">{duree(s.uptime)}</span>
+            <Power className="size-4 text-hud" />{t(" Allumé depuis ")}<span className="font-mono text-hud">{duree(s.uptime)}</span>
           </div>
           {s.gpu && (
             <div className="flex items-center gap-2">
@@ -96,7 +97,7 @@ export function VueSysteme() {
             </div>
           )}
           <p className="text-doux">
-            Avec 8 Go de VRAM, les autres applis qui utilisent la carte graphique (jeux, LDPlayer, Wallpaper Engine…) font déborder le modèle sur le CPU : Jarvis devient plus lent. Libère la VRAM avant de jouer.
+            {t("Avec 8 Go de VRAM, les autres applis qui utilisent la carte graphique (jeux, LDPlayer, Wallpaper Engine…) font déborder le modèle sur le CPU : Jarvis devient plus lent. Libère la VRAM avant de jouer.")}
           </p>
         </Panneau>
       </div>

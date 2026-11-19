@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { Activity, ChevronRight, RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Bouton, Champ, EnTetePage, Vide } from "../components/ui";
@@ -24,11 +25,11 @@ function Ligne({ a }: { a: Action }) {
       {ouvert && (
         <div className="grid gap-3 bg-black/20 px-4 pt-1 pb-4 lg:grid-cols-2">
           <div>
-            <div className="titre-hud mb-1.5 text-[10px] text-doux">Paramètres</div>
+            <div className="titre-hud mb-1.5 text-[10px] text-doux">{t("Paramètres")}</div>
             <pre className="max-h-72 overflow-auto rounded bg-black/40 p-3 font-mono text-xs whitespace-pre-wrap text-texte">{JSON.stringify(a.args, null, 2)}</pre>
           </div>
           <div>
-            <div className="titre-hud mb-1.5 text-[10px] text-doux">Résultat</div>
+            <div className="titre-hud mb-1.5 text-[10px] text-doux">{t("Résultat")}</div>
             <pre className={cx("max-h-72 overflow-auto rounded bg-black/40 p-3 font-mono text-xs whitespace-pre-wrap", estErreur(a.resultat) ? "text-rouge" : "text-doux")}>
               {a.resultat ?? "(pas de résultat enregistré)"}
             </pre>
@@ -78,11 +79,11 @@ export function VueActivite() {
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
-        titre="Activité"
-        sousTitre="Journal de toutes les actions exécutées sur ton PC (logs/actions.log)."
+        titre={t("Activité")}
+        sousTitre={t("Journal de toutes les actions exécutées sur ton PC (logs/actions.log).")}
         actions={
           <Bouton icone={<RefreshCw className={cx("size-4", chargement && "animate-spin")} />} onClick={charger}>
-            Actualiser
+            {t("Actualiser")}
           </Bouton>
         }
       />
@@ -113,10 +114,10 @@ export function VueActivite() {
       <div className="coins border border-ligne bg-surface/60">
         <div className="flex items-center gap-3 border-b border-ligne px-4 py-2">
           <Search className="size-4 text-doux" />
-          <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder="Filtrer par outil ou paramètre…" className="h-9 border-0 bg-transparent px-0" />
+          <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder={t("Filtrer par outil ou paramètre…")} className="h-9 border-0 bg-transparent px-0" />
         </div>
         {visibles.length === 0 ? (
-          <Vide icone={<Activity />} titre="Aucune action" texte="Les actions de Jarvis sur ton PC apparaîtront ici." />
+          <Vide icone={<Activity />} titre={t("Aucune action")} texte={t("Les actions de Jarvis sur ton PC apparaîtront ici.")} />
         ) : (
           <ul>
             {visibles.map((a, i) => (

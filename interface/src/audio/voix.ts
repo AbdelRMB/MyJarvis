@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 /**
  * Chaîne vocale : phrase captée → Whisper (serveur) → filtrage mot d'activation → envoi à Jarvis.
  * Branche aussi la voix et les bips sur les événements de la conversation.
@@ -101,7 +102,7 @@ export function brancherVoix() {
     try {
       traiterParole(await transcrire(morceaux), auto);
     } catch (e) {
-      toast(`Transcription impossible : ${(e as Error).message}`, "erreur");
+      toast(t("Transcription impossible : {msg}", { msg: (e as Error).message }), "erreur");
     } finally {
       majAudio({ transcrit: false });
     }

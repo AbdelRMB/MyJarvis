@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import {
   AlertTriangle,
   ArrowUp,
@@ -38,18 +39,18 @@ export function useStatut(): { libelle: string; detail: string; ton: "hud" | "am
     }
   }, [a.eveilJusqua]);
 
-  if (a.vocalServeur === "eveil") return { libelle: "Écoute", detail: "Je t'écoute…", ton: "vert" };
-  if (a.vocalServeur === "transcription") return { libelle: "Transcription", detail: "J'analyse ta voix…", ton: "hud" };
-  if (a.enregistre) return { libelle: "Écoute", detail: mode === "ptt" ? "Relâche pour envoyer" : "J'envoie dès que tu te tais", ton: "vert" };
-  if (a.transcrit) return { libelle: "Transcription", detail: "Whisper analyse ta voix…", ton: "hud" };
-  if (outilEnCours) return { libelle: "Exécution", detail: nomOutil(outilEnCours), ton: "ambre" };
-  if (occupe) return { libelle: "Analyse", detail: "Je réfléchis…", ton: "hud" };
-  if (a.parle) return { libelle: "Transmission", detail: "Dis « Jarvis, stop » ou Échap pour couper", ton: "hud" };
-  if (a.eveilJusqua > Date.now()) return { libelle: "À vos ordres", detail: "Je t'écoute…", ton: "vert" };
-  if (!a.micActif) return { libelle: "En veille", detail: "Micro coupé — tape ta demande", ton: "hud" };
-  if (mode === "eveil") return { libelle: "En attente", detail: a.ecouteFond ? "Dis « Jarvis, … »" : "Dis « Jarvis, … »", ton: "hud" };
-  if (mode === "auto") return { libelle: "À l'écoute", detail: "Parle quand tu veux", ton: "hud" };
-  return { libelle: "En veille", detail: "Maintiens Espace pour parler", ton: "hud" };
+  if (a.vocalServeur === "eveil") return { libelle: t("Écoute"), detail: t("Je t'écoute…"), ton: "vert" };
+  if (a.vocalServeur === "transcription") return { libelle: t("Transcription"), detail: t("J'analyse ta voix…"), ton: "hud" };
+  if (a.enregistre) return { libelle: t("Écoute"), detail: mode === "ptt" ? "Relâche pour envoyer" : "J'envoie dès que tu te tais", ton: "vert" };
+  if (a.transcrit) return { libelle: t("Transcription"), detail: t("Whisper analyse ta voix…"), ton: "hud" };
+  if (outilEnCours) return { libelle: t("Exécution"), detail: nomOutil(outilEnCours), ton: "ambre" };
+  if (occupe) return { libelle: t("Analyse"), detail: t("Je réfléchis…"), ton: "hud" };
+  if (a.parle) return { libelle: t("Transmission"), detail: t("Dis « Jarvis, stop » ou Échap pour couper"), ton: "hud" };
+  if (a.eveilJusqua > Date.now()) return { libelle: t("À vos ordres"), detail: t("Je t'écoute…"), ton: "vert" };
+  if (!a.micActif) return { libelle: t("En veille"), detail: t("Micro coupé — tape ta demande"), ton: "hud" };
+  if (mode === "eveil") return { libelle: t("En attente"), detail: a.ecouteFond ? "Dis « Jarvis, … »" : "Dis « Jarvis, … »", ton: "hud" };
+  if (mode === "auto") return { libelle: t("À l'écoute"), detail: t("Parle quand tu veux"), ton: "hud" };
+  return { libelle: t("En veille"), detail: t("Maintiens Espace pour parler"), ton: "hud" };
 }
 
 function Statut({ grand, gauche }: { grand?: boolean; gauche?: boolean }) {
@@ -122,7 +123,7 @@ function Pensee({ texte }: { texte: string }) {
   return (
     <div className="text-sm">
       <button onClick={() => setOuvert(!ouvert)} className="flex items-center gap-1.5 text-doux hover:text-texte">
-        <Sparkles className="size-3.5" /> Réflexion
+        <Sparkles className="size-3.5" />{t(" Réflexion")}
         <ChevronRight className={cx("size-3.5 transition-transform", ouvert && "rotate-90")} />
       </button>
       {ouvert && <p className="mt-2 border-l border-ligne-forte pl-3 text-[13px] whitespace-pre-wrap text-doux italic">{texte}</p>}
@@ -132,7 +133,7 @@ function Pensee({ texte }: { texte: string }) {
 
 function Points() {
   return (
-    <span className="inline-flex gap-1 py-2" aria-label="Jarvis écrit">
+    <span className="inline-flex gap-1 py-2" aria-label={t("Jarvis écrit")}>
       {[0, 1, 2].map((i) => (
         <span key={i} className="size-1.5 animate-pulse rounded-full bg-hud" style={{ animationDelay: `${i * 0.2}s` }} />
       ))}
@@ -149,7 +150,7 @@ function ReponseJarvis({ m }: { m: MessageJarvis }) {
       </div>
       <div className="min-w-0 flex-1 space-y-3">
         <div className="flex items-baseline gap-2">
-          <span className="titre-hud text-[11px] font-bold text-hud">Jarvis</span>
+          <span className="titre-hud text-[11px] font-bold text-hud">{t("Jarvis")}</span>
           <span className="text-[11px] text-tres-doux">{heure(m.date)}</span>
         </div>
         {m.blocs.map((b, i) =>
@@ -257,18 +258,18 @@ function Saisie() {
             valider();
           }
         }}
-        placeholder="Demande-moi n'importe quoi…"
+        placeholder={t("Demande-moi n'importe quoi…")}
         className="max-h-[200px] min-h-11 flex-1 resize-none bg-transparent px-2 py-2.5 text-[15px] leading-relaxed outline-none placeholder:text-tres-doux"
       />
       {occupe || parle ? (
-        <button onClick={stopTout} aria-label="Stop" title="Stop (Échap)" className="grid size-11 flex-none place-items-center rounded-full border border-rouge/60 bg-rouge/10 text-rouge hover:bg-rouge/20">
+        <button onClick={stopTout} aria-label={t("Stop")} title={t("Stop (Échap)")} className="grid size-11 flex-none place-items-center rounded-full border border-rouge/60 bg-rouge/10 text-rouge hover:bg-rouge/20">
           <Square className="size-4 fill-current" />
         </button>
       ) : (
         <button
           onClick={valider}
           disabled={!texte.trim()}
-          aria-label="Envoyer"
+          aria-label={t("Envoyer")}
           className="grid size-11 flex-none place-items-center rounded-full bg-hud text-fond shadow-glow transition-all hover:bg-hud-clair disabled:bg-surface-3 disabled:text-tres-doux disabled:shadow-none"
         >
           <ArrowUp className="size-5" />
@@ -292,18 +293,18 @@ function Rail() {
         <Reacteur className="aspect-square w-full" />
       </div>
       <Statut grand />
-      <Panneau titre="Audio" corpsClassName="space-y-2.5">
+      <Panneau titre={t("Audio")} corpsClassName="space-y-2.5">
         <div className="truncate text-xs text-doux">{micActif ? nomMicro : "Micro inactif"}</div>
         <VuMetre />
         {derniereTranscription && (
           <p className="text-[13px] text-doux">
-            <span className="text-tres-doux">Entendu : </span>« {derniereTranscription} »
+            <span className="text-tres-doux">{t("Entendu : ")}</span>« {derniereTranscription} »
           </p>
         )}
       </Panneau>
-      <Panneau titre="Actions de la session" actions={<Badge ton="doux">{outils.length}</Badge>} className="min-h-[200px] flex-1" corpsClassName="overflow-y-auto p-0">
+      <Panneau titre={t("Actions de la session")} actions={<Badge ton="doux">{outils.length}</Badge>} className="min-h-[200px] flex-1" corpsClassName="overflow-y-auto p-0">
         {outils.length === 0 ? (
-          <p className="p-4 text-center text-sm text-tres-doux">Aucune action pour l'instant.</p>
+          <p className="p-4 text-center text-sm text-tres-doux">{t("Aucune action pour l'instant.")}</p>
         ) : (
           <ul className="divide-y divide-ligne">
             {outils.map((o, i) => (
@@ -322,12 +323,12 @@ function Rail() {
 
 /* ---------------- vue ---------------- */
 const SUGGESTIONS = [
-  "Ouvre mon dernier projet dans VS Code",
-  "Quelle météo aujourd'hui ?",
-  "Qu'est-ce qui consomme le plus de mémoire ?",
-  "Fais une capture et dis-moi ce que tu vois",
-  "Résume les actus tech du jour",
-  "Crée un projet Vite React dans Documents",
+  t("Ouvre mon dernier projet dans VS Code"),
+  t("Quelle météo aujourd'hui ?"),
+  t("Qu'est-ce qui consomme le plus de mémoire ?"),
+  t("Fais une capture et dis-moi ce que tu vois"),
+  t("Résume les actus tech du jour"),
+  t("Crée un projet Vite React dans Documents"),
 ];
 
 function BandeauCle() {
@@ -339,8 +340,8 @@ function BandeauCle() {
       onClick={() => maj({ vue: "reglages" })}
       className="mb-6 w-full max-w-2xl rounded-md border border-ambre/50 bg-ambre/10 px-4 py-3 text-left text-sm text-ambre hover:bg-ambre/15"
     >
-      <strong>Bienvenue sur ce nouvel ordinateur !</strong> Ajoute ta clé API Claude pour que Jarvis puisse réfléchir : Réglages › Cerveau.
-      <span className="mt-1 block text-[13px] text-doux">Ta mémoire et tes connecteurs sont déjà là grâce à ton compte.</span>
+      <strong>{t("Bienvenue sur ce nouvel ordinateur !")}</strong>{t(" Ajoute ta clé API Claude pour que Jarvis puisse réfléchir : Réglages › Cerveau.")}
+      <span className="mt-1 block text-[13px] text-doux">{t("Ta mémoire et tes connecteurs sont déjà là grâce à ton compte.")}</span>
     </button>
   );
 }
@@ -356,9 +357,9 @@ function Accueil() {
       </div>
       <BandeauCle />
       <h2 className="mt-8 text-center text-2xl font-semibold xl:mt-0 xl:text-3xl">
-        {h < 5 || h >= 18 ? "Bonsoir" : "Bonjour"} {nom}.
+        {h < 5 || h >= 18 ? t("Bonsoir") : t("Bonjour")} {nom}.
       </h2>
-      <p className="mt-2 text-center text-doux">Que puis-je faire pour vous ?</p>
+      <p className="mt-2 text-center text-doux">{t("Que puis-je faire pour vous ?")}</p>
       <div className="mt-8 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
         {SUGGESTIONS.map((s) => (
           <button
@@ -383,7 +384,7 @@ function EnTeteConversation({ children }: { children?: ReactNode }) {
       <div className="min-w-0 xl:hidden">
         <Statut gauche />
       </div>
-      <span className="titre-hud text-[11px] text-doux max-xl:hidden">Conversation en cours</span>
+      <span className="titre-hud text-[11px] text-doux max-xl:hidden">{t("Conversation en cours")}</span>
       <div className="ml-auto flex items-center gap-1">{children}</div>
     </div>
   );
@@ -405,7 +406,7 @@ export function VueAssistant() {
       <div className="flex min-w-0 flex-1 flex-col">
         {!vide && (
           <EnTeteConversation>
-            <BoutonIcone label="Nouvelle conversation" onClick={nouvelleConversation}>
+            <BoutonIcone label={t("Nouvelle conversation")} onClick={nouvelleConversation}>
               <RotateCcw className="size-4" />
             </BoutonIcone>
           </EnTeteConversation>
@@ -431,7 +432,7 @@ export function VueAssistant() {
         <div className="mx-auto w-full max-w-3xl px-4 pt-2 pb-4 md:px-6">
           <Saisie />
           <p className="mt-2 text-center text-[11px] text-tres-doux max-sm:hidden">
-            Entrée pour envoyer · Maj+Entrée nouvelle ligne · Espace maintenu pour parler · Échap pour stopper
+            {t("Entrée pour envoyer · Maj+Entrée nouvelle ligne · Espace maintenu pour parler · Échap pour stopper")}
           </p>
         </div>
       </div>

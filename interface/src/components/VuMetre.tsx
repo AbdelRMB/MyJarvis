@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { useEffect, useRef } from "react";
 import { micro } from "../audio/micro";
 import { cx } from "../lib/format";
@@ -61,7 +62,7 @@ export function VuMetre({ className, segments = 40 }: { className?: string; segm
       <div
         className="absolute inset-y-0 w-0.5 bg-ambre shadow-[0_0_8px] shadow-ambre"
         style={{ left: `${echelle(seuil) * 100}%` }}
-        title="Seuil de détection"
+        title={t("Seuil de détection")}
       />
     </div>
   );

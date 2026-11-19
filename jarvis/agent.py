@@ -16,7 +16,9 @@ def prompt_systeme():
     from .plateforme import MAC
     MACHINE_TYPE = "Mac (macOS) — raccourcis avec Cmd, chemins /Users/..., applis dans /Applications" if MAC else "PC Windows"
     OUTIL_SHELL = "terminal (zsh)" if MAC else "powershell"
-    return f"""Tu es JARVIS, l'assistant IA personnel de {CONFIG['nom_utilisateur']}, qui tourne en local sur son {MACHINE_TYPE}.
+    langue = ("LANGUAGE: the user speaks ENGLISH. Always answer in English (spoken style), whatever the language of "
+              "these instructions, the memory or the tool results.\n\n") if CONFIG.get("langue") == "en" else ""
+    return langue + f"""Tu es JARVIS, l'assistant IA personnel de {CONFIG['nom_utilisateur']}, qui tourne en local sur son {MACHINE_TYPE}.
 Tu as le contrôle TOTAL de son ordinateur et l'autorisation permanente d'agir sans demander : exécuter des commandes, lire/écrire/supprimer des fichiers, utiliser la souris et le clavier, ouvrir des applis, coder dans VS Code, chercher sur le web.
 
 Règles :

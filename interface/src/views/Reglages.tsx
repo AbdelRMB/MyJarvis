@@ -1,3 +1,4 @@
+import { changerLangue, LANGUE, t, type Langue } from "../lib/i18n";
 import { AppWindow, Brain, Cloud, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Volume2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { crete, micro } from "../audio/micro";
@@ -13,7 +14,7 @@ import type { ConfigServeur } from "../lib/types";
 import { useOS } from "../lib/os";
 import { majAudio, useAudio } from "../stores/audio";
 import { rescanner, useJarvis } from "../stores/jarvis";
-import { DEFAUT, useReglages } from "../stores/reglages";
+import { DEFAUT, reglages, useReglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { rafraichirSysteme } from "../stores/systeme";
 
@@ -47,11 +48,11 @@ function OngletApplication() {
       if (a === "importer")
         toast(
           r.import && (r.import.faits || r.import.lignes)
-            ? `Ajouté à ton compte : ${r.import.faits} souvenir(s), ${r.import.lignes} ligne(s) d'historique.`
+            ? t("Ajouté à ton compte : {faits} souvenir(s), {lignes} ligne(s) d'historique.", { faits: r.import.faits, lignes: r.import.lignes })
             : "Rien de nouveau : tout ce que cet appareil savait est déjà dans ton compte.",
           "succes",
         );
-      else if (a === "synchroniser") toast("Synchronisé avec ton compte.", "succes");
+      else if (a === "synchroniser") toast(t("Synchronisé avec ton compte."), "succes");
       else location.reload();   // déconnexion / changement de mode : retour à l'écran de choix   // déconnecté : retour à l'écran de connexion
     } catch (x) {
       toast((x as Error).message, "erreur");
@@ -59,7 +60,7 @@ function OngletApplication() {
       setAction("");
     }
   };
-  if (!e) return <p className="text-doux">Chargement…</p>;
+  if (!e) return <p className="text-doux">{t("Chargement…")}</p>;
   const regler = async (p: Partial<EtatAppli>) => {
     try {
       const n = await api<EtatAppli>("/api/appli", { method: "POST", json: p });
@@ -72,82 +73,79 @@ function OngletApplication() {
   const raccourci = os.touches(e.raccourci);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panneau titre="Application" icone={<AppWindow />}>
+      <Panneau titre={t("Application")} icone={<AppWindow />}>
         {!e.appli && (
           <p className="mb-3 rounded border border-ambre/40 bg-ambre/5 p-3 text-[13px] text-ambre">
-            Tu utilises Jarvis dans le navigateur. L'écoute de fond et la fenêtre qui s'ouvre toute seule fonctionnent avec l'application (Jarvis installé, ou lanceur.pyw).
+            {t("Tu utilises Jarvis dans le navigateur. L'écoute de fond et la fenêtre qui s'ouvre toute seule fonctionnent avec l'application (Jarvis installé, ou lanceur.pyw).")}
           </p>
         )}
         <div className="divide-y divide-ligne">
           <Interrupteur
-            label={`Lancer Jarvis ${os.demarrage}`}
-            aide={`Il démarre caché (icône ${os.zoneIcone}) et attend que tu l'appelles.`}
+            label={t("Lancer Jarvis {quand}", { quand: os.demarrage })}
+            aide={t("Il démarre caché (icône {zone}) et attend que tu l'appelles.", { zone: os.zoneIcone })}
             actif={e.demarrage_auto}
             onChange={(v) => regler({ demarrage_auto: v })}
           />
           <Interrupteur
-            label="Écoute « Jarvis » en arrière-plan"
-            aide="Même fenêtre fermée : dis « Jarvis, ouvre Discord » d'une traite, ou « Jarvis » puis ta demande. Tout est analysé sur ton PC : rien n'est envoyé tant qu'il n'a pas reconnu son nom."
+            label={t("Écoute « Jarvis » en arrière-plan")}
+            aide={t("Même fenêtre fermée : dis « Jarvis, ouvre Discord » d'une traite, ou « Jarvis » puis ta demande. Tout est analysé sur ton PC : rien n'est envoyé tant qu'il n'a pas reconnu son nom.")}
             actif={e.ecoute_fond}
             onChange={(v) => regler({ ecoute_fond: v })}
           />
         </div>
         <Curseur
-          label="Sensibilité du mot d'activation"
+          label={t("Sensibilité du mot d'activation")}
           valeur={1 - e.seuil_eveil}
           min={0.1}
           max={0.8}
           pas={0.05}
           affichage={e.seuil_eveil <= 0.35 ? "haute" : e.seuil_eveil >= 0.65 ? "basse" : "normale"}
           onChange={(v) => regler({ seuil_eveil: Math.round((1 - v) * 100) / 100 })}
-          aide="Monte-la s'il ne t'entend pas, baisse-la s'il se déclenche tout seul."
+          aide={t("Monte-la s'il ne t'entend pas, baisse-la s'il se déclenche tout seul.")}
         />
         <div className="mt-2 rounded-md border border-ligne bg-black/20 p-3 text-sm">
-          Raccourci pour l'appeler : <kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{raccourci}</kbd>
+          {t("Raccourci pour l'appeler : ")}<kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{raccourci}</kbd>
           <br />
-          Pour le faire taire : dis « Jarvis, stop », ou appuie sur <kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{os.touches("<ctrl>+<alt>+s")}</kbd> (même fenêtre cachée).
+          {t("Pour le faire taire : dis « Jarvis, stop », ou appuie sur ")}<kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{os.touches("<ctrl>+<alt>+s")}</kbd>{t(" (même fenêtre cachée).")}
           <p className="mt-1 text-[13px] text-doux">Fermer la fenêtre la cache seulement. Pour quitter : clic sur l'icône Jarvis {os.zoneIcone}, puis « Quitter ».</p>
         </div>
       </Panneau>
       {compte?.mode === "local" ? (
-        <Panneau titre="Jarvis en local" icone={<Cloud />}>
+        <Panneau titre={t("Jarvis en local")} icone={<Cloud />}>
           <p className="text-[13px] leading-relaxed text-doux">
-            Tout reste sur cet ordinateur : mémoire, historique, connecteurs, clés. Rien n'est envoyé à un serveur. Mais il n'y a pas de récupération ailleurs :
-            sur un autre appareil, ce sera un nouveau Jarvis qui ne sait rien de toi.
+            {t("Tout reste sur cet ordinateur : mémoire, historique, connecteurs, clés. Rien n'est envoyé à un serveur. Mais il n'y a pas de récupération ailleurs : sur un autre appareil, ce sera un nouveau Jarvis qui ne sait rien de toi.")}
           </p>
           <p className="mt-3 text-[13px] leading-relaxed text-doux">
-            En passant en ligne, tu crées ton compte (ou tu te connectes) et Jarvis y envoie toute sa mémoire, ses réglages, tes connecteurs et tes clés
-            (chiffrées avec ton mot de passe).
+            {t("En passant en ligne, tu crées ton compte (ou tu te connectes) et Jarvis y envoie toute sa mémoire, ses réglages, tes connecteurs et tes clés (chiffrées avec ton mot de passe).")}
           </p>
           <Bouton className="mt-4" variante="primaire" icone={<Cloud />} chargement={action === "changer_mode"} onClick={() => agir("changer_mode")}>
-            Passer en ligne
+            {t("Passer en ligne")}
           </Bouton>
         </Panneau>
       ) : (
-      <Panneau titre="Mon compte" icone={<Cloud />}>
+      <Panneau titre={t("Mon compte")} icone={<Cloud />}>
         <p className="text-sm">
-          Connecté : <span className="font-mono text-hud">{compte?.email ?? "…"}</span>
+          {t("Connecté : ")}<span className="font-mono text-hud">{compte?.email ?? "…"}</span>
         </p>
         <p className="mt-1 text-sm">
-          Cet appareil : <span className="font-mono text-hud">{e.machine}</span>
+          {t("Cet appareil : ")}<span className="font-mono text-hud">{e.machine}</span>
         </p>
         <p className="mt-3 text-[13px] leading-relaxed text-doux">
-          Tes souvenirs, l'historique des conversations, tes connecteurs et tes réglages sont rangés dans ton compte : connecte-toi sur n'importe quel appareil et
-          Jarvis se souvient des mêmes choses. Ta clé API et les mots de passe des connecteurs y sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.
+          {t("Tes souvenirs, l'historique des conversations, tes connecteurs et tes réglages sont rangés dans ton compte : connecte-toi sur n'importe quel appareil et Jarvis se souvient des mêmes choses. Ta clé API et les mots de passe des connecteurs y sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.")}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Bouton icone={<Cloud />} chargement={action === "importer"} onClick={() => agir("importer")}>
-            Envoyer la mémoire de cet appareil
+            {t("Envoyer la mémoire de cet appareil")}
           </Bouton>
           <Bouton variante="fantome" chargement={action === "synchroniser"} onClick={() => agir("synchroniser")}>
-            Synchroniser
+            {t("Synchroniser")}
           </Bouton>
           <Bouton variante="danger" chargement={action === "deconnexion"} onClick={() => agir("deconnexion")}>
-            Se déconnecter
+            {t("Se déconnecter")}
           </Bouton>
         </div>
         <p className="mt-2 text-[13px] text-doux">
-          « Envoyer » ajoute à ton compte ce que cet appareil savait avant (anciennes versions, OneDrive). Rien n'est écrasé, les doublons sont ignorés.
+          {t("« Envoyer » ajoute à ton compte ce que cet appareil savait avant (anciennes versions, OneDrive). Rien n'est écrasé, les doublons sont ignorés.")}
         </p>
       </Panneau>
       )}
@@ -193,14 +191,14 @@ function TestMicro() {
       {res && verdict && (
         <div className="rounded-md border border-ligne bg-black/20 p-3 text-sm">
           <p>
-            Crête : <span className="font-mono">{Math.round(res.crete * 100)} %</span> — <span className={verdict[1]}>{verdict[0]}</span>
+            {t("Crête : ")}<span className="font-mono">{Math.round(res.crete * 100)} %</span> — <span className={verdict[1]}>{verdict[0]}</span>
           </p>
           <p className="mt-1 text-doux">
-            Whisper a compris : <span className="text-texte">« {res.texte || "(rien)"} »</span>
+            {t("Whisper a compris : ")}<span className="text-texte">« {res.texte || "(rien)"} »</span>
           </p>
         </div>
       )}
-      <p className="text-[13px] text-doux">Enregistre 4 secondes, te les fait réécouter et montre ce que la reconnaissance vocale a compris.</p>
+      <p className="text-[13px] text-doux">{t("Enregistre 4 secondes, te les fait réécouter et montre ce que la reconnaissance vocale a compris.")}</p>
     </div>
   );
 }
@@ -212,12 +210,12 @@ function OngletMicro() {
   const actuel = r.deviceId || micro.idPeripheriqueActif() || "default";
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panneau titre="Entrée" icone={<Mic />}>
+      <Panneau titre={t("Entrée")} icone={<Mic />}>
         {erreurMicro && <p className="mb-3 rounded border border-rouge/40 bg-rouge/5 p-3 text-sm text-rouge">{erreurMicro}</p>}
         <Selecteur
-          label="Périphérique"
+          label={t("Périphérique")}
           valeur={actuel}
-          options={peripheriques.length ? peripheriques.map((p) => ({ valeur: p.id, libelle: p.nom })) : [{ valeur: "default", libelle: "Micro par défaut" }]}
+          options={peripheriques.length ? peripheriques.map((p) => ({ valeur: p.id, libelle: p.nom })) : [{ valeur: "default", libelle: t("Micro par défaut") }]}
           onChange={(v) => {
             r.maj({ deviceId: v });
             redemarrer();
@@ -225,27 +223,27 @@ function OngletMicro() {
         />
         <div className="py-2">
           <div className="mb-1.5 flex justify-between text-sm">
-            <span>Niveau en direct</span>
+            <span>{t("Niveau en direct")}</span>
             {micActif ? <NiveauDirect /> : <span className="text-xs text-rouge">inactif</span>}
           </div>
           <VuMetre segments={50} />
           <p className="mt-1.5 text-[13px] text-doux">
-            La ligne orange est le seuil de détection : ta voix doit la dépasser nettement, le silence doit rester en dessous.
+            {t("La ligne orange est le seuil de détection : ta voix doit la dépasser nettement, le silence doit rester en dessous.")}
           </p>
         </div>
-        <Curseur label="Gain" valeur={r.gain} min={0.5} max={5} pas={0.1} affichage={`×${r.gain.toFixed(1)}`} onChange={(v) => { r.maj({ gain: v }); micro.setGain(v); }} />
+        <Curseur label={t("Gain")} valeur={r.gain} min={0.5} max={5} pas={0.1} affichage={`×${r.gain.toFixed(1)}`} onChange={(v) => { r.maj({ gain: v }); micro.setGain(v); }} />
         <Curseur
-          label="Seuil de détection"
+          label={t("Seuil de détection")}
           valeur={r.seuil}
           min={0}
           max={0.25}
           pas={0.001}
           affichage={r.seuil === 0 ? "0 · auto" : (r.seuil * 100).toFixed(1)}
           onChange={(v) => r.maj({ seuil: v })}
-          aide="À 0, pas de seuil fixe : Jarvis s'adapte au bruit de ta pièce et capte même une voix faible."
+          aide={t("À 0, pas de seuil fixe : Jarvis s'adapte au bruit de ta pièce et capte même une voix faible.")}
         />
         <Curseur
-          label="Silence avant envoi"
+          label={t("Silence avant envoi")}
           valeur={r.silence}
           min={500}
           max={10000}
@@ -255,19 +253,19 @@ function OngletMicro() {
             r.maj({ silence: v });
             api("/api/appli", { method: "POST", json: { silence_fin: v / 1000 } }).catch(() => {});
           }}
-          aide="Jarvis t'écoute jusqu'au bout, pauses comprises : il n'envoie ta demande qu'après ce temps de silence. Vaut aussi pour « Jarvis, … » fenêtre fermée."
+          aide={t("Jarvis t'écoute jusqu'au bout, pauses comprises : il n'envoie ta demande qu'après ce temps de silence. Vaut aussi pour « Jarvis, … » fenêtre fermée.")}
         />
       </Panneau>
       <div className="space-y-4">
-        <Panneau titre="Traitement">
+        <Panneau titre={t("Traitement")}>
           <div className="divide-y divide-ligne">
-            <Interrupteur label="Suppression du bruit" aide="Filtre les bruits de fond (ventilos, clavier)" actif={r.bruit} onChange={(v) => { r.maj({ bruit: v }); redemarrer(); }} />
-            <Interrupteur label="Annulation d'écho" aide="Indispensable si tu es sur haut-parleurs" actif={r.echo} onChange={(v) => { r.maj({ echo: v }); redemarrer(); }} />
-            <Interrupteur label="Gain automatique" aide="Le navigateur ajuste le volume tout seul" actif={r.agc} onChange={(v) => { r.maj({ agc: v }); redemarrer(); }} />
-            <Interrupteur label="Sourdine pendant que Jarvis parle" aide="Évite qu'il s'écoute lui-même en mode mains libres" actif={r.sourdine} onChange={(v) => r.maj({ sourdine: v })} />
+            <Interrupteur label={t("Suppression du bruit")} aide={t("Filtre les bruits de fond (ventilos, clavier)")} actif={r.bruit} onChange={(v) => { r.maj({ bruit: v }); redemarrer(); }} />
+            <Interrupteur label={t("Annulation d'écho")} aide={t("Indispensable si tu es sur haut-parleurs")} actif={r.echo} onChange={(v) => { r.maj({ echo: v }); redemarrer(); }} />
+            <Interrupteur label={t("Gain automatique")} aide={t("Le navigateur ajuste le volume tout seul")} actif={r.agc} onChange={(v) => { r.maj({ agc: v }); redemarrer(); }} />
+            <Interrupteur label={t("Sourdine pendant que Jarvis parle")} aide={t("Évite qu'il s'écoute lui-même en mode mains libres")} actif={r.sourdine} onChange={(v) => r.maj({ sourdine: v })} />
           </div>
         </Panneau>
-        <Panneau titre="Test">
+        <Panneau titre={t("Test")}>
           <TestMicro />
         </Panneau>
       </div>
@@ -284,18 +282,18 @@ function OngletVoix() {
     chargerVoix();
     listerVoixServeur().then(setVoixServeur).catch(() => {});
   }, []);
-  const tester = () => parler(`Bonjour ${nom}. Que puis-je faire pour vous ?`, true);
+  const tester = () => parler(t("Bonjour {nom}. Que puis-je faire pour vous ?", { nom }), true);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panneau titre="Voix de Jarvis" icone={<Volume2 />}>
-        <Interrupteur label="Réponses vocales" aide="Jarvis lit ses réponses à voix haute, phrase par phrase, pendant qu'il les écrit" actif={r.tts} onChange={(v) => r.maj({ tts: v })} />
+      <Panneau titre={t("Voix de Jarvis")} icone={<Volume2 />}>
+        <Interrupteur label={t("Réponses vocales")} aide={t("Jarvis lit ses réponses à voix haute, phrase par phrase, pendant qu'il les écrit")} actif={r.tts} onChange={(v) => r.maj({ tts: v })} />
         <Selecteur
-          label="Moteur"
+          label={t("Moteur")}
           valeur={r.ttsMoteur}
           options={[
-            { valeur: "edge", libelle: "Neuronal Microsoft — voix humaine (en ligne)" },
-            { valeur: "piper", libelle: "Piper — neuronal 100 % local" },
-            { valeur: "navigateur", libelle: "Navigateur — voix Windows (robotique)" },
+            { valeur: "edge", libelle: t("Neuronal Microsoft — voix humaine (en ligne)") },
+            { valeur: "piper", libelle: t("Piper — neuronal 100 % local") },
+            { valeur: "navigateur", libelle: t("Navigateur — voix Windows (robotique)") },
           ]}
           onChange={(v) => r.maj({ ttsMoteur: v as typeof r.ttsMoteur })}
           aide={
@@ -307,46 +305,46 @@ function OngletVoix() {
           }
         />
         {r.ttsMoteur === "edge" && (
-          <Selecteur label="Voix" valeur={r.ttsVoixEdge} options={voixServeur.edge.map((v) => ({ valeur: v.id, libelle: v.nom }))} onChange={(v) => r.maj({ ttsVoixEdge: v })} />
+          <Selecteur label={t("Voix")} valeur={r.ttsVoixEdge} options={voixServeur.edge.map((v) => ({ valeur: v.id, libelle: v.nom }))} onChange={(v) => r.maj({ ttsVoixEdge: v })} />
         )}
         {r.ttsMoteur === "piper" && (
           <Selecteur
-            label="Voix"
+            label={t("Voix")}
             valeur={r.ttsVoixPiper}
-            options={voixServeur.piper.length ? voixServeur.piper.map((v) => ({ valeur: v.id, libelle: v.nom })) : [{ valeur: "", libelle: "Aucune voix dans le dossier voix/" }]}
+            options={voixServeur.piper.length ? voixServeur.piper.map((v) => ({ valeur: v.id, libelle: v.nom })) : [{ valeur: "", libelle: t("Aucune voix dans le dossier voix/") }]}
             onChange={(v) => r.maj({ ttsVoixPiper: v })}
           />
         )}
         {r.ttsMoteur === "navigateur" && (
           <>
             <Selecteur
-              label="Voix"
+              label={t("Voix")}
               valeur={r.voix}
-              options={voixNav.length ? voixNav.map((v) => ({ valeur: v.uri, libelle: `${v.nom} — ${v.lang}` })) : [{ valeur: "", libelle: "Aucune voix trouvée" }]}
+              options={voixNav.length ? voixNav.map((v) => ({ valeur: v.uri, libelle: `${v.nom} — ${v.lang}` })) : [{ valeur: "", libelle: t("Aucune voix trouvée") }]}
               onChange={(v) => r.maj({ voix: v })}
             />
-            <Curseur label="Hauteur" valeur={r.hauteur} min={0.5} max={1.5} pas={0.05} affichage={r.hauteur.toFixed(2)} onChange={(v) => r.maj({ hauteur: v })} />
+            <Curseur label={t("Hauteur")} valeur={r.hauteur} min={0.5} max={1.5} pas={0.05} affichage={r.hauteur.toFixed(2)} onChange={(v) => r.maj({ hauteur: v })} />
           </>
         )}
-        <Curseur label="Débit" valeur={r.debit} min={0.7} max={1.6} pas={0.05} affichage={`×${r.debit.toFixed(2)}`} onChange={(v) => r.maj({ debit: v })} />
-        <Curseur label="Volume" valeur={r.volume} min={0} max={1} pas={0.05} affichage={`${Math.round(r.volume * 100)} %`} onChange={(v) => r.maj({ volume: v })} />
+        <Curseur label={t("Débit")} valeur={r.debit} min={0.7} max={1.6} pas={0.05} affichage={`×${r.debit.toFixed(2)}`} onChange={(v) => r.maj({ debit: v })} />
+        <Curseur label={t("Volume")} valeur={r.volume} min={0} max={1} pas={0.05} affichage={`${Math.round(r.volume * 100)} %`} onChange={(v) => r.maj({ volume: v })} />
         <div className="mt-3 flex gap-2">
           <Bouton icone={<Play className="size-4" />} onClick={tester}>
-            Écouter
+            {t("Écouter")}
           </Bouton>
           <Bouton variante="fantome" onClick={taire}>
-            Stop
+            {t("Stop")}
           </Bouton>
         </div>
       </Panneau>
-      <Panneau titre="Reconnaissance">
+      <Panneau titre={t("Reconnaissance")}>
         <Selecteur
-          label="Langue parlée"
+          label={t("Langue parlée")}
           valeur={r.langue}
           options={[
-            { valeur: "fr", libelle: "Français" },
-            { valeur: "en", libelle: "Anglais" },
-            { valeur: "", libelle: "Détection automatique" },
+            { valeur: "fr", libelle: t("Français") },
+            { valeur: "en", libelle: t("Anglais") },
+            { valeur: "", libelle: t("Détection automatique") },
           ]}
           onChange={(v) => {
             r.maj({ langue: v });
@@ -354,7 +352,7 @@ function OngletVoix() {
           }}
         />
         <p className="mt-2 text-[13px] text-doux">
-          La reconnaissance vocale (Whisper) tourne en local sur ton PC et se charge au démarrage de Jarvis. Sa précision se règle dans l'onglet Cerveau.
+          {t("La reconnaissance vocale (Whisper) tourne en local sur ton PC et se charge au démarrage de Jarvis. Sa précision se règle dans l'onglet Cerveau.")}
         </p>
       </Panneau>
     </div>
@@ -386,7 +384,7 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
     try {
       await api("/api/claude/cle", { method: "POST", json: { cle } });
       setCle("");
-      toast("Clé enregistrée dans le fichier .env de Jarvis.", "succes");
+      toast(t("Clé enregistrée dans le fichier .env de Jarvis."), "succes");
       charger();
     } catch (e) {
       toast((e as Error).message, "erreur");
@@ -409,13 +407,13 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
   return (
     <div className="space-y-1">
       <div className="py-2">
-        <span className="mb-1.5 block text-sm">Clé API Anthropic</span>
+        <span className="mb-1.5 block text-sm">{t("Clé API Anthropic")}</span>
         {etat?.cle ? (
           <p className="mb-2 flex items-center gap-2 text-sm text-vert">
-            <KeyRound className="size-4" /> Configurée <span className="font-mono text-xs text-doux">{etat.cle_masquee}</span>
+            <KeyRound className="size-4" />{t(" Configurée ")}<span className="font-mono text-xs text-doux">{etat.cle_masquee}</span>
           </p>
         ) : (
-          <p className="mb-2 text-sm text-ambre">Aucune clé : crée-en une sur platform.claude.com (section API keys).</p>
+          <p className="mb-2 text-sm text-ambre">{t("Aucune clé : crée-en une sur platform.claude.com (section API keys).")}</p>
         )}
         <div className="flex gap-2">
           <input
@@ -428,30 +426,30 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
             className="h-10 min-w-0 flex-1 rounded-md border border-ligne-forte bg-surface-2 px-3 font-mono text-sm outline-none focus:border-hud"
           />
           <Bouton onClick={sauverCle} disabled={!cle.trim()}>
-            Enregistrer
+            {t("Enregistrer")}
           </Bouton>
         </div>
-        <p className="mt-1 text-[13px] text-doux">Stockée uniquement dans le fichier .env de Jarvis, sur ton PC.</p>
+        <p className="mt-1 text-[13px] text-doux">{t("Stockée uniquement dans le fichier .env de Jarvis, sur ton PC.")}</p>
       </div>
       <Selecteur
-        label="Modèle"
+        label={t("Modèle")}
         valeur={cfg.claude_modele}
         options={(etat?.modeles ?? [{ id: cfg.claude_modele, nom: cfg.claude_modele }]).map((m) => ({ valeur: m.id, libelle: m.nom }))}
         onChange={(v) => enregistrer({ claude_modele: v })}
       />
       <Selecteur
-        label="Effort de réflexion"
+        label={t("Effort de réflexion")}
         valeur={cfg.claude_effort}
         options={[
-          { valeur: "low", libelle: "Bas — le plus réactif, idéal à l'oral (recommandé)" },
-          { valeur: "medium", libelle: "Moyen — mieux pour les longues tâches avec outils" },
-          { valeur: "high", libelle: "Élevé — plus lent et plus cher" },
+          { valeur: "low", libelle: t("Bas — le plus réactif, idéal à l'oral (recommandé)") },
+          { valeur: "medium", libelle: t("Moyen — mieux pour les longues tâches avec outils") },
+          { valeur: "high", libelle: t("Élevé — plus lent et plus cher") },
         ]}
         onChange={(v) => enregistrer({ claude_effort: v })}
       />
       <div className="flex flex-wrap items-center gap-3 py-2">
         <Bouton icone={<Zap className="size-4" />} chargement={enCours} onClick={tester} disabled={!etat?.cle}>
-          Tester
+          {t("Tester")}
         </Bouton>
         {test && <span className={cx("text-sm", test.startsWith("✓") ? "text-vert" : "text-rouge")}>{test}</span>}
       </div>
@@ -467,7 +465,7 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
               <div className="mt-1 font-mono text-sm text-hud">{v}</div>
             </div>
           ))}
-          <p className="col-span-3 text-[12px] text-tres-doux">Estimation à partir des tokens facturés (cache compris). Le solde exact est sur platform.claude.com.</p>
+          <p className="col-span-3 text-[12px] text-tres-doux">{t("Estimation à partir des tokens facturés (cache compris). Le solde exact est sur platform.claude.com.")}</p>
         </div>
       )}
     </div>
@@ -488,7 +486,7 @@ function ReglagesOpenAI({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
     try {
       setE(await api<Etat>("/api/openai/cle", { method: "POST", json: { cle } }));
       setCle("");
-      toast("Clé OpenAI enregistrée.", "succes");
+      toast(t("Clé OpenAI enregistrée."), "succes");
     } catch (x) {
       toast((x as Error).message, "erreur");
     }
@@ -509,17 +507,17 @@ function ReglagesOpenAI({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
       <label className="block text-sm">
         <span className="mb-1.5 block">Clé API OpenAI {e?.cle && <span className="font-mono text-[12px] text-vert">({e.cle_masquee})</span>}</span>
         <div className="flex gap-2">
-          <Champ type="password" placeholder="sk-…" value={cle} onChange={(x) => setCle(x.target.value)} className="flex-1" />
+          <Champ type="password" placeholder={t("sk-…")} value={cle} onChange={(x) => setCle(x.target.value)} className="flex-1" />
           <Bouton variante="primaire" icone={<KeyRound className="size-4" />} onClick={sauverCle} disabled={!cle.trim()}>
-            Enregistrer
+            {t("Enregistrer")}
           </Bouton>
         </div>
-        <span className="mt-1 block text-[12px] text-doux">platform.openai.com › API keys. L'abonnement ChatGPT Plus n'inclut pas de crédit API.</span>
+        <span className="mt-1 block text-[12px] text-doux">{t("platform.openai.com › API keys. L'abonnement ChatGPT Plus n'inclut pas de crédit API.")}</span>
       </label>
       {e?.erreur && <p className="text-[12px] text-rouge">{e.erreur}</p>}
       {e && e.modeles.length > 0 && (
         <Selecteur
-          label="Modèle"
+          label={t("Modèle")}
           valeur={cfg.openai_modele || e.modele || e.modeles[0]}
           options={e.modeles.map((m) => ({ valeur: m, libelle: m }))}
           onChange={(v) => enregistrer({ openai_modele: v })}
@@ -527,7 +525,7 @@ function ReglagesOpenAI({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
       )}
       {e?.cle && (
         <Bouton icone={<Zap className="size-4" />} chargement={enCours} onClick={tester}>
-          Tester
+          {t("Tester")}
         </Bouton>
       )}
       {test && <p className="text-[13px] text-doux">{test}</p>}
@@ -547,12 +545,12 @@ function PanneauCerveau({
   enregistrer: (p: Partial<ConfigServeur>) => void;
 }) {
   return (
-    <Panneau titre="Cerveau" icone={<Brain />}>
-      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Cerveau de Jarvis">
+    <Panneau titre={t("Cerveau")} icone={<Brain />}>
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t("Cerveau de Jarvis")}>
         {[
-          { id: "claude", titre: "Claude (API)", detail: "Plus intelligent, ne touche pas ta carte graphique. Payant, données envoyées à Anthropic." },
-          { id: "openai", titre: "OpenAI (API)", detail: "Avec ta clé API OpenAI (GPT). Payant, données envoyées à OpenAI." },
-          { id: "ollama", titre: "Ollama (local)", detail: "Gratuit, 100 % privé. Utilise ta carte graphique." },
+          { id: "claude", titre: t("Claude (API)"), detail: t("Plus intelligent, ne touche pas ta carte graphique. Payant, données envoyées à Anthropic.") },
+          { id: "openai", titre: t("OpenAI (API)"), detail: t("Avec ta clé API OpenAI (GPT). Payant, données envoyées à OpenAI.") },
+          { id: "ollama", titre: t("Ollama (local)"), detail: t("Gratuit, 100 % privé. Utilise ta carte graphique.") },
         ].map((o) => (
           <button
             key={o.id}
@@ -575,18 +573,18 @@ function PanneauCerveau({
         <ReglagesOpenAI cfg={cfg} enregistrer={enregistrer} />
       ) : (
         <>
-          <Selecteur label="Modèle Ollama" valeur={cfg.modele} options={modeles.map((m) => ({ valeur: m, libelle: m }))} onChange={(v) => maj({ modele: v })} />
-          <Interrupteur label="Réflexion approfondie" aide="Le modèle réfléchit avant de répondre : plus malin, plus lent" actif={cfg.reflexion} onChange={(v) => maj({ reflexion: v })} />
-          <Curseur label="Température" valeur={cfg.temperature} min={0} max={1.2} pas={0.05} affichage={cfg.temperature.toFixed(2)} onChange={(v) => maj({ temperature: v })} aide="Bas = précis et prévisible, haut = plus créatif." />
+          <Selecteur label={t("Modèle Ollama")} valeur={cfg.modele} options={modeles.map((m) => ({ valeur: m, libelle: m }))} onChange={(v) => maj({ modele: v })} />
+          <Interrupteur label={t("Réflexion approfondie")} aide={t("Le modèle réfléchit avant de répondre : plus malin, plus lent")} actif={cfg.reflexion} onChange={(v) => maj({ reflexion: v })} />
+          <Curseur label={t("Température")} valeur={cfg.temperature} min={0} max={1.2} pas={0.05} affichage={cfg.temperature.toFixed(2)} onChange={(v) => maj({ temperature: v })} aide={t("Bas = précis et prévisible, haut = plus créatif.")} />
           <Selecteur
-            label="Taille du contexte"
+            label={t("Taille du contexte")}
             valeur={String(cfg.num_ctx)}
-            options={[8192, 16384, 32768].map((n) => ({ valeur: String(n), libelle: `${n / 1024}k jetons${n > 16384 ? " (plus de VRAM)" : ""}` }))}
+            options={[8192, 16384, 32768].map((n) => ({ valeur: String(n), libelle: t("{k}k jetons", { k: n / 1024 }) + (n > 16384 ? t(" (plus de VRAM)") : "") }))}
             onChange={(v) => maj({ num_ctx: +v })}
           />
         </>
       )}
-      <Curseur label="Étapes d'outils max" valeur={cfg.max_etapes_outils} min={5} max={60} pas={1} affichage={String(cfg.max_etapes_outils)} onChange={(v) => maj({ max_etapes_outils: v })} />
+      <Curseur label={t("Étapes d'outils max")} valeur={cfg.max_etapes_outils} min={5} max={60} pas={1} affichage={String(cfg.max_etapes_outils)} onChange={(v) => maj({ max_etapes_outils: v })} />
     </Panneau>
   );
 }
@@ -606,7 +604,7 @@ function OngletCerveau() {
       .catch((e) => toast(e.message, "erreur"));
   }, []);
 
-  if (!cfg) return <p className="text-doux">Chargement…</p>;
+  if (!cfg) return <p className="text-doux">{t("Chargement…")}</p>;
   const maj = (p: Partial<ConfigServeur>) => setCfg({ ...cfg, ...p });
   // choix du cerveau / modèle Claude / effort : appliqués tout de suite
   const enregistrer = async (p: Partial<ConfigServeur>) => {
@@ -628,7 +626,7 @@ function OngletCerveau() {
     setSauve(true);
     try {
       await api("/api/config", { method: "POST", json: { ...cfg, modele_vision: cfg.modele } });
-      toast("Configuration enregistrée.", "succes");
+      toast(t("Configuration enregistrée."), "succes");
     } catch (e) {
       toast((e as Error).message, "erreur");
     } finally {
@@ -652,27 +650,27 @@ function OngletCerveau() {
     <div className="grid gap-4 lg:grid-cols-2">
       <PanneauCerveau cfg={cfg} maj={maj} modeles={modeles} enregistrer={enregistrer} />
       <div className="space-y-4">
-        <Panneau titre="Reconnaissance vocale">
+        <Panneau titre={t("Reconnaissance vocale")}>
           <Selecteur
-            label="Modèle Whisper"
+            label={t("Modèle Whisper")}
             valeur={cfg.whisper_modele}
             options={[
-              { valeur: "tiny", libelle: "tiny — instantané, approximatif" },
-              { valeur: "base", libelle: "base — rapide" },
-              { valeur: "small", libelle: "small — bon équilibre (recommandé)" },
-              { valeur: "medium", libelle: "medium — précis, lent sur CPU" },
-              { valeur: "large-v3", libelle: "large-v3 — très précis, très lent" },
+              { valeur: "tiny", libelle: t("tiny — instantané, approximatif") },
+              { valeur: "base", libelle: t("base — rapide") },
+              { valeur: "small", libelle: t("small — bon équilibre (recommandé)") },
+              { valeur: "medium", libelle: t("medium — précis, lent sur CPU") },
+              { valeur: "large-v3", libelle: t("large-v3 — très précis, très lent") },
             ]}
             onChange={(v) => maj({ whisper_modele: v })}
           />
           <Bouton className="mt-2" icone={<Download className="size-4" />} chargement={prechargement} onClick={precharger}>
-            Précharger Whisper
+            {t("Précharger Whisper")}
           </Bouton>
-          <p className="mt-2 text-[13px] text-doux">Évite d'attendre ~10 s à ta première phrase. Enregistre d'abord si tu as changé de modèle.</p>
+          <p className="mt-2 text-[13px] text-doux">{t("Évite d'attendre ~10 s à ta première phrase. Enregistre d'abord si tu as changé de modèle.")}</p>
         </Panneau>
-        <Panneau titre="Profil">
+        <Panneau titre={t("Profil")}>
           <label className="block text-sm">
-            <span className="mb-1.5 block">Ton prénom</span>
+            <span className="mb-1.5 block">{t("Ton prénom")}</span>
             <input
               value={cfg.nom_utilisateur}
               onChange={(e) => maj({ nom_utilisateur: e.target.value })}
@@ -681,13 +679,13 @@ function OngletCerveau() {
           </label>
           <div className="mt-4 flex flex-wrap gap-2">
             <Bouton variante="primaire" icone={<Save className="size-4" />} chargement={sauve} onClick={sauver}>
-              Enregistrer
+              {t("Enregistrer")}
             </Bouton>
             <Bouton
               icone={<ScanLine className="size-4" />}
               onClick={() => {
                 rescanner();
-                toast("Scan du PC lancé…");
+                toast(t("Scan du PC lancé…"));
               }}
             >
               Re-scanner le PC
@@ -699,25 +697,51 @@ function OngletCerveau() {
   );
 }
 
+/** Langue de Jarvis : textes de l'interface, réponses, reconnaissance vocale, voix et annonces. */
+export async function choisirLangue(l: Langue) {
+  changerLangue(l);
+  const r = reglages();
+  const voixFr = r.ttsVoixEdge.startsWith("fr-");
+  r.maj({ langue: l, ...(l === "en" && voixFr ? { ttsVoixEdge: "en-GB-RyanNeural" } : l === "fr" && !voixFr ? { ttsVoixEdge: "fr-FR-HenriNeural" } : {}) });
+  try {
+    await api("/api/config", { method: "POST", json: { langue: l } });
+  } catch {
+    /* hors application : la langue de l'interface change quand même */
+  }
+  location.reload();
+}
+
 function OngletInterface() {
   const r = useReglages();
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panneau titre="Interface" icone={<Monitor />}>
+      <Panneau titre="Langue / Language" icone={<Monitor />}>
+        <Selecteur
+          label="Jarvis"
+          valeur={LANGUE}
+          options={[
+            { valeur: "fr", libelle: "Français" },
+            { valeur: "en", libelle: "English" },
+          ]}
+          onChange={(v) => choisirLangue(v as Langue)}
+          aide={t("Textes de l'interface, réponses de Jarvis, reconnaissance vocale, voix et annonces.")}
+        />
+      </Panneau>
+      <Panneau titre={t("Interface")} icone={<Monitor />}>
         <div className="divide-y divide-ligne">
-          <Interrupteur label="Bips d'interface" aide="Petits sons à l'écoute, à l'envoi, à chaque action" actif={r.bips} onChange={(v) => r.maj({ bips: v })} />
-          <Interrupteur label="Menu replié" actif={r.menuReduit} onChange={(v) => r.maj({ menuReduit: v })} />
+          <Interrupteur label={t("Bips d'interface")} aide={t("Petits sons à l'écoute, à l'envoi, à chaque action")} actif={r.bips} onChange={(v) => r.maj({ bips: v })} />
+          <Interrupteur label={t("Menu replié")} actif={r.menuReduit} onChange={(v) => r.maj({ menuReduit: v })} />
         </div>
         <Selecteur
-          label="Animations du réacteur"
+          label={t("Animations du réacteur")}
           valeur={r.animations}
           options={[
-            { valeur: "legeres", libelle: "Légères — recommandé" },
-            { valeur: "completes", libelle: "Complètes — lueurs, 60 images/s" },
-            { valeur: "aucunes", libelle: "Désactivées — le plus rapide" },
+            { valeur: "legeres", libelle: t("Légères — recommandé") },
+            { valeur: "completes", libelle: t("Complètes — lueurs, 60 images/s") },
+            { valeur: "aucunes", libelle: t("Désactivées — le plus rapide") },
           ]}
           onChange={(v) => r.maj({ animations: v as typeof r.animations })}
-          aide="La carte graphique est partagée avec le modèle d'IA. Les animations complètes peuvent rendre Jarvis beaucoup plus lent quand la VRAM est presque pleine (jeux, LDPlayer, Wallpaper Engine…)."
+          aide={t("La carte graphique est partagée avec le modèle d'IA. Les animations complètes peuvent rendre Jarvis beaucoup plus lent quand la VRAM est presque pleine (jeux, LDPlayer, Wallpaper Engine…).")}
         />
         <Bouton
           variante="danger"
@@ -726,13 +750,13 @@ function OngletInterface() {
           onClick={() => {
             r.maj({ ...DEFAUT, vue: "reglages" });
             micro.setGain(DEFAUT.gain);
-            toast("Réglages remis par défaut.");
+            toast(t("Réglages remis par défaut."));
           }}
         >
           Réglages par défaut
         </Bouton>
       </Panneau>
-      <Panneau titre="Raccourcis clavier">
+      <Panneau titre={t("Raccourcis clavier")}>
         <dl className="space-y-2.5 text-sm">
           {[
             ["Espace (maintenu)", "Parler (mode Appui)"],
@@ -759,17 +783,17 @@ export function VueReglages() {
   const [onglet, setOnglet] = useState<Onglet>("micro");
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
-      <EnTetePage titre="Réglages" sousTitre="Micro, voix et cerveau de Jarvis. Les réglages audio sont propres à ce navigateur." />
+      <EnTetePage titre={t("Réglages")} sousTitre={t("Micro, voix et cerveau de Jarvis. Les réglages audio sont propres à ce navigateur.")} />
       <Onglets<Onglet>
         actif={onglet}
         onChange={setOnglet}
         onglets={[
-          { id: "micro", libelle: "Micro", icone: <Mic /> },
-          { id: "voix", libelle: "Voix", icone: <Volume2 /> },
-          { id: "cerveau", libelle: "Cerveau", icone: <Brain /> },
-          { id: "application", libelle: "Application", icone: <AppWindow /> },
-          { id: "autorisations", libelle: "Autorisations", icone: <ShieldCheck /> },
-          { id: "interface", libelle: "Interface", icone: <Monitor /> },
+          { id: "micro", libelle: t("Micro"), icone: <Mic /> },
+          { id: "voix", libelle: t("Voix"), icone: <Volume2 /> },
+          { id: "cerveau", libelle: t("Cerveau"), icone: <Brain /> },
+          { id: "application", libelle: t("Application"), icone: <AppWindow /> },
+          { id: "autorisations", libelle: t("Autorisations"), icone: <ShieldCheck /> },
+          { id: "interface", libelle: t("Interface"), icone: <Monitor /> },
         ]}
       />
       <div className={cx("mt-6")}>

@@ -3,7 +3,11 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
-## 1.1.1
+## 1.2.0
+- **English version**: choose French or English (Settings › Interface, or on the first screen). Interface, Jarvis's replies, speech recognition, voice and announcements switch language. / **Version anglaise** : choisis français ou anglais ; interface, réponses, reconnaissance vocale, voix et annonces suivent.
+- **Cerveau OpenAI** : en plus de Claude et Ollama, utilise ta clé API OpenAI (GPT). Le modèle se choisit parmi ceux de ta clé.
+- **Local ou en ligne, au choix** : au premier lancement, garde tout sur cet ordinateur (rien n'est envoyé à un serveur) ou crée un compte pour retrouver ta mémoire partout. En local, un autre appareil sera un nouveau Jarvis qui ne te connaît pas ; tu peux passer en ligne plus tard et tout envoyer dans ton compte (mémoire, réglages, connecteurs, clés).
+- **Journal des mises à jour** : l'écran Mises à jour liste toutes les versions publiées et leur contenu.
 - **Connexion beaucoup plus rapide** : la création de compte et la connexion pouvaient rester bloquées plusieurs minutes sur certaines box Internet (IPv6 défaillant). Jarvis passe maintenant directement par la bonne connexion, et l'écran n'attend plus la première synchronisation.
 - **Moins d'attente au démarrage sur Mac** : le trousseau n'est plus relu à chaque échange avec le serveur.
 - **Pas de doublon d'historique** quand la même ancienne mémoire est trouvée à deux endroits sur un appareil.

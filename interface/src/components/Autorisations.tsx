@@ -1,3 +1,4 @@
+import { t } from "../lib/i18n";
 import { CheckCircle2, CircleHelp, ExternalLink, ShieldCheck, ShieldOff, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "../lib/api";
@@ -24,8 +25,8 @@ function useAutorisations() {
     try {
       const r = await api<Reponse>(`/api/autorisations/${action}`, { method: "POST", json: corps });
       setE(r);
-      if (r.resultat === "reglages") toast("Réglages Système ouverts : active Jarvis dans la liste, puis reviens ici.", "info");
-      if (r.resultat === "retire") toast("Accès retiré. Jarvis le redemandera s'il en a besoin.", "succes");
+      if (r.resultat === "reglages") toast(t("Réglages Système ouverts : active Jarvis dans la liste, puis reviens ici."), "info");
+      if (r.resultat === "retire") toast(t("Accès retiré. Jarvis le redemandera s'il en a besoin."), "succes");
     } catch (x) {
       toast((x as Error).message, "erreur");
     }
@@ -48,7 +49,7 @@ export function OngletAutorisations() {
   if (!e) return null;
   const mac = e.plateforme === "mac";
   return (
-    <Panneau titre="Autorisations" icone={<ShieldCheck />}>
+    <Panneau titre={t("Autorisations")} icone={<ShieldCheck />}>
       <p className="mb-3 text-[13px] leading-relaxed text-doux">
         {mac
           ? "macOS ne laisse aucune appli s'accorder ces accès toute seule : c'est toi qui acceptes, une seule fois. Ils restent acquis après les mises à jour de Jarvis."
@@ -65,17 +66,17 @@ export function OngletAutorisations() {
             </div>
             {mac && a.etat !== "accorde" && (
               <Bouton taille="sm" variante="primaire" onClick={() => agir("demander", { id: a.id })}>
-                Autoriser
+                {t("Autoriser")}
               </Bouton>
             )}
             {mac && a.etat === "accorde" && (
               <Bouton taille="sm" variante="fantome" icone={<ShieldOff />} onClick={() => agir("retirer", { id: a.id })}>
-                Retirer
+                {t("Retirer")}
               </Bouton>
             )}
             {(mac || a.id === "micro") && (
               <Bouton taille="sm" variante="fantome" icone={<ExternalLink />} onClick={() => agir("reglages", { id: a.id })}>
-                Réglages
+                {t("Réglages")}
               </Bouton>
             )}
           </div>
@@ -94,9 +95,9 @@ export function BandeauAutorisations() {
   return (
     <div className="fixed right-4 bottom-4 z-40 w-[min(420px,calc(100vw-32px))] rounded-lg border border-hud/40 bg-surface-2/95 p-4 shadow-glow backdrop-blur">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-hud">
-        <ShieldCheck className="size-4" /> Jarvis a besoin de quelques accès
+        <ShieldCheck className="size-4" />{t(" Jarvis a besoin de quelques accès")}
       </div>
-      <p className="mb-3 text-[12px] text-doux">Une seule fois : ton choix est retenu, tu pourras le changer dans Réglages › Autorisations.</p>
+      <p className="mb-3 text-[12px] text-doux">{t("Une seule fois : ton choix est retenu, tu pourras le changer dans Réglages › Autorisations.")}</p>
       <div className="space-y-2">
         {aProposer.map((a) => (
           <div key={a.id} className="flex items-center gap-2">
@@ -105,7 +106,7 @@ export function BandeauAutorisations() {
               <div className="text-[11px] text-doux">{a.role}</div>
             </div>
             <Bouton taille="sm" variante="primaire" onClick={() => agir("demander", { id: a.id })}>
-              Autoriser
+              {t("Autoriser")}
             </Bouton>
           </div>
         ))}
