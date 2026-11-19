@@ -3,7 +3,9 @@
 Utilisé par publier-mac.sh (Mac), publier.bat (Windows) et la CI (.github/workflows/versions.yml) :
     python publier.py installateur/Jarvis-1.0.5-mac-arm64.dmg
 Crée la release vX.Y.Z si elle n'existe pas (description = section « ## X.Y.Z » de CHANGELOG.md),
-puis y ajoute le fichier (remplace un fichier du même nom). Le 2e appareil ajoute son installateur à la même release.
+puis y ajoute le fichier (remplace un fichier du même nom).
+Ensuite, depuis une machine (pas depuis la CI), demande à GitHub de fabriquer l'installateur de L'AUTRE système :
+publié depuis le Mac -> GitHub fait le .exe Windows ; publié depuis Windows -> GitHub fait le .dmg Mac.
 Identifiant GitHub : celui que git utilise déjà sur cette machine (aucun jeton à créer).
 """
 import re
@@ -18,6 +20,7 @@ sys.path.insert(0, str(ICI))
 from jarvis.version import DEPOT, VERSION  # noqa: E402
 
 API = f"https://api.github.com/repos/{DEPOT}"
+DEPOT_URL = f"https://github.com/{DEPOT}"
 
 
 def git(*args) -> str:
@@ -45,7 +48,7 @@ def notes() -> str:
 
 
 def main():
-    fichier = Path(sys.argv[1])
+    fichier = Path([a for a in sys.argv[1:] if not a.startswith("--")][0])
     if not fichier.exists():
         sys.exit(f"Introuvable : {fichier}")
     if VERSION not in fichier.name:
@@ -78,6 +81,18 @@ def main():
                    headers={"Content-Type": "application/octet-stream", "Content-Length": str(taille)}, timeout=3600)
     r.raise_for_status()
     print(f"Publié : {rel['html_url']}")
+
+    import os
+    if not os.environ.get("GITHUB_ACTIONS") and "--sans-autre" not in sys.argv:
+        autre = "windows" if sys.platform == "darwin" else "mac"
+        r = s.post(f"{API}/actions/workflows/versions.yml/dispatches",
+                   json={"ref": "main", "inputs": {"windows": autre == "windows", "mac": autre == "mac"}})
+        if r.status_code == 204:
+            print(f"GitHub fabrique maintenant l'installateur {autre.capitalize()} (quelques minutes), "
+                  f"il sera ajouté à la même version : {DEPOT_URL}/actions")
+        else:
+            print(f"! Impossible de lancer la fabrication {autre} sur GitHub ({r.status_code}) : "
+                  f"Actions > Versions de Jarvis > Run workflow, case « {autre} ».")
 
 
 if __name__ == "__main__":

@@ -1,25 +1,20 @@
-# Publie les installateurs de Jarvis dans l'onglet « Releases » du dépôt (privé, gratuit).
+# Fabrique l'installateur de l'AUTRE système et l'ajoute à la release vX.Y.Z (dépôt privé, gratuit).
 #
-# - Windows : construit ICI automatiquement dès que jarvis/version.py change sur main (~6 min de runner
-#   Windows = ~12 min du quota gratuit de 2000 min/mois, soit ~160 versions par mois).
-# - Mac : construit sur le Mac de développement par ./publier-mac.sh (aucune minute consommée).
-#   Secours si on code depuis Windows : Actions > « Versions de Jarvis » > Run workflow, case « mac » cochée
-#   (un runner macOS compte x10 sur le quota : à réserver à ce cas).
-# La release vX.Y.Z prend la description de la section « ## X.Y.Z » de CHANGELOG.md (publier.py).
+# Lancé automatiquement par publier.py à la fin d'une publication locale :
+# - publié depuis le Mac (./publier-mac.sh)  -> ce workflow fabrique le .exe Windows (~12 min de quota)
+# - publié depuis Windows (publier.bat)      -> ce workflow fabrique le .dmg Mac (~70 min de quota, runner x10)
+# Quota gratuit : 2000 min/mois. Lancement manuel possible : Actions > Run workflow.
 name: Versions de Jarvis
 
 on:
-  push:
-    branches: [main]
-    paths: [jarvis/version.py]
   workflow_dispatch:
     inputs:
       windows:
         description: "Construire l'installateur Windows"
         type: boolean
-        default: true
+        default: false
       mac:
-        description: "Construire aussi le .dmg Mac (coûte x10 sur le quota)"
+        description: "Construire le .dmg Mac"
         type: boolean
         default: false
 
@@ -41,7 +36,7 @@ jobs:
 
   windows:
     needs: version
-    if: github.event_name == 'push' || inputs.windows
+    if: inputs.windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -70,7 +65,7 @@ jobs:
 
   mac:
     needs: version
-    if: github.event_name == 'workflow_dispatch' && inputs.mac
+    if: inputs.mac
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
