@@ -1,6 +1,6 @@
-"""Publie un installateur dans les GitHub Releases du dépôt (gratuit et sans limite, aucune minute GitHub Actions).
+"""Publie un installateur dans les GitHub Releases du dépôt.
 
-Utilisé par publier-mac.sh (Mac) et publier.bat (Windows), après la construction :
+Utilisé par publier-mac.sh (Mac), publier.bat (Windows) et la CI (.github/workflows/versions.yml) :
     python publier.py installateur/Jarvis-1.0.5-mac-arm64.dmg
 Crée la release vX.Y.Z si elle n'existe pas (description = section « ## X.Y.Z » de CHANGELOG.md),
 puis y ajoute le fichier (remplace un fichier du même nom). Le 2e appareil ajoute son installateur à la même release.
@@ -25,6 +25,9 @@ def git(*args) -> str:
 
 
 def jeton() -> str:
+    import os
+    if os.environ.get("GH_TOKEN"):   # GitHub Actions
+        return os.environ["GH_TOKEN"]
     r = subprocess.run(["git", "credential", "fill"], input="protocol=https\nhost=github.com\n\n",
                        capture_output=True, text=True, cwd=ICI)
     m = re.search(r"^password=(.+)$", r.stdout, re.M)
@@ -58,7 +61,10 @@ def main():
     if r.status_code == 404:
         r = s.post(f"{API}/releases", json={"tag_name": tag, "target_commitish": git("rev-parse", "HEAD"),
                                             "name": f"Jarvis {VERSION}", "body": notes()})
-        print(f"Release {tag} créée.")
+        if r.status_code == 422:   # créée au même moment par l'autre appareil / la CI
+            r = s.get(f"{API}/releases/tags/{tag}")
+        else:
+            print(f"Release {tag} créée.")
     r.raise_for_status()
     rel = r.json()
     for a in rel.get("assets", []):

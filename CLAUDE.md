@@ -7,8 +7,9 @@ L'utilisateur parle français : messages de commit, CHANGELOG et textes de l'int
 
 Quand tu as fini de coder un changement de l'appli, **demande à l'utilisateur s'il veut publier la mise à jour**
 (en lui rappelant la version et la description prévues dans le CHANGELOG). S'il répond oui, fais tout toi-même :
-version + CHANGELOG, commit, push sur `main`, puis `./publier-mac.sh` sur le Mac. Rappelle-lui ensuite de lancer
-`publier.bat` sur son PC Windows pour ajouter le .exe à la même version. S'il répond non, laisse les changements
+version + CHANGELOG, commit, push sur `main` (GitHub construit et publie alors le .exe Windows tout seul), puis
+`./publier-mac.sh` si tu es sur le Mac (ou, depuis Windows, lance le workflow avec `mac` coché). Vérifie à la fin
+que la release contient bien les deux installateurs. S'il répond non, laisse les changements
 en local (committés ou non, selon ce qu'il préfère) sans publier.
 
 ## Mises à jour : règle obligatoire pour chaque commit qui change l'appli
@@ -21,14 +22,15 @@ description, et permet d'installer la dernière ou une version précise. Pour qu
 2. **Ajoute en haut de `CHANGELOG.md`** une section `## x.y.z` (exactement la nouvelle version) avec la description
    de la mise à jour : une puce par changement, en français, écrite pour l'utilisateur (ce qui change pour lui),
    pas le détail du code. **Aucune version sans description** : la CI échoue si la section manque.
-3. Commit + push sur `main`, puis **publier** (gratuit et sans limite, rien ne passe par GitHub Actions) :
-   - sur le Mac : `./publier-mac.sh` → construit le .dmg et crée la release `vx.y.z` avec cette description ;
-   - sur le PC Windows : `publier.bat` → construit JarvisSetup.exe et l'ajoute à la même release.
+3. Commit + push sur `main`, puis **publier** (dépôt privé, gratuit) :
+   - **Windows, automatique** : le push qui change `jarvis/version.py` lance `.github/workflows/versions.yml`,
+     qui construit JarvisSetup.exe sur GitHub et l'ajoute à la release `vx.y.z` (~12 min de quota sur 2000/mois).
+   - **Mac, sur le Mac de dev** : `./publier-mac.sh` construit le .dmg et l'ajoute à la même release
+     (aucune minute consommée). Depuis Windows : Actions > Run workflow avec `mac` coché (x10 sur le quota).
+   - Si le quota GitHub est épuisé : `publier.bat` sur le PC Windows fait la même chose en local.
    La version apparaît alors dans « Mises à jour » sur tous les appareils (sur un appareil dont l'installateur
    n'est pas encore envoyé, elle s'affiche « pas encore prête »). `publier.py` refuse de publier si des commits
    ne sont pas poussés ou si la section du CHANGELOG manque.
-   Secours : `.github/workflows/versions.yml` fait les deux builds sur GitHub, mais uniquement lancé à la main
-   (Actions > Run workflow), car il consomme le quota mensuel de minutes.
 
 Plusieurs commits peuvent partager une même version tant qu'elle n'est pas poussée : regroupe-les dans la même
 section du CHANGELOG. Une version déjà publiée (tag existant) ne se modifie plus : il faut en créer une nouvelle.
@@ -37,7 +39,7 @@ Les commits qui ne touchent pas l'appli (README, CLAUDE.md, CI seule) n'ont pas 
 ## Installateurs
 
 - Jamais committés dans le dépôt (`installateur/` est ignoré) : ils font 250+ Mo, au-delà de la limite de 100 Mo
-  par fichier de GitHub. Ils sont publiés dans les **Releases** (`publier-mac.sh` / `publier.bat`).
+  par fichier de GitHub. Ils sont publiés dans les **Releases** (CI pour Windows, `publier-mac.sh` pour Mac).
 - Build seul, sans publier : `bash construire-mac.sh` (Mac) ou `construire.bat` (Windows).
 - Mise à jour sans désinstaller : Windows = même `AppId` Inno Setup, installation silencieuse par-dessus ;
   Mac = remplacement de `/Applications/Jarvis.app` depuis le .dmg (`jarvis/mises_a_jour.py`).

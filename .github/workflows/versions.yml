@@ -1,13 +1,27 @@
-# Publie chaque nouvelle version de Jarvis dans l'onglet « Releases » du dépôt.
-# Si jarvis/version.py contient une version qui n'a pas encore
-# de tag vX.Y.Z, on construit le .dmg (Mac puce Apple) et le JarvisSetup.exe (Windows), puis on crée
-# la release avec la description de CHANGELOG.md. L'appli la voit dans « Mises à jour ».
+# Publie les installateurs de Jarvis dans l'onglet « Releases » du dépôt (privé, gratuit).
+#
+# - Windows : construit ICI automatiquement dès que jarvis/version.py change sur main (~6 min de runner
+#   Windows = ~12 min du quota gratuit de 2000 min/mois, soit ~160 versions par mois).
+# - Mac : construit sur le Mac de développement par ./publier-mac.sh (aucune minute consommée).
+#   Secours si on code depuis Windows : Actions > « Versions de Jarvis » > Run workflow, case « mac » cochée
+#   (un runner macOS compte x10 sur le quota : à réserver à ce cas).
+# La release vX.Y.Z prend la description de la section « ## X.Y.Z » de CHANGELOG.md (publier.py).
 name: Versions de Jarvis
 
-# Lancement MANUEL uniquement (onglet Actions > Run workflow) : la voie normale, gratuite et sans limite,
-# c'est publier-mac.sh / publier.bat sur tes machines. Ce workflow consomme des minutes GitHub (quota mensuel).
 on:
+  push:
+    branches: [main]
+    paths: [jarvis/version.py]
   workflow_dispatch:
+    inputs:
+      windows:
+        description: "Construire l'installateur Windows"
+        type: boolean
+        default: true
+      mac:
+        description: "Construire aussi le .dmg Mac (coûte x10 sur le quota)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -17,47 +31,28 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
-      nouvelle: ${{ steps.v.outputs.nouvelle }}
     steps:
       - uses: actions/checkout@v4
       - id: v
         run: |
           V=$(grep -E '^VERSION = ' jarvis/version.py | cut -d'"' -f2)
+          grep -qE "^## $V\b" CHANGELOG.md || { echo "::error::CHANGELOG.md n'a pas de section « ## $V » (description obligatoire)"; exit 1; }
           echo "version=$V" >> "$GITHUB_OUTPUT"
-          if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null; then
-            echo "nouvelle=false" >> "$GITHUB_OUTPUT"; echo "v$V existe déjà : rien à publier."
-          else
-            grep -qE "^## $V\b" CHANGELOG.md || { echo "::error::CHANGELOG.md n'a pas de section « ## $V » (description obligatoire)"; exit 1; }
-            echo "nouvelle=true" >> "$GITHUB_OUTPUT"
-          fi
-
-  mac:
-    needs: version
-    if: needs.version.outputs.nouvelle == 'true'
-    runs-on: macos-14            # Apple Silicon (arm64). Pour les Mac Intel : dupliquer ce job sur macos-15-intel.
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - uses: actions/setup-node@v4
-        with: { node-version: "22" }
-      - run: bash construire-mac.sh
-        env: { PYTHON: python }
-      - uses: actions/upload-artifact@v4
-        with: { name: mac, path: installateur/*.dmg, if-no-files-found: error }
 
   windows:
     needs: version
-    if: needs.version.outputs.nouvelle == 'true'
+    if: github.event_name == 'push' || inputs.windows
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: "requirements*.txt" }
       - uses: actions/setup-node@v4
-        with: { node-version: "22" }
-      - name: Construire l'appli et l'installateur
+        with: { node-version: "22", cache: npm, cache-dependency-path: interface/package-lock.json }
+      - name: Construire et publier JarvisSetup.exe
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = "Stop"
           python -m venv .venv
@@ -71,20 +66,22 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
           & $iscc /Q "/DVersion=${{ needs.version.outputs.version }}" installateur.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-      - uses: actions/upload-artifact@v4
-        with: { name: windows, path: installateur/*.exe, if-no-files-found: error }
+          .venv\Scripts\python publier.py "installateur\JarvisSetup-${{ needs.version.outputs.version }}.exe"
 
-  publier:
-    needs: [version, mac, windows]
-    runs-on: ubuntu-latest
+  mac:
+    needs: version
+    if: github.event_name == 'workflow_dispatch' && inputs.mac
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with: { path: fichiers, merge-multiple: true }
-      - name: Créer la release
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Construire et publier le .dmg
         env:
+          PYTHON: python
           GH_TOKEN: ${{ github.token }}
-          V: ${{ needs.version.outputs.version }}
         run: |
-          awk -v v="$V" '/^## /{ if (p) exit; if ($2 == v) { p = 1; next } } p' CHANGELOG.md > notes.md
-          gh release create "v$V" fichiers/* --title "Jarvis $V" --notes-file notes.md --target "$GITHUB_SHA"
+          bash construire-mac.sh
+          .venv-mac/bin/python publier.py "installateur/Jarvis-${{ needs.version.outputs.version }}-mac-$(uname -m).dmg"
