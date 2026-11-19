@@ -67,16 +67,21 @@ class Jarvis:
     def reset(self):
         self.messages = [{"role": "system", "content": prompt_systeme()}]
         self.histo_claude = []   # historique au format Anthropic (cerveau Claude), jamais modifié après coup
+        self.histo_openai = []   # historique au format OpenAI (cerveau OpenAI)
 
     @property
     def avec_claude(self):
         return CONFIG.get("cerveau") == "claude"
 
+    @property
+    def avec_openai(self):
+        return CONFIG.get("cerveau") == "openai"
+
     def prechauffer(self):
         """Charge le modèle et lui fait lire le prompt système + les outils à l'avance.
         Ollama garde ce début de contexte en cache : la vraie question n'a plus qu'à lire ses propres mots
         (premier mot en ~0,6 s au lieu de ~15 s à froid)."""
-        if self.avec_claude:
+        if self.avec_claude or self.avec_openai:
             return   # cerveau dans le cloud : rien à charger sur la carte graphique
         try:
             ollama.chat(model=CONFIG["modele"], messages=[self.messages[0], {"role": "user", "content": "ok"}],
@@ -106,6 +111,9 @@ class Jarvis:
         if self.avec_claude:
             from . import claude
             return claude.demander(self, texte, sur_texte, sur_outil, sur_pensee)
+        if self.avec_openai:
+            from . import openai_cerveau
+            return openai_cerveau.demander(self, texte, sur_texte, sur_outil, sur_pensee)
         memoire.journaliser("Abdel", texte)
         self.messages.append({"role": "user", "content": texte})
         self._tronquer()
@@ -157,6 +165,14 @@ class Jarvis:
 
     def extraire_souvenirs(self):
         """Fin de session : le modèle relit la conversation et mémorise les faits durables."""
+        if self.avec_openai:
+            from . import openai_cerveau
+            echanges = [f"{m['role']}: {str(m.get('content') or '')[:500]}" for m in self.histo_openai
+                        if m["role"] in ("user", "assistant") and m.get("content")]
+            if len(echanges) < 2:
+                return []
+            faits = openai_cerveau.souvenirs(echanges, memoire.profil_texte()[0])
+            return [memoire.ajouter(f["fait"], f.get("categorie", "general")) for f in faits if f.get("fait")]
         if self.avec_claude:
             from . import claude
             echanges = []

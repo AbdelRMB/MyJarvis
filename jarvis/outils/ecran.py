@@ -31,6 +31,9 @@ def _vision(prompt, image):
     if CONFIG.get("cerveau") == "claude":
         from ..claude import vision
         return vision(prompt, image)
+    if CONFIG.get("cerveau") == "openai":
+        from ..openai_cerveau import vision
+        return vision(prompt, image)
     r = ollama.chat(model=CONFIG["modele_vision"], think=False,
                     options={"num_ctx": 8192, "temperature": 0.2},
                     messages=[{"role": "user", "content": prompt, "images": [image]}])

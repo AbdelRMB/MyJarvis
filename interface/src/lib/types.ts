@@ -31,7 +31,7 @@ export type Systeme = {
   ollama: boolean;
   charges: { nom: string; vram: number; taille: number }[];
   modele: string;
-  cerveau?: "ollama" | "claude";
+  cerveau?: "ollama" | "claude" | "openai";
   cle_claude_manquante?: boolean;
   occupe: boolean;
   uptime: number;
@@ -46,7 +46,8 @@ export type ConfigServeur = {
   max_etapes_outils: number;
   whisper_modele: string;
   nom_utilisateur: string;
-  cerveau: "ollama" | "claude";
+  cerveau: "ollama" | "claude" | "openai";
+  openai_modele?: string;
   claude_modele: string;
   claude_effort: string;
 };

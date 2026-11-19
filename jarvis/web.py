@@ -35,7 +35,7 @@ JETON = secrets.token_urlsafe(24)
 HOTES_OK = {"127.0.0.1", "localhost"}
 CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
                "max_etapes_outils", "whisper_modele", "nom_utilisateur",
-               "cerveau", "claude_modele", "claude_effort"]
+               "cerveau", "claude_modele", "claude_effort", "openai_modele"]
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 jarvis: Jarvis | None = None
@@ -108,9 +108,10 @@ def systeme(req: Request):
     return {"cpu": psutil.cpu_percent(interval=None), "ram": ram.percent, "ram_used": ram.used / 2**30,
             "ram_total": ram.total / 2**30, "disque": disque.percent, "disque_libre": disque.free / 2**30,
             "gpu": _gpu(), "ollama": ollama_ok, "charges": charges, "cerveau": CONFIG.get("cerveau", "ollama"),
-            "modele": CONFIG["claude_modele"] if CONFIG.get("cerveau") == "claude" else CONFIG["modele"],
-            "cle_claude_manquante": CONFIG.get("cerveau") == "claude" and not __import__("os").environ.get("ANTHROPIC_API_KEY")
-            and not (RACINE / ".env").exists(),
+            "modele": {"claude": CONFIG["claude_modele"], "openai": CONFIG.get("openai_modele") or "OpenAI"}.get(
+                CONFIG.get("cerveau"), CONFIG["modele"]),
+            "cle_claude_manquante": (CONFIG.get("cerveau") == "claude" and not __import__("os").environ.get("ANTHROPIC_API_KEY"))
+            or (CONFIG.get("cerveau") == "openai" and not __import__("os").environ.get("OPENAI_API_KEY")),
             "occupe": verrou_tache.locked(), "uptime": int(time.time() - psutil.boot_time())}
 
 
@@ -138,9 +139,9 @@ async def ecrire_config(req: Request):
         jarvis.arreter = True
         jarvis.reset()
         diffuser(type="reset")
-        diffuser(type="info", texte="Cerveau : " + ("Claude " + CONFIG["claude_modele"] if CONFIG["cerveau"] == "claude"
+        diffuser(type="info", texte="Cerveau : " + ("OpenAI " + (CONFIG.get("openai_modele") or "") if CONFIG["cerveau"] == "openai" else "Claude " + CONFIG["claude_modele"] if CONFIG["cerveau"] == "claude"
                                                      else "Ollama local " + CONFIG["modele"]))
-        if CONFIG["cerveau"] == "claude":
+        if CONFIG["cerveau"] in ("claude", "openai"):
             threading.Thread(target=Jarvis.liberer, daemon=True).start()   # rend la VRAM
         else:
             threading.Thread(target=jarvis.prechauffer, daemon=True).start()
@@ -360,6 +361,43 @@ async def precharger(req: Request):
             _modele_whisper()
     await asyncio.to_thread(charger)
     return {"ok": True, "secondes": round(time.time() - t0, 1)}
+
+
+# ---------- cerveau OpenAI ----------
+@app.get("/api/openai")
+async def etat_openai(req: Request):
+    _verifier(req)
+    from . import openai_cerveau as o
+    modeles, erreur = [], ""
+    if o.cle_configuree():
+        try:
+            modeles = await asyncio.to_thread(o.modeles)
+        except Exception as e:
+            erreur = f"Liste des modèles indisponible : {e}"
+    return {"cle": o.cle_configuree(), "cle_masquee": o.cle_masquee(), "modeles": modeles,
+            "modele": CONFIG.get("openai_modele") or "", "erreur": erreur}
+
+
+@app.post("/api/openai/cle")
+async def cle_openai(req: Request):
+    _verifier(req)
+    from . import openai_cerveau as o
+    cle = str((await req.json()).get("cle", "")).strip()
+    if cle and not cle.startswith("sk-"):
+        raise HTTPException(400, "Ce n'est pas une clé API OpenAI (elle commence par sk-).")
+    o.definir_cle(cle)
+    return await etat_openai(req)
+
+
+@app.post("/api/openai/tester")
+async def tester_openai(req: Request):
+    _verifier(req)
+    from . import openai_cerveau as o
+    try:
+        texte, s = await asyncio.to_thread(o.tester)
+    except Exception as e:
+        raise HTTPException(502, f"Échec : {e}")
+    return {"texte": texte, "secondes": round(s, 1), "modele": o.modele()}
 
 
 # ---------- cerveau Claude ----------
@@ -737,6 +775,9 @@ def _conversation():
     if jarvis.avec_claude:
         from . import claude
         return claude.conversation_ui(jarvis.histo_claude)
+    if jarvis.avec_openai:
+        from . import openai_cerveau
+        return openai_cerveau.conversation_ui(jarvis.histo_openai)
     out = []
     for m in jarvis.messages[1:]:
         if m["role"] == "user":
@@ -889,7 +930,7 @@ def preparer():
     compte.au_demarrage()   # mémoire, connecteurs et profil du compte connecté (cache local + synchro)
     from . import automatisations
     automatisations.demarrer()   # surveille tes boîtes mail pour les règles « quand je reçois… »
-    if CONFIG.get("cerveau") != "claude":
+    if CONFIG.get("cerveau") not in ("claude", "openai"):
         _demarrer_ollama()
     if not memoire.SYSTEME.exists():
         print("  Premier lancement : scan du PC...")

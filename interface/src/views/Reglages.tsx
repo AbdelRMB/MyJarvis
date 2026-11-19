@@ -5,7 +5,7 @@ import { sons } from "../audio/bips";
 import { chargerVoix, listerVoixServeur, parler, taire, type VoixServeur } from "../audio/tts";
 import { transcrire } from "../audio/voix";
 import { OngletAutorisations } from "../components/Autorisations";
-import { Bouton, Curseur, EnTetePage, Interrupteur, Onglets, Panneau, Selecteur } from "../components/ui";
+import { Bouton, Champ, Curseur, EnTetePage, Interrupteur, Onglets, Panneau, Selecteur } from "../components/ui";
 import { VuMetre } from "../components/VuMetre";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
@@ -474,6 +474,67 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
   );
 }
 
+/** Cerveau OpenAI : clé API (gardée dans .env + coffre chiffré du compte) et modèle choisi parmi ceux de la clé. */
+function ReglagesOpenAI({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer: (p: Partial<ConfigServeur>) => void }) {
+  type Etat = { cle: boolean; cle_masquee: string; modeles: string[]; modele: string; erreur: string };
+  const [e, setE] = useState<Etat | null>(null);
+  const [cle, setCle] = useState("");
+  const [test, setTest] = useState<string | null>(null);
+  const [enCours, setEnCours] = useState(false);
+  useEffect(() => {
+    api<Etat>("/api/openai").then(setE).catch(() => {});
+  }, []);
+  const sauverCle = async () => {
+    try {
+      setE(await api<Etat>("/api/openai/cle", { method: "POST", json: { cle } }));
+      setCle("");
+      toast("Clé OpenAI enregistrée.", "succes");
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  const tester = async () => {
+    setEnCours(true);
+    try {
+      const r = await api<{ texte: string; secondes: number; modele: string }>("/api/openai/tester", { method: "POST" });
+      setTest(`${r.modele} : « ${r.texte} » en ${r.secondes} s`);
+    } catch (x) {
+      setTest((x as Error).message);
+    } finally {
+      setEnCours(false);
+    }
+  };
+  return (
+    <div className="space-y-3">
+      <label className="block text-sm">
+        <span className="mb-1.5 block">Clé API OpenAI {e?.cle && <span className="font-mono text-[12px] text-vert">({e.cle_masquee})</span>}</span>
+        <div className="flex gap-2">
+          <Champ type="password" placeholder="sk-…" value={cle} onChange={(x) => setCle(x.target.value)} className="flex-1" />
+          <Bouton variante="primaire" icone={<KeyRound className="size-4" />} onClick={sauverCle} disabled={!cle.trim()}>
+            Enregistrer
+          </Bouton>
+        </div>
+        <span className="mt-1 block text-[12px] text-doux">platform.openai.com › API keys. L'abonnement ChatGPT Plus n'inclut pas de crédit API.</span>
+      </label>
+      {e?.erreur && <p className="text-[12px] text-rouge">{e.erreur}</p>}
+      {e && e.modeles.length > 0 && (
+        <Selecteur
+          label="Modèle"
+          valeur={cfg.openai_modele || e.modele || e.modeles[0]}
+          options={e.modeles.map((m) => ({ valeur: m, libelle: m }))}
+          onChange={(v) => enregistrer({ openai_modele: v })}
+        />
+      )}
+      {e?.cle && (
+        <Bouton icone={<Zap className="size-4" />} chargement={enCours} onClick={tester}>
+          Tester
+        </Bouton>
+      )}
+      {test && <p className="text-[13px] text-doux">{test}</p>}
+    </div>
+  );
+}
+
 function PanneauCerveau({
   cfg,
   maj,
@@ -487,9 +548,10 @@ function PanneauCerveau({
 }) {
   return (
     <Panneau titre="Cerveau" icone={<Brain />}>
-      <div className="mb-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Cerveau de Jarvis">
+      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Cerveau de Jarvis">
         {[
           { id: "claude", titre: "Claude (API)", detail: "Plus intelligent, ne touche pas ta carte graphique. Payant, données envoyées à Anthropic." },
+          { id: "openai", titre: "OpenAI (API)", detail: "Avec ta clé API OpenAI (GPT). Payant, données envoyées à OpenAI." },
           { id: "ollama", titre: "Ollama (local)", detail: "Gratuit, 100 % privé. Utilise ta carte graphique." },
         ].map((o) => (
           <button
@@ -509,6 +571,8 @@ function PanneauCerveau({
       </div>
       {cfg.cerveau === "claude" ? (
         <ReglagesClaude cfg={cfg} enregistrer={enregistrer} />
+      ) : cfg.cerveau === "openai" ? (
+        <ReglagesOpenAI cfg={cfg} enregistrer={enregistrer} />
       ) : (
         <>
           <Selecteur label="Modèle Ollama" valeur={cfg.modele} options={modeles.map((m) => ({ valeur: m, libelle: m }))} onChange={(v) => maj({ modele: v })} />
@@ -549,7 +613,11 @@ function OngletCerveau() {
     setCfg({ ...cfg, ...p });
     try {
       await api("/api/config", { method: "POST", json: p });
-      if (p.cerveau) toast(p.cerveau === "claude" ? "Cerveau : Claude. VRAM libérée." : "Cerveau : Ollama local. Chargement du modèle…", "succes");
+      if (p.cerveau)
+        toast(
+          p.cerveau === "claude" ? "Cerveau : Claude. VRAM libérée." : p.cerveau === "openai" ? "Cerveau : OpenAI. VRAM libérée." : "Cerveau : Ollama local. Chargement du modèle…",
+          "succes",
+        );
       rafraichirSysteme();
     } catch (e) {
       toast((e as Error).message, "erreur");
