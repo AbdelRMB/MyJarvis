@@ -403,7 +403,8 @@ _dernier_coffre = {"blob": None}
 def synchroniser() -> dict:
     """Récupère du serveur l'état du compte : souvenirs ajoutés, modifiés ou supprimés sur un autre appareil,
     nouvel historique, réglages, connecteurs, secrets. Renvoie ce qui a changé ici."""
-    changements = {"faits": False, "historique": 0, "reglages": False, "connecteurs": False, "coffre": False}
+    changements = {"faits": False, "historique": 0, "reglages": False, "connecteurs": False, "coffre": False,
+                   "automatisations": False}
     if not connecte():
         return changements
     from . import memoire
@@ -434,9 +435,15 @@ def synchroniser() -> dict:
                     h.write("\n".join(ajout) + "\n")
                 changements["historique"] += len(ajout)
         curseur_f.write_text(str(depuis))
-        for nom in ("profil", "connecteurs"):
+        for nom in ("profil", "connecteurs", "automatisations"):
             doc = _appel("GET", f"/v1/documents/{nom}")["contenu"]
             if doc is None:
+                continue
+            if nom == "automatisations":
+                from . import automatisations
+                if doc != automatisations.lister():
+                    automatisations._ecrire(doc, synchro=False)
+                    changements["automatisations"] = True
                 continue
             if nom == "profil":
                 cles = [k for k in config.CLES_PARTAGEES if k != "nom_utilisateur"]   # le prénom vient du compte

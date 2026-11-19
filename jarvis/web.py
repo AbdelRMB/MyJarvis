@@ -437,7 +437,7 @@ async def supprimer_connecteur(cid: str, req: Request):
 
 
 # ---------- application de bureau (fenêtre, démarrage, écoute de fond) ----------
-APPLI = {"active": False, "afficher": None, "ecoute": None, "quitter": None, "relancer_raccourcis": None}   # renseigné par jarvis/app.py
+APPLI = {"active": False, "afficher": None, "ecoute": None, "quitter": None, "relancer_raccourcis": None, "icone": None}   # renseigné par jarvis/app.py
 PAROLE = {"actif": False, "depuis": 0.0}   # la fenêtre signale quand Jarvis parle (pour l'écoute de fond)
 
 
@@ -518,6 +518,52 @@ async def afficher_fenetre(req: Request):
     if APPLI["afficher"]:
         APPLI["afficher"](vue)
     return {"ok": bool(APPLI["afficher"])}
+
+
+# ---------- automatisations ----------
+@app.get("/api/automatisations")
+def lister_automatisations(req: Request):
+    _verifier(req)
+    from . import automatisations
+    boites = [{"cid": cid, "nom": f"{c.nom} — {c.etiquette()}"} for cid, c in automatisations._boites().items()]
+    return {"regles": [{**r, "description": automatisations.decrire(r)} for r in automatisations.lister()], "boites": boites}
+
+
+@app.post("/api/automatisations")
+async def creer_automatisation(req: Request):
+    _verifier(req)
+    from . import automatisations
+    d = await req.json()
+    if not (d.get("expediteur") or d.get("sujet") or d.get("contient")):
+        raise HTTPException(400, "Indique au moins un expéditeur, un mot du sujet ou un mot du texte.")
+    automatisations.creer(d.get("nom", ""), d.get("expediteur", ""), d.get("sujet", ""), d.get("contient", ""),
+                          d.get("connecteur", ""), d.get("action", "prevenir"), d.get("consigne", ""))
+    return lister_automatisations(req)
+
+
+@app.patch("/api/automatisations/{rid}")
+async def modifier_automatisation(rid: str, req: Request):
+    _verifier(req)
+    from . import automatisations
+    automatisations.modifier(rid, **(await req.json()))
+    return lister_automatisations(req)
+
+
+@app.delete("/api/automatisations/{rid}")
+def supprimer_automatisation(rid: str, req: Request):
+    _verifier(req)
+    from . import automatisations
+    automatisations.supprimer(rid)
+    return lister_automatisations(req)
+
+
+@app.post("/api/automatisations/tester")
+async def tester_annonce(req: Request):
+    """Bouton « Tester la voix » : Jarvis parle comme il le fera pour une automatisation."""
+    _verifier(req)
+    from . import annonces
+    annonces.annoncer("Ceci est un test : c'est comme ça que je te préviendrai.")
+    return {"ok": True}
 
 
 # ---------- autorisations du système (micro, écran, accessibilité, fichiers, applis) ----------
@@ -835,6 +881,8 @@ def preparer():
         diffuser(type="memoire_maj", **changements)
     compte.ecouteurs.append(apres_synchro)
     compte.au_demarrage()   # mémoire, connecteurs et profil du compte connecté (cache local + synchro)
+    from . import automatisations
+    automatisations.demarrer()   # surveille tes boîtes mail pour les règles « quand je reçois… »
     if CONFIG.get("cerveau") != "claude":
         _demarrer_ollama()
     if not memoire.SYSTEME.exists():

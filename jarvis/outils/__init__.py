@@ -27,12 +27,13 @@ def outil(fn):
     return ajouter_fonction(fn, fn.__name__)
 
 
-def ajouter_fonction(fn, nom, source="jarvis"):
-    """Docstring : 1re ligne = description, puis lignes 'param: description'."""
+def ajouter_fonction(fn, nom, source="jarvis", prefixe_desc=""):
+    """Docstring : 1re ligne = description, puis lignes 'param: description'.
+    prefixe_desc : précise le compte concerné quand il y en a plusieurs (ex : « [Gmail travail] »)."""
     global VERSION
     doc = inspect.getdoc(fn) or nom
     lignes = doc.splitlines()
-    desc = lignes[0]
+    desc = prefixe_desc + lignes[0]
     pdesc = {}
     for l in lignes[1:]:
         if ":" in l:
@@ -114,4 +115,4 @@ def appeler(nom: str, args: dict) -> str:
 
 
 def charger_tous():
-    from . import systeme, fichiers, controle, ecran, web, code, memoire_outils, divers  # noqa: F401
+    from . import systeme, fichiers, controle, ecran, web, code, memoire_outils, divers, automatisations_outils  # noqa: F401

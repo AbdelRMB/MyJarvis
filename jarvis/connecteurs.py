@@ -85,9 +85,22 @@ class Connecteur:
         """Liste de (nom_outil, fonction) — la docstring sert de description."""
         return []
 
+    def etiquette(self) -> str:
+        """Nom lisible de ce compte (plusieurs comptes du même type sont possibles)."""
+        return (self.conf.get("compte") or self.conf.get("email") or self.conf.get("nom") or self.cid.split(":")[-1]).strip()
+
+    def suffixe(self) -> str:
+        """Le 1er compte d'un type garde les noms d'outils d'origine ; les suivants ont un suffixe (gmail_lire__travail)."""
+        if self.cid == self.type:
+            return ""
+        return re.sub(r"[^a-z0-9]+", "_", self.etiquette().lower()).strip("_")[:20] or self.cid.split(":")[-1][:20]
+
     def demarrer(self):
+        suffixe = self.suffixe()
         for nom, fn in self.fonctions():
-            outils.ajouter_fonction(fn, nom, source=self.cid)
+            nom_outil = f"{nom}__{suffixe}"[:64] if suffixe else nom
+            outils.ajouter_fonction(fn, nom_outil, source=self.cid,
+                                    prefixe_desc=f"[{self.nom} — {self.etiquette()}] " if suffixe else f"[{self.etiquette()}] ")
 
     def arreter(self):
         outils.retirer_source(self.cid)
@@ -562,6 +575,13 @@ class MCP(Connecteur):
         return f"{len(self.outils_mcp)} outil(s) : " + ", ".join(n for n, _, _ in self.outils_mcp[:15])
 
 
+# Chaque type accepte plusieurs comptes : un nom court pour les distinguer (et pour le dire à Jarvis)
+CHAMP_COMPTE = {"nom": "compte", "libelle": "Nom de ce compte", "type": "text", "requis": False,
+                "aide": "ex : perso, travail, papa. Tu pourras dire à Jarvis « regarde mes mails travail »."}
+for _t in (Mail, Gmail, Agenda, GitHub, Notion):
+    if not any(c["nom"] == "compte" for c in _t.__dict__.get("champs", [])):
+        _t.champs = [CHAMP_COMPTE] + list(_t.champs)
+
 TYPES = {c.type: c for c in (Gmail, Mail, Agenda, GitHub, Notion, MCP)}
 
 
@@ -688,4 +708,4 @@ def etat():
 
 def catalogue():
     return [{"type": t, "nom": c.nom, "description": c.description, "icone": c.icone, "champs": c.champs,
-             "aide": c.aide, "multiple": t in ("mcp", "mail")} for t, c in TYPES.items()]
+             "aide": c.aide, "multiple": True} for t, c in TYPES.items()]   # autant de comptes que tu veux par type

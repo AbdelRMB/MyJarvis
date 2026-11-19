@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { micro } from "./audio/micro";
 import { sons } from "./audio/bips";
-import { chargerVoix } from "./audio/tts";
+import { chargerVoix, parler } from "./audio/tts";
 import { brancherVoix, stopTout } from "./audio/voix";
 import { BarreHaut, BarreLaterale, NavMobile, Toasts } from "./components/Cadre";
 import { BandeauAutorisations } from "./components/Autorisations";
+import { toast } from "./stores/toasts";
 import { Connexion, type Compte } from "./components/Connexion";
 import { Demarrage } from "./components/Demarrage";
 import { api, ouvrirSession } from "./lib/api";
 import { majAudio } from "./stores/audio";
-import { connecter, useJarvis } from "./stores/jarvis";
+import { bus, connecter, useJarvis } from "./stores/jarvis";
 import { useReglages, type Vue } from "./stores/reglages";
 import { rafraichirSysteme } from "./stores/systeme";
 import { VueActivite } from "./views/Activite";
@@ -19,10 +20,11 @@ import { VueConnecteurs } from "./views/Connecteurs";
 import { VueHistorique } from "./views/Historique";
 import { VueMemoire } from "./views/Memoire";
 import { VueReglages } from "./views/Reglages";
+import { VueAutomatisations } from "./views/Automatisations";
 import { VueMisesAJour } from "./views/MisesAJour";
 import { VueSysteme } from "./views/Systeme";
 
-const VUES: Vue[] = ["assistant", "historique", "memoire", "connecteurs", "activite", "arsenal", "systeme", "reglages", "majs"];
+const VUES: Vue[] = ["assistant", "historique", "memoire", "connecteurs", "activite", "arsenal", "automatisations", "systeme", "reglages", "majs"];
 
 function useRaccourcis() {
   useEffect(() => {
@@ -95,6 +97,17 @@ export default function App() {
   }, []);
 
   useRaccourcis();
+
+  // Automatisations : Jarvis prévient à voix haute (voix choisie dans Réglages › Voix), même fenêtre cachée
+  useEffect(() => {
+    const sur = (ev: Event) => {
+      const texte = (ev as CustomEvent<string>).detail;
+      parler(texte, true);
+      toast(texte, "info");
+    };
+    bus.addEventListener("annonce", sur);
+    return () => bus.removeEventListener("annonce", sur);
+  }, []);
   const demarreRef = useRef(false);
   const demarrerRef = useRef<(() => void) | null>(null);
 
@@ -130,6 +143,7 @@ export default function App() {
             {vue === "systeme" && <VueSysteme />}
             {vue === "reglages" && <VueReglages />}
             {vue === "majs" && <VueMisesAJour />}
+            {vue === "automatisations" && <VueAutomatisations />}
           </div>
         </main>
       </div>

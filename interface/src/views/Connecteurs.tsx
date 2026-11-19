@@ -25,12 +25,14 @@ function Editeur({
   def,
   cid,
   existant,
+  idsExistants,
   onFermer,
   onFini,
 }: {
   def: TypeConnecteur;
   cid: string | null;
   existant?: Installe;
+  idsExistants: string[];
   onFermer: () => void;
   onFini: () => void;
 }) {
@@ -42,7 +44,10 @@ function Editeur({
     def.type !== "mcp" || (conf.mode === "url" ? !["commande", "env"].includes(c.nom) : !["url", "entete"].includes(c.nom));
 
   const enregistrer = async () => {
-    const id = cid ?? (def.multiple ? `${def.type}:${(conf.nom || conf.email || "x").toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24)}` : def.type);
+    // 1er compte d'un type : identifiant = le type (compatibilité) ; les suivants : type:nom-du-compte (unique)
+    const base = (conf.compte || conf.email || conf.nom || "compte").toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24);
+    let id = cid ?? (idsExistants.includes(def.type) ? `${def.type}:${base}` : def.type);
+    for (let n = 2; !cid && idsExistants.includes(id) && n < 99; n++) id = `${def.type}:${base}_${n}`;
     setEnvoi(true);
     try {
       const r = await api<Installe>(`/api/connecteurs/${encodeURIComponent(id)}`, {
@@ -133,7 +138,7 @@ function Editeur({
 function CarteInstalle({ cid, c, def, onModifier, onMaj }: { cid: string; c: Installe; def?: TypeConnecteur; onModifier: () => void; onMaj: () => void }) {
   const [test, setTest] = useState<{ ok: boolean; texte: string } | null>(null);
   const [enCours, setEnCours] = useState(false);
-  const titre = c.conf.nom || c.conf.email || def?.nom || cid;
+  const titre = [def?.nom, c.conf.compte || c.conf.email || c.conf.nom].filter(Boolean).join(" — ") || cid;
   const statut = !c.actif ? ["Désactivé", "doux"] : c.erreur ? [c.erreur.startsWith("Identifiants") ? "À configurer sur ce PC" : "Erreur", c.erreur.startsWith("Identifiants") ? "ambre" : "rouge"] : [`Actif · ${c.outils.length} outils`, "vert"];
 
   const tester = async () => {
@@ -275,6 +280,7 @@ export function VueConnecteurs() {
           def={edition.def}
           cid={edition.cid}
           existant={edition.cid ? d.installes[edition.cid] : undefined}
+          idsExistants={Object.keys(d.installes)}
           onFermer={() => setEdition(null)}
           onFini={() => {
             setEdition(null);

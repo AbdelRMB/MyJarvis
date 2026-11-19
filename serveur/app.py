@@ -402,7 +402,7 @@ def ecrire_historique(d: Lignes, uid: int = Depends(utilisateur)):
 
 
 # ---------- documents (réglages partagés, connecteurs) ----------
-NOMS_DOCS = {"profil", "connecteurs"}
+NOMS_DOCS = {"profil", "connecteurs", "automatisations"}
 
 
 @app.get("/v1/documents/{nom}")

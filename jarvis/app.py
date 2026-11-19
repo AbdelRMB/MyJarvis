@@ -211,6 +211,7 @@ def main():
         pystray.MenuItem("Mises à jour…", lambda i, _: afficher("majs")),
         pystray.MenuItem("Quitter", quitter)))
     etat["icone"] = icone
+    web.APPLI["icone"] = icone   # notifications Windows des automatisations
     try:
         # sur Mac, l'icône vit dans la barre des menus, sur la boucle Cocoa de la fenêtre (d'où run_detached)
         icone.run_detached()
@@ -221,6 +222,19 @@ def main():
     import os
     if sys.platform == "win32":
         os.environ.setdefault("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "--autoplay-policy=no-user-gesture-required")
+    if cache:
+        def precharger_interface():
+            """Démarrage de l'ordinateur : l'interface se charge en arrière-plan, fenêtre cachée, quelques secondes
+            après le lancement. Elle est ainsi prête à parler (avec la voix choisie) quand une automatisation se
+            déclenche, et la fenêtre s'ouvre tout de suite quand on appelle Jarvis."""
+            time.sleep(4)
+            if not etat["charge"]:
+                etat["charge"] = True
+                try:
+                    fen.load_url(url_fenetre)
+                except Exception:
+                    traceback.print_exc()
+        threading.Thread(target=precharger_interface, daemon=True).start()
     webview.start(private_mode=False, storage_path=str(RACINE / "webview"))
 
     serveur.should_exit = True
