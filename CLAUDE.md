@@ -3,6 +3,14 @@
 Assistant personnel de bureau (Python + interface React), distribué en appli Windows (Inno Setup) et macOS (.dmg).
 L'utilisateur parle français : messages de commit, CHANGELOG et textes de l'interface en français.
 
+## Fin de tâche : toujours proposer de publier
+
+Quand tu as fini de coder un changement de l'appli, **demande à l'utilisateur s'il veut publier la mise à jour**
+(en lui rappelant la version et la description prévues dans le CHANGELOG). S'il répond oui, fais tout toi-même :
+version + CHANGELOG, commit, push sur `main`, puis `./publier-mac.sh` sur le Mac. Rappelle-lui ensuite de lancer
+`publier.bat` sur son PC Windows pour ajouter le .exe à la même version. S'il répond non, laisse les changements
+en local (committés ou non, selon ce qu'il préfère) sans publier.
+
 ## Mises à jour : règle obligatoire pour chaque commit qui change l'appli
 
 L'écran **Mises à jour** de l'appli liste les versions publiées dans les GitHub Releases de ce dépôt, avec leur
