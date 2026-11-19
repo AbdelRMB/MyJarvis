@@ -258,9 +258,14 @@ class Lignes(BaseModel):
     lignes: list[Ligne] = Field(max_length=20_000)
 
 
-def _ajouter_lignes(c, uid, lignes) -> int:
+def _ajouter_lignes(c, uid, lignes, import_appareil=False) -> int:
+    """import_appareil : une même ligne, le même jour, déjà présente sous un autre nom d'appareil (copie
+    d'une ancienne mémoire trouvée à deux endroits) n'est pas ajoutée une 2e fois."""
     n = 0
     for l in lignes:
+        if import_appareil and c.execute("SELECT 1 FROM historique WHERE utilisateur = ? AND jour = ? AND empreinte = ?",
+                                         (uid, l.jour, _empreinte(l.ligne))).fetchone():
+            continue
         cur = c.execute("INSERT OR IGNORE INTO historique (utilisateur, jour, machine, ligne, empreinte) VALUES (?, ?, ?, ?, ?)",
                         (uid, l.jour, l.machine, l.ligne, _empreinte(l.ligne)))
         n += cur.rowcount
@@ -318,7 +323,7 @@ class Import(BaseModel):
 @app.post("/v1/import")
 def importer(d: Import, uid: int = Depends(utilisateur)):
     with db() as c:
-        return {"faits": _ajouter_faits(c, uid, d.faits), "lignes": _ajouter_lignes(c, uid, d.lignes)}
+        return {"faits": _ajouter_faits(c, uid, d.faits), "lignes": _ajouter_lignes(c, uid, d.lignes, import_appareil=True)}
 
 
 @app.get("/v1/sante")

@@ -19,8 +19,14 @@ import time
 from pathlib import Path
 
 import requests
+import urllib3.util.connection
 
 from . import config
+
+# Beaucoup de box ont un IPv6 cassé : la connexion part en IPv6 et attend jusqu'à l'expiration avant de
+# basculer en IPv4 (créer un compte prenait plusieurs minutes). Jarvis passe donc directement par l'IPv4.
+urllib3.util.connection.HAS_IPV6 = False
+_http = requests.Session()   # connexion réutilisée entre les appels (plus rapide)
 from .config import CONFIG, MACHINE, RACINE
 
 SERVEUR_DEFAUT = "https://jarvis.abdelrahimriche.com"
@@ -60,15 +66,21 @@ def dossier(uid=None) -> Path:
 
 
 # ---------- trousseau de l'appareil ----------
+_cache_trousseau: dict = {}   # lire le trousseau macOS peut prendre plusieurs secondes : une fois suffit
+
+
 def _secret_local(nom: str) -> str:
-    try:
-        import keyring
-        return keyring.get_password(SERVICE, nom) or ""
-    except Exception:
-        return ""
+    if nom not in _cache_trousseau:
+        try:
+            import keyring
+            _cache_trousseau[nom] = keyring.get_password(SERVICE, nom) or ""
+        except Exception:
+            return ""
+    return _cache_trousseau[nom]
 
 
 def _definir_secret_local(nom: str, valeur: str):
+    _cache_trousseau[nom] = valeur or ""
     import keyring
     if valeur:
         keyring.set_password(SERVICE, nom, valeur)
@@ -109,7 +121,7 @@ def _appel(methode, chemin, jeton=None, **kw):
     h = {"Authorization": f"Bearer {jeton or _secret_local('compte:jeton')}", "X-Jarvis-Appli": CONFIG.get("cle_appli") or CLE_APPLI_DEFAUT,
          "User-Agent": "Jarvis"}
     try:
-        r = requests.request(methode, serveur() + chemin, headers=h, timeout=kw.pop("timeout", 20), **kw)
+        r = _http.request(methode, serveur() + chemin, headers=h, timeout=(8, kw.pop("timeout", 20)), **kw)
     except requests.RequestException as e:
         raise ErreurCompte(f"Serveur Jarvis injoignable ({type(e).__name__}).") from e
     if r.status_code == 401 and chemin not in ("/v1/connexion", "/v1/inscription"):
@@ -165,7 +177,7 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
             _sauver_etat(e)
         except ErreurCompte as x:
             resultat["import"] = {"erreur": str(x)}
-    synchroniser()
+    threading.Thread(target=synchroniser, daemon=True).start()   # l'écran n'attend pas la 1re synchro
     demarrer_synchro()
     return resultat
 
@@ -468,7 +480,12 @@ def importer_appareil() -> dict:
             for l in f.read_text(encoding="utf-8").splitlines():
                 if l.strip() and len(jour) == 10:
                     lignes.append({"jour": jour, "machine": machine or MACHINE, "ligne": l})
-    r = _appel("POST", "/v1/import", json={"faits": faits, "lignes": lignes}, timeout=120)
+    vues, uniques = set(), []
+    for l in lignes:   # la même ancienne mémoire peut être trouvée à deux endroits (dossier local + OneDrive)
+        if (l["jour"], l["ligne"]) not in vues:
+            vues.add((l["jour"], l["ligne"]))
+            uniques.append(l)
+    r = _appel("POST", "/v1/import", json={"faits": faits, "lignes": uniques}, timeout=120)
     # connecteurs et réglages communs : seulement si le compte n'en a pas encore
     for s in sources:
         for nom, fichier in (("connecteurs", s.parent / "connecteurs.json"), ("profil", s.parent / "profil.json")):

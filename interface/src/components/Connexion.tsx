@@ -75,7 +75,7 @@ export function Connexion({ onConnecte }: { onConnecte: (c: Compte) => void }) {
         {inscription && (
           <p className="mt-3 text-[12px] leading-relaxed text-doux">
             Ton mot de passe ne quitte jamais cet appareil : il chiffre ta clé API et les mots de passe de tes connecteurs avant l'envoi, le serveur ne peut
-            pas les lire. Si tu l'oublies, ta mémoire reste, mais ces secrets seront à ressaisir.
+            pas les lire. Choisis-le bien : la récupération d'un mot de passe oublié arrive dans une prochaine version.
           </p>
         )}
         <Bouton type="submit" variante="primaire" className="mt-5 w-full justify-center" chargement={envoi} icone={inscription ? <UserPlus /> : <LogIn />}>
