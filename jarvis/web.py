@@ -410,7 +410,7 @@ async def supprimer_connecteur(cid: str, req: Request):
 
 
 # ---------- application de bureau (fenêtre, démarrage, écoute de fond) ----------
-APPLI = {"active": False, "afficher": None, "ecoute": None}   # renseigné par jarvis/app.py
+APPLI = {"active": False, "afficher": None, "ecoute": None, "quitter": None}   # renseigné par jarvis/app.py
 PAROLE = {"actif": False, "depuis": 0.0}   # la fenêtre signale quand Jarvis parle (pour l'écoute de fond)
 
 
@@ -429,12 +429,60 @@ def stop_vocal():
     print("  Stop demandé")
 
 
-@app.post("/api/fenetre/afficher")
-def afficher_fenetre(req: Request):
+@app.post("/api/memoire/envoyer")
+def envoyer_memoire(req: Request):
     _verifier(req)
+    r = memoire.envoyer_memoire_locale()
+    if r["faits"] and jarvis is not None:
+        try:
+            from .agent import prompt_systeme
+            jarvis.messages[0]["content"] = prompt_systeme()   # nouveaux souvenirs pris en compte tout de suite
+        except Exception:
+            pass
+    return r
+
+
+@app.post("/api/fenetre/afficher")
+async def afficher_fenetre(req: Request):
+    _verifier(req)
+    try:
+        vue = (await req.json()).get("vue")
+    except Exception:
+        vue = None
     if APPLI["afficher"]:
-        APPLI["afficher"]()
+        APPLI["afficher"](vue)
     return {"ok": bool(APPLI["afficher"])}
+
+
+# ---------- mises à jour ----------
+@app.get("/api/majs")
+def lister_majs(req: Request):
+    _verifier(req)
+    from . import mises_a_jour
+    return mises_a_jour.lister()
+
+
+@app.post("/api/majs/jeton")
+async def jeton_majs(req: Request):
+    _verifier(req)
+    from . import mises_a_jour
+    mises_a_jour.definir_jeton((await req.json()).get("jeton", ""))
+    return mises_a_jour.lister()
+
+
+@app.post("/api/majs/installer")
+async def installer_maj(req: Request):
+    _verifier(req)
+    from . import mises_a_jour
+    version = (await req.json()).get("version", "")
+    if not APPLI["quitter"]:
+        raise HTTPException(400, "Les mises à jour s'installent depuis l'application Jarvis installée.")
+    try:
+        mises_a_jour.installer(version, lambda etape, pct, texte: diffuser(type="maj", etape=etape, pct=pct, texte=texte),
+                               APPLI["quitter"])
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
 
 
 @app.get("/api/appli")
@@ -489,7 +537,13 @@ def commande_vocale(audio: np.ndarray):
         if RX_STOP_SEUL.match(texte) or re.match(r"^(stop|arr[êe]te|annule|tais[- ]toi|chut|silence)\b", texte, re.I):
             stop_vocal()
             return
-        threading.Thread(target=executer, args=(texte,), daemon=True).start()
+        def lancer():
+            for _ in range(80):   # jusqu'à 8 s : fenêtre réveillée à l'instant, pas encore branchée
+                if _clients:
+                    break
+                time.sleep(0.1)
+            executer(texte)
+        threading.Thread(target=lancer, daemon=True).start()
 
 
 # ---------- synthèse vocale ----------

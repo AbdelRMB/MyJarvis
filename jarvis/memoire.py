@@ -102,6 +102,60 @@ def resume_recent(n_lignes=30):
     return "\n".join(lignes[-n_lignes:])
 
 
+def envoyer_memoire_locale() -> dict:
+    """Bouton « Envoyer la mémoire de ce PC » : fusionne dans le dossier partagé (OneDrive) la mémoire
+    restée sur ce PC (avant OneDrive, ou ancienne version). Ajoute sans jamais écraser ni supprimer."""
+    import shutil
+    sources = [RACINE / "memoire", RACINE / "partage" / "memoire"]
+    sources = [s for s in sources if s.exists() and s.resolve() != DOSSIER.resolve()]
+    faits, ajoutes, hist = _charger(), 0, 0
+    connus = {x["fait"].lower() for x in faits}
+    for s in sources:
+        try:
+            for x in json.loads((s / "faits.json").read_text(encoding="utf-8")):
+                if x.get("fait") and x["fait"].lower() not in connus:
+                    faits.append(x)
+                    connus.add(x["fait"].lower())
+                    ajoutes += 1
+        except (OSError, ValueError):
+            pass
+        for f in (s / "historique").glob("*.md") if (s / "historique").exists() else []:
+            cible = HIST / (f.name if "__" in f.stem else f"{f.stem}__{MACHINE}.md")
+            if not cible.exists():
+                shutil.copy2(f, cible)
+                hist += 1
+            else:   # n'ajoute que les lignes absentes
+                deja = set(cible.read_text(encoding="utf-8").splitlines())
+                nouv = [l for l in f.read_text(encoding="utf-8").splitlines() if l not in deja]
+                if nouv:
+                    with open(cible, "a", encoding="utf-8") as h:
+                        h.write("\n".join(nouv) + "\n")
+                    hist += 1
+    if ajoutes:
+        _sauver(faits)
+    # connecteurs configurés sur ce PC avant OneDrive
+    ancien, cible = RACINE / "partage" / "connecteurs.json", DOSSIER.parent / "connecteurs.json"
+    connecteurs = 0
+    if ancien.exists() and ancien.resolve() != cible.resolve():
+        try:
+            a = json.loads(ancien.read_text(encoding="utf-8"))
+            c = json.loads(cible.read_text(encoding="utf-8")) if cible.exists() else type(a)()
+            if isinstance(a, dict) and isinstance(c, dict):
+                nouveaux = {k: v for k, v in a.items() if k not in c}
+                c.update(nouveaux)
+            elif isinstance(a, list) and isinstance(c, list):
+                nouveaux = [x for x in a if x not in c]
+                c += nouveaux
+            else:
+                nouveaux = []
+            if nouveaux:
+                cible.write_text(json.dumps(c, ensure_ascii=False, indent=1), encoding="utf-8")
+                connecteurs = len(nouveaux)
+        except (OSError, ValueError):
+            pass
+    return {"faits": ajoutes, "historique": hist, "connecteurs": connecteurs, "dossier": str(DOSSIER.parent)}
+
+
 # ---------- Scan du PC ----------
 
 def _vscode_recents():

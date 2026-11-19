@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION=$(grep -E '^VERSION = ' jarvis-mac.spec | cut -d'"' -f2)
+VERSION=$(grep -E '^VERSION = ' jarvis/version.py | cut -d'"' -f2)
 PUCE=$(uname -m)   # arm64 (Apple Silicon) ou x86_64 (Intel)
 PY=${PYTHON:-python3.12}
 command -v "$PY" >/dev/null || PY=python3
@@ -27,6 +27,7 @@ python -c "from openwakeword.utils import download_models; download_models(model
 echo "[4/5] Application (PyInstaller, quelques minutes)..."
 rm -rf build dist/Jarvis dist/Jarvis.app
 pyinstaller jarvis-mac.spec --noconfirm --log-level WARN
+xattr -cr dist/Jarvis.app   # retire les attributs Finder (sinon codesign refuse)
 codesign --force --deep --sign - --entitlements entitlements.plist dist/Jarvis.app   # signature ad hoc
 
 echo "[5/5] Image disque..."

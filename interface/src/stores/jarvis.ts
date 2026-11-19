@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { getJeton, ouvrirSession } from "../lib/api";
 import { uid } from "../lib/format";
 import type { Bloc, Message, MessageJarvis, Session } from "../lib/types";
+import { useReglages, type Vue } from "./reglages";
 
 type EtatJarvis = {
   session: Session | null;
@@ -83,6 +84,8 @@ export function ajouterSysteme(role: "info" | "erreur", texte: string) {
 
 /* ---------- réception ---------- */
 type Evt =
+  | { type: "maj"; etape: string; pct: number; texte: string }
+  | { type: "naviguer"; vue: Vue }
   | { type: "init"; conversation: ({ role: "user"; texte: string } | { role: "jarvis"; blocs: Bloc[] })[]; occupe: boolean }
   | { type: "utilisateur"; texte: string }
   | { type: "etat"; occupe: boolean }
@@ -194,6 +197,12 @@ function recevoir(e: Evt) {
       break;
     case "stop_voix":
       emettre("stop_voix");
+      break;
+    case "maj":
+      emettre("maj", e);
+      break;
+    case "naviguer":
+      useReglages.getState().maj({ vue: e.vue });
       break;
   }
 }

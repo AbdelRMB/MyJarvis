@@ -24,12 +24,13 @@ def _journaux():
         print(f"\n===== Démarrage {time.strftime('%Y-%m-%d %H:%M:%S')} =====")
 
 
-def _appeler_instance(url):
-    """Une instance tourne déjà : on lui demande d'afficher sa fenêtre."""
+def _appeler_instance(url, vue=None):
+    """Une instance tourne déjà : on lui demande d'afficher sa fenêtre (sur une vue précise si besoin)."""
     try:
         with urllib.request.urlopen(f"{url}/api/session", timeout=2) as r:
             jeton = json.load(r)["jeton"]
-        req = urllib.request.Request(f"{url}/api/fenetre/afficher", method="POST", headers={"x-jeton": jeton})
+        req = urllib.request.Request(f"{url}/api/fenetre/afficher", method="POST", data=json.dumps({"vue": vue}).encode(),
+                                     headers={"x-jeton": jeton, "content-type": "application/json"})
         urllib.request.urlopen(req, timeout=3)
         return True
     except Exception:
@@ -49,6 +50,9 @@ def _icone():
 
 def main():
     cache = "--cache" in sys.argv
+    vue_maj = "majs" if "--maj" in sys.argv else None   # raccourci « Mettre à jour Jarvis »
+    if vue_maj:
+        cache = False
     _journaux()
     from . import web
     from .agent import Jarvis
@@ -56,8 +60,21 @@ def main():
 
     url = f"http://{web.HOTE}:{web.PORT}"
     if web._deja_lance(url):
-        _appeler_instance(url)
+        _appeler_instance(url, vue_maj)
         return
+
+    if GELE and sys.platform == "darwin" and sys.executable.startswith("/Applications/") \
+            and not CONFIG.get("demarrage_auto_initialise"):
+        from . import demarrage
+        from .config import sauver_config
+        demarrage.activer(True)
+        CONFIG["demarrage_auto_initialise"] = True
+        sauver_config(["demarrage_auto_initialise"])
+    try:
+        from .mises_a_jour import creer_raccourci_mac
+        creer_raccourci_mac()   # « Mettre à jour Jarvis » trouvable dans Spotlight
+    except Exception as e:
+        print(f"  ! Raccourci de mise à jour : {e}")
 
     web.preparer()
     import uvicorn
@@ -70,12 +87,22 @@ def main():
     print(f"  Serveur prêt sur {url}")
 
     import webview
-    fen = webview.create_window("J.A.R.V.I.S.", url, width=1320, height=860, min_size=(420, 560), hidden=cache,
+    # Au démarrage de l'ordinateur (--cache) : juste le processus (serveur + écoute de fond).
+    # L'interface n'est chargée qu'au premier appel (« Jarvis », raccourci, icône).
+    vide = "<html><body style='background:#04090f'></body></html>"
+    url_fenetre = f"{url}/?appli=1" + (f"&vue={vue_maj}" if vue_maj else "")
+    fen = webview.create_window("J.A.R.V.I.S.", None if cache else url_fenetre, html=vide if cache else "",
+                                width=1320, height=860, min_size=(420, 560), hidden=cache,
                                 background_color="#04090f", text_select=True)
-    etat = {"quitter": False}
+    etat = {"quitter": False, "charge": not cache}
 
-    def afficher():
+    def afficher(vue=None):
         try:
+            if not etat["charge"]:
+                etat["charge"] = True
+                fen.load_url(f"{url}/?appli=1" + (f"&vue={vue}" if vue else ""))
+            elif vue:
+                web.diffuser(type="naviguer", vue=vue)
             fen.show()
             fen.restore()
             fen.on_top = True     # passe devant les autres fenêtres…
@@ -125,17 +152,24 @@ def main():
         from .config import sauver_config
         sauver_config(["ecoute_fond"])
 
-    def quitter(icone, _):
+    def quitter(icone=None, _=None):
         etat["quitter"] = True
         ecoute.arreter()
-        icone.stop()
+        try:
+            (icone or etat.get("icone")).stop()
+        except Exception:
+            pass
         fen.destroy()
+
+    web.APPLI["quitter"] = quitter   # utilisé par la mise à jour
 
     icone = pystray.Icon("Jarvis", _icone(), "J.A.R.V.I.S. — Ctrl+Alt+J ou dis « Jarvis »", menu=pystray.Menu(
         pystray.MenuItem("Ouvrir Jarvis", lambda i, _: afficher(), default=True),
         pystray.MenuItem("Écoute « Jarvis »", basculer_ecoute, checked=lambda _: ecoute.actif),
         pystray.Menu.SEPARATOR,
+        pystray.MenuItem("Mises à jour…", lambda i, _: afficher("majs")),
         pystray.MenuItem("Quitter", quitter)))
+    etat["icone"] = icone
     try:
         # sur Mac, l'icône vit dans la barre des menus, sur la boucle Cocoa de la fenêtre (d'où run_detached)
         icone.run_detached()

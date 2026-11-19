@@ -1,0 +1,90 @@
+# Publie chaque nouvelle version de Jarvis dans l'onglet « Releases » du dépôt.
+# Déclenché à chaque push sur main : si jarvis/version.py contient une version qui n'a pas encore
+# de tag vX.Y.Z, on construit le .dmg (Mac puce Apple) et le JarvisSetup.exe (Windows), puis on crée
+# la release avec la description de CHANGELOG.md. L'appli la voit dans « Mises à jour ».
+name: Versions de Jarvis
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      nouvelle: ${{ steps.v.outputs.nouvelle }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          V=$(grep -E '^VERSION = ' jarvis/version.py | cut -d'"' -f2)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null; then
+            echo "nouvelle=false" >> "$GITHUB_OUTPUT"; echo "v$V existe déjà : rien à publier."
+          else
+            grep -qE "^## $V\b" CHANGELOG.md || { echo "::error::CHANGELOG.md n'a pas de section « ## $V » (description obligatoire)"; exit 1; }
+            echo "nouvelle=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  mac:
+    needs: version
+    if: needs.version.outputs.nouvelle == 'true'
+    runs-on: macos-14            # Apple Silicon (arm64). Pour les Mac Intel : dupliquer ce job sur macos-15-intel.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: bash construire-mac.sh
+        env: { PYTHON: python }
+      - uses: actions/upload-artifact@v4
+        with: { name: mac, path: installateur/*.dmg, if-no-files-found: error }
+
+  windows:
+    needs: version
+    if: needs.version.outputs.nouvelle == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - name: Construire l'appli et l'installateur
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m venv .venv
+          .venv\Scripts\python -m pip install -q --upgrade pip
+          .venv\Scripts\python -m pip install -q -r requirements.txt -r requirements-voix.txt
+          Push-Location interface; npm ci; npm run build; Pop-Location
+          if (-not (Test-Path voix\fr_FR-tom-medium.onnx)) { .venv\Scripts\python -m piper.download_voices fr_FR-tom-medium --data-dir voix }
+          .venv\Scripts\python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
+          .venv\Scripts\pyinstaller jarvis.spec --noconfirm --log-level WARN
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc /Q "/DVersion=${{ needs.version.outputs.version }}" installateur.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with: { name: windows, path: installateur/*.exe, if-no-files-found: error }
+
+  publier:
+    needs: [version, mac, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: fichiers, merge-multiple: true }
+      - name: Créer la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ needs.version.outputs.version }}
+        run: |
+          awk -v v="$V" '/^## /{ if (p) exit; if ($2 == v) { p = 1; next } } p' CHANGELOG.md > notes.md
+          gh release create "v$V" fichiers/* --title "Jarvis $V" --notes-file notes.md --target "$GITHUB_SHA"

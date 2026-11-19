@@ -9,6 +9,7 @@ partage/
 # Fichiers générés
 build/
 dist/
+# installateur/ : 250+ Mo, trop gros pour git (limite 100 Mo) -> publiés dans les GitHub Releases par la CI
 installateur/
 voix/*.onnx
 voix/*.onnx.json

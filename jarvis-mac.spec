@@ -3,7 +3,7 @@
 # Produit dist/Jarvis.app (appli de barre des menus, sans icône dans le Dock).
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-VERSION = "1.0.3"
+VERSION = open("jarvis/version.py", encoding="utf-8").read().split('VERSION = "')[1].split('"')[0]
 
 datas = [("jarvis/static", "jarvis/static"), ("voix", "voix")]
 binaries = []
@@ -11,7 +11,7 @@ hiddenimports = (collect_submodules("jarvis") + collect_submodules("uvicorn") + 
                  + ["pystray._darwin", "pynput.keyboard._darwin", "pynput.mouse._darwin"])
 
 for paquet in ["webview", "openwakeword", "faster_whisper", "ctranslate2", "onnxruntime", "piper", "edge_tts",
-               "sounddevice", "_sounddevice_data", "mcp", "recurring_ical_events", "icalendar", "tokenizers", "certifi",
+               "sounddevice", "_sounddevice_data", "recurring_ical_events", "icalendar", "tokenizers", "certifi",
                "ddgs", "objc", "Foundation", "AppKit", "WebKit", "Quartz"]:
     try:
         d, b, h = collect_all(paquet)
@@ -20,6 +20,12 @@ for paquet in ["webview", "openwakeword", "faster_whisper", "ctranslate2", "onnx
         hiddenimports += h
     except Exception as e:
         print(f"(collect_all {paquet} : {e})")
+
+# mcp : tout sauf mcp.cli (qui exige typer et fait échouer collect_all)
+d, b, h = collect_all("mcp", filter_submodules=lambda nom: not nom.startswith("mcp.cli"))
+datas += d
+binaries += b
+hiddenimports += h
 
 a = Analysis(
     ["lanceur.pyw"],

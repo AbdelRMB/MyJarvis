@@ -358,7 +358,7 @@ function Accueil() {
       <h2 className="mt-8 text-center text-2xl font-semibold xl:mt-0 xl:text-3xl">
         {h < 5 || h >= 18 ? "Bonsoir" : "Bonjour"} {nom}.
       </h2>
-      <p className="mt-2 text-center text-doux">Tous les systèmes sont opérationnels. Que puis-je faire pour vous ?</p>
+      <p className="mt-2 text-center text-doux">Que puis-je faire pour vous ?</p>
       <div className="mt-8 grid w-full max-w-2xl gap-2 sm:grid-cols-2">
         {SUGGESTIONS.map((s) => (
           <button

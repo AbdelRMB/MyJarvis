@@ -46,6 +46,23 @@ function OngletApplication() {
     }
   };
   const raccourci = os.touches(e.raccourci);
+  const [envoi, setEnvoi] = useState(false);
+  const envoyerMemoire = async () => {
+    setEnvoi(true);
+    try {
+      const r = await api<{ faits: number; historique: number; connecteurs: number }>("/api/memoire/envoyer", { method: "POST" });
+      toast(
+        r.faits || r.historique || r.connecteurs
+          ? `Envoyé : ${r.faits} souvenir(s), ${r.historique} journée(s) d'historique, ${r.connecteurs} connecteur(s).`
+          : "Rien de nouveau à envoyer : tout est déjà dans le dossier partagé.",
+        "succes",
+      );
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setEnvoi(false);
+    }
+  };
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Panneau titre="Application" icone={<AppWindow />}>
@@ -94,6 +111,10 @@ function OngletApplication() {
         <p className="mt-3 text-[13px] leading-relaxed text-doux">
           Les souvenirs, l'historique des conversations et la liste des connecteurs sont rangés ici. OneDrive les synchronise : sur tes autres ordinateurs, PC ou Mac avec le même compte Microsoft, Jarvis se souvient des mêmes choses. Les mots de passe des connecteurs et la clé API restent sur chaque machine.
         </p>
+        <Bouton className="mt-4" icone={<Cloud />} chargement={envoi} onClick={envoyerMemoire}>
+          Envoyer la mémoire de ce PC vers le dossier partagé
+        </Bouton>
+        <p className="mt-2 text-[13px] text-doux">Ajoute ce que ce PC savait avant OneDrive (souvenirs, historique, connecteurs). Rien n'est écrasé.</p>
       </Panneau>
     </div>
   );
@@ -228,7 +249,7 @@ function OngletVoix() {
     chargerVoix();
     listerVoixServeur().then(setVoixServeur).catch(() => {});
   }, []);
-  const tester = () => parler(`Bonjour ${nom}. Tous les systèmes sont opérationnels. Que puis-je faire pour vous ?`, true);
+  const tester = () => parler(`Bonjour ${nom}. Que puis-je faire pour vous ?`, true);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Panneau titre="Voix de Jarvis" icone={<Volume2 />}>

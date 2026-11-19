@@ -1,7 +1,10 @@
 ; Programme d'installation de Jarvis (Inno Setup 6) : "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installateur.iss
 ; Prérequis : avoir construit dist\Jarvis avec  .venv\Scripts\pyinstaller jarvis.spec --noconfirm
 
-#define Version "1.0.3"
+; La version vient de jarvis/version.py (construire.bat et GitHub Actions passent /DVersion=x.y.z)
+#ifndef Version
+  #define Version "0.0.0"
+#endif
 
 [Setup]
 AppId={{6E0B7C1A-4C1F-4B9B-9E2A-3F7D1A2B9C01}
@@ -37,6 +40,7 @@ Source: "dist\Jarvis\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs c
 
 [Icons]
 Name: "{userprograms}\Jarvis"; Filename: "{app}\Jarvis.exe"; Comment: "Ton assistant personnel"
+Name: "{userprograms}\Mettre à jour Jarvis"; Filename: "{app}\Jarvis.exe"; Parameters: "--maj"; Comment: "Voir et installer les mises à jour de Jarvis"
 Name: "{userdesktop}\Jarvis"; Filename: "{app}\Jarvis.exe"; Tasks: bureau
 
 [Registry]
@@ -44,6 +48,8 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\Jarvis.exe"; Description: "Lancer Jarvis maintenant"; Flags: nowait postinstall skipifsilent
+; mise à jour depuis l'appli (installation silencieuse) : Jarvis redémarre tout seul
+Filename: "{app}\Jarvis.exe"; Flags: nowait skipifnotsilent
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/IM Jarvis.exe /F"; Flags: runhidden; RunOnceId: "ArretJarvis"

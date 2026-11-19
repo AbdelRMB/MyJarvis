@@ -4,6 +4,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Cpu,
+  Download,
   History,
   MessageSquare,
   Mic,
@@ -35,6 +36,7 @@ const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
   { id: "arsenal", libelle: "Arsenal", icone: Wrench },
   { id: "systeme", libelle: "Système", icone: Cpu },
   { id: "reglages", libelle: "Réglages", icone: Settings },
+  { id: "majs", libelle: "Mises à jour", icone: Download },
 ];
 
 function MiniReacteur({ actif }: { actif: boolean }) {

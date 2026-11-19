@@ -29,14 +29,17 @@ MACHINE = (platform.node() or "PC").removesuffix(".local")
 
 def _onedrive():
     """Dossier OneDrive : variable d'environnement (Windows) ou emplacements de l'appli OneDrive pour Mac."""
-    od = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
-    if od and Path(od).exists():
-        return Path(od)
+    # Compte PERSONNEL en priorité partout, sinon un PC avec un OneDrive école/pro et un Mac avec le perso
+    # n'utiliseraient pas le même dossier (%OneDrive% = compte pro sur Windows quand il y en a un).
+    for var in ("OneDriveConsumer", "OneDrive"):
+        od = os.environ.get(var)
+        if od and Path(od).exists():
+            return Path(od)
     if sys.platform == "darwin":
         nuage = Path.home() / "Library" / "CloudStorage"
-        candidats = sorted(nuage.glob("OneDrive*")) if nuage.exists() else []
-        candidats += [Path.home() / "OneDrive"]
-        for c in candidats:   # « OneDrive-Personnel » en priorité, puis un compte pro
+        tous = sorted(nuage.glob("OneDrive*")) if nuage.exists() else []
+        perso = [c for c in tous if c.name in ("OneDrive-Personal", "OneDrive-Personnel")]
+        for c in perso + tous + [Path.home() / "OneDrive"]:
             if c.exists():
                 return c
     return None
