@@ -25,9 +25,14 @@ mkdir -p voix
 python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
 
 echo "[4/5] Application (PyInstaller, quelques minutes)..."
-rm -rf build dist/Jarvis dist/Jarvis.app
-pyinstaller jarvis-mac.spec --noconfirm --log-level WARN
-xattr -cr dist/Jarvis.app   # retire les attributs Finder (sinon codesign refuse)
+# Construction HORS du Bureau : s'il est synchronisé par iCloud, iCloud ajoute des attributs aux fichiers pendant
+# la construction (signature refusée) et crée des copies « Jarvis 2.app ». Dossier non synchronisé :
+SORTIE="${JARVIS_BUILD:-$HOME/Library/Caches/jarvis-build}"
+mkdir -p "$SORTIE"
+rm -rf "$SORTIE/build" "$SORTIE/dist" dist/Jarvis dist/Jarvis.app
+pyinstaller jarvis-mac.spec --noconfirm --log-level WARN --distpath "$SORTIE/dist" --workpath "$SORTIE/build"
+mkdir -p dist && ln -sfn "$SORTIE/dist/Jarvis.app" dist/Jarvis.app   # dist/Jarvis.app reste utilisable
+xattr -cr "$SORTIE/dist/Jarvis.app"   # retire les attributs Finder (sinon codesign refuse)
 # Signature STABLE : macOS rattache les autorisations (micro, écran, accessibilité…) à la signature.
 # Avec une signature « ad hoc », elle change à chaque version et macOS oublie tout ; avec un certificat
 # Apple (Developer ID ou Apple Development), les autorisations restent acquises après chaque mise à jour.
@@ -36,10 +41,10 @@ IDENTITE=${JARVIS_SIGNATURE:-$(security find-identity -v -p codesigning 2>/dev/n
 [ -n "$IDENTITE" ] || IDENTITE=$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Apple Development[^"]*"' | head -1 | tr -d '"' || true)
 if [ -n "$IDENTITE" ]; then
   echo "    signature : $IDENTITE"
-  codesign --force --deep --sign "$IDENTITE" --entitlements entitlements.plist dist/Jarvis.app
+  codesign --force --deep --sign "$IDENTITE" --entitlements entitlements.plist "$SORTIE/dist/Jarvis.app"
 else
   echo "    ! aucun certificat Apple : signature ad hoc (les autorisations seront redemandées à chaque version)"
-  codesign --force --deep --sign - --entitlements entitlements.plist dist/Jarvis.app
+  codesign --force --deep --sign - --entitlements entitlements.plist "$SORTIE/dist/Jarvis.app"
 fi
 
 echo "[5/5] Image disque..."
@@ -47,13 +52,13 @@ mkdir -p installateur
 DMG="installateur/Jarvis-${VERSION}-mac-${PUCE}.dmg"
 TMP=$(mktemp -d)
 # copie SANS les attributs Finder (le Bureau synchronisé en ajoute, ce qui invaliderait la signature)
-ditto --norsrc --noextattr --noacl dist/Jarvis.app "$TMP/Jarvis.app"
+ditto --norsrc --noextattr --noacl "$SORTIE/dist/Jarvis.app" "$TMP/Jarvis.app"
 xattr -cr "$TMP/Jarvis.app"
 codesign --verify --deep --strict "$TMP/Jarvis.app"
 ln -s /Applications "$TMP/Applications"
 rm -f "$DMG"
 hdiutil create -volname "Jarvis" -srcfolder "$TMP" -ov -format UDZO "$DMG" >/dev/null
-rm -rf "$TMP" build
+rm -rf "$TMP"
 echo
 echo "Terminé : $DMG"
 echo "Installe-le : ouvre le .dmg, glisse Jarvis dans Applications, puis clic droit > Ouvrir la première fois."
