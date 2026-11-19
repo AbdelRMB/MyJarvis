@@ -35,17 +35,6 @@ function OngletApplication() {
   useEffect(() => {
     api<EtatAppli>("/api/appli").then(setE).catch((x) => toast(x.message, "erreur"));
   }, []);
-  if (!e) return <p className="text-doux">Chargement…</p>;
-  const regler = async (p: Partial<EtatAppli>) => {
-    try {
-      const n = await api<EtatAppli>("/api/appli", { method: "POST", json: p });
-      setE(n);
-      majAudio({ ecouteFond: n.appli && n.ecoute_active });
-    } catch (x) {
-      toast((x as Error).message, "erreur");
-    }
-  };
-  const raccourci = os.touches(e.raccourci);
   const [compte, setCompte] = useState<{ email: string; prenom: string; serveur: string; machine: string } | null>(null);
   const [action, setAction] = useState("");
   useEffect(() => {
@@ -70,6 +59,17 @@ function OngletApplication() {
       setAction("");
     }
   };
+  if (!e) return <p className="text-doux">Chargement…</p>;
+  const regler = async (p: Partial<EtatAppli>) => {
+    try {
+      const n = await api<EtatAppli>("/api/appli", { method: "POST", json: p });
+      setE(n);
+      majAudio({ ecouteFond: n.appli && n.ecoute_active });
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  const raccourci = os.touches(e.raccourci);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Panneau titre="Application" icone={<AppWindow />}>
