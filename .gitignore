@@ -32,3 +32,4 @@ serveur/mettre-a-jour-apache.sh
 serveur/Dockerfile
 serveur/docker-compose.yml
 serveur/.env
+serveur/deployer.sh
