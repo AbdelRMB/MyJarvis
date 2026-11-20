@@ -199,3 +199,12 @@ l'appli : `"serveur_comptes"` et `"cle_appli"`.
 
 Diagnostic : `logs/jarvis.log` (démarrage, erreurs), `logs/perf.log` (vitesse du modèle), `logs/couts.json`
 (dépenses estimées de l'API Claude).
+
+## Licence
+
+Copyright (C) 2026 Abdelrahim Riche
+
+Jarvis est un logiciel libre : tu peux le redistribuer et le modifier selon les termes de la
+**GNU General Public License version 3** (ou toute version ultérieure), publiée par la Free Software Foundation.
+Toute version modifiée que tu distribues doit rester sous cette même licence, avec son code source.
+Jarvis est fourni **sans aucune garantie**. Texte complet : [LICENSE](LICENSE).
