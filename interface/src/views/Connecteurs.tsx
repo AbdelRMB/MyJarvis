@@ -14,6 +14,8 @@ const LIBELLES_CHOIX: Record<string, string> = {
   confirmation: "Confirmation : il me demande avant de modifier quoi que ce soit (conseillé)",
   lecture: "Lecture seule : il peut seulement regarder",
   libre: "Libre : il agit sans demander",
+  non: "Non : jamais de sudo",
+  oui: "Oui : sudo sans mot de passe, avec ton accord à chaque fois",
 };
 type TypeConnecteur = { type: string; nom: string; description: string; icone: string; champs: ChampDef[]; aide: string; multiple: boolean };
 type Installe = { type: string; actif: boolean; conf: Record<string, string>; secrets: Record<string, boolean>; erreur: string; outils: string[] };

@@ -511,4 +511,6 @@ export const EN: Record<string, string> = {
   "Remplis l'adresse et l'utilisateur pour avoir aussi la commande à taper depuis ce PC.": "Fill in the address and user to also get the command to run from this computer.",
   "Clique sur « Connecter », puis sur « Tester » sur la carte du serveur.": "Click \"Connect\", then \"Test\" on the server card.",
   "Le serveur demande encore un code même avec la clé ? Dans /etc/ssh/sshd_config, ajoute à la fin (remplace l'utilisateur), puis lance « sudo systemctl reload ssh ». Garde ta session ouverte pendant le test pour ne pas te bloquer dehors :": "Server still asks for a code with the key? Add this at the end of /etc/ssh/sshd_config (replace the user), then run \"sudo systemctl reload ssh\". Keep your session open while testing so you don't lock yourself out:",
+  "Non : jamais de sudo": "No: never use sudo",
+  "Oui : sudo sans mot de passe, avec ton accord à chaque fois": "Yes: passwordless sudo, with your approval every time",
 };

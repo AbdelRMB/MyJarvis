@@ -585,6 +585,10 @@ _LECTURE = re.compile(r"^\s*(ls|ll|cat|head|tail|less|more|df|du|free|uptime|who
                       r"certbot\s+certificates|git\s+(status|log|diff|branch|remote)|crontab\s+-l|echo|pwd)\b")
 
 
+# « sudo » employé comme commande (début, après ; & | ( ou un espace), avec son éventuel -n déjà présent
+_SUDO = re.compile(r"(^|[;&|(\s])sudo(?:\s+-n)?(?=\s|$)")
+
+
 def commande_en_lecture(commande: str) -> bool:
     """Vraie si la commande ne fait que lire (chaque morceau d'une chaîne ; | && ||), sans redirection d'écriture."""
     if re.search(r"(^|[^>2&])>{1,2}(?!&)|\btee\b|\bsudo\b|`|\$\(", commande):
@@ -640,6 +644,9 @@ class SSH(Connecteur):
         {"nom": "utilisateur", "libelle": "Utilisateur", "type": "text", "aide": "ex : debian, ubuntu, abdel"},
         {"nom": "mode", "libelle": "Ce que Jarvis a le droit de faire", "type": "choix",
          "choix": ["confirmation", "lecture", "libre"]},
+        {"nom": "sudo", "libelle": "Droits administrateur (sudo)", "type": "choix", "choix": ["non", "oui"],
+         "aide": "Oui : sudo doit marcher SANS mot de passe pour cet utilisateur sur le serveur (/etc/sudoers.d). "
+                 "Chaque commande sudo te demande toujours « Autoriser / Refuser », même en mode libre."},
         {"nom": "cle_privee", "libelle": "Clé privée SSH", "type": "secret", "requis": False, "multiligne": True,
          "aide": "Bouton « Générer une clé » ci-dessus, ou colle une clé existante (-----BEGIN OPENSSH PRIVATE KEY----- …). "
                  "Collée ici, elle suit ton compte sur tous tes appareils. Vide : clés de cet ordinateur (~/.ssh)."},
@@ -649,10 +656,14 @@ class SSH(Connecteur):
     ]
     aide = ("Modes :\n- confirmation (conseillé) : Jarvis regarde librement, mais te demande « Autoriser / Refuser » "
             "avant toute commande qui modifie le serveur ;\n- lecture : il ne peut que regarder (logs, état, fichiers) ;\n"
-            "- libre : il agit sans demander.\nsudo n'est jamais utilisé (ton mot de passe sudo n'est pas demandé).")
+            "- libre : il agit sans demander.\nsudo : désactivé par défaut. Activé, il ne demande jamais ton mot de passe "
+            "(sudo sans mot de passe à configurer sur le serveur) et chaque commande sudo attend ton accord.")
 
     def mode(self):
         return self.conf.get("mode") or "confirmation"
+
+    def sudo_permis(self):
+        return self.conf.get("sudo") == "oui"
 
     def _client(self):
         import io
@@ -694,9 +705,9 @@ class SSH(Connecteur):
         res = (out + (("\n[stderr]\n" + err) if err.strip() else "")).strip() or "(aucune sortie)"
         return (f"[code {code}]\n" if code else "") + res[-12000:]
 
-    def _autorise(self, action: str, detail: str) -> str:
-        """« » si autorisé, sinon le message à renvoyer à Jarvis."""
-        if self.mode() == "libre":
+    def _autorise(self, action: str, detail: str, toujours_demander=False) -> str:
+        """« » si autorisé, sinon le message à renvoyer à Jarvis (toujours_demander : même en mode libre)."""
+        if self.mode() == "libre" and not toujours_demander:
             return ""
         if self.mode() == "lecture":
             return f"Refusé : {self.etiquette()} est en lecture seule (Connecteurs › {self.nom}). Explique à l'utilisateur ce qu'il faudrait faire."
@@ -707,13 +718,31 @@ class SSH(Connecteur):
 
     def fonctions(self):
         def commande(commande: str):
-            """Exécute une commande shell sur ce serveur et renvoie sa sortie. Les commandes qui modifient le serveur peuvent demander l'accord de l'utilisateur. Pas de sudo.
-            commande: la commande à lancer (ex : df -h, docker ps, tail -n 50 /var/log/syslog)"""
-            if not commande_en_lecture(commande):
+            """(description fixée plus bas, selon que sudo est permis ou non)"""
+            if _SUDO.search(commande):
+                if not self.sudo_permis():
+                    return (f"Refusé : sudo n'est pas activé pour {self.etiquette()}. Fais sans sudo, ou explique à "
+                            f"l'utilisateur qu'il peut l'activer dans Connecteurs › {self.nom} › Droits administrateur.")
+                commande = _SUDO.sub(r"\1sudo -n", commande)   # -n : jamais de demande de mot de passe
+                refus = self._autorise("commande administrateur (sudo)", commande, toujours_demander=True)
+                if refus:
+                    return refus
+            elif not commande_en_lecture(commande):
                 refus = self._autorise("exécuter une commande", commande)
                 if refus:
                     return refus
-            return self._executer(commande)
+            res = self._executer(commande)
+            if "sudo" in commande and "password is required" in res:
+                res += ("\n[Jarvis] sudo demande un mot de passe : sur le serveur, l'utilisateur doit autoriser sudo "
+                        "sans mot de passe (sudo visudo -f /etc/sudoers.d/<utilisateur>).")
+            return res
+        commande.__doc__ = (
+            "Exécute une commande shell sur ce serveur et renvoie sa sortie. Les commandes qui modifient le serveur "
+            "peuvent demander l'accord de l'utilisateur. "
+            + ("sudo est permis (sans mot de passe) ; chaque commande sudo demande l'accord de l'utilisateur, donc "
+               "regroupe les actions administrateur en une commande. Fichier protégé : printf '...' | sudo tee chemin."
+               if self.sudo_permis() else "Pas de sudo.")
+            + "\ncommande: la commande à lancer (ex : df -h, docker ps, tail -n 50 /var/log/syslog)")
 
         def etat():
             """État rapide du serveur : système, charge, mémoire, disque, conteneurs Docker, services en échec."""

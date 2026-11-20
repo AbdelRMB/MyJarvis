@@ -3,6 +3,9 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.7.2
+- **sudo sur tes serveurs** : nouvelle option « Droits administrateur (sudo) » dans le connecteur Serveur SSH. Activée, Jarvis peut lancer des commandes administrateur (redémarrer un service, installer un paquet, modifier une configuration…), sans jamais te demander ton mot de passe. Chaque commande sudo attend toujours ton « Autoriser / Refuser », même en mode libre. Sur le serveur, sudo doit être autorisé sans mot de passe pour l'utilisateur de Jarvis. / **sudo on your servers**: optional admin rights for the SSH connector, always with your approval.
+
 ## 1.7.1
 - **Clé SSH générée par Jarvis** : dans le connecteur « Serveur SSH (VPS) », le bouton **Générer une clé** crée une clé rien que pour Jarvis et te donne la commande à copier pour l'ajouter à ton serveur. Fini le mot de passe et le code d'authentification à chaque connexion, et la clé suit ton compte sur tous tes appareils. « Voir la clé publique » la réaffiche à tout moment. / **Jarvis generates your SSH key** and gives you the command to add it to your server; no more password or 2FA code, and it follows your account.
 - **Appli Mac signée par Apple** : Jarvis est maintenant signé avec un certificat de développeur Apple et vérifié par Apple (notarisation). Il s'ouvre sans l'avertissement « développeur non identifié », et macOS garde tes autorisations (micro, écran, accessibilité) d'une mise à jour à l'autre. Après cette mise à jour, macOS te les redemandera **une dernière fois**. / **Mac app signed and notarized by Apple**: no more warning, and permissions are kept across updates (asked one last time).
