@@ -33,3 +33,6 @@ serveur/Dockerfile
 serveur/docker-compose.yml
 serveur/.env
 serveur/deployer.sh
+serveur/deploiement-vps.sh
+serveur/Jenkinsfile.serveur
+serveur/COMMIT
