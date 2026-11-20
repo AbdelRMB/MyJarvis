@@ -6,7 +6,7 @@ from PyInstaller.utils.win32.versioninfo import (FixedFileInfo, StringFileInfo, 
                                                  VarFileInfo, VarStruct, VSVersionInfo)
 
 VERSION = open("jarvis/version.py", encoding="utf-8").read().split('VERSION = "')[1].split('"')[0]
-DEVELOPPEUR = "AbdelRMB"
+DEVELOPPEUR = "Abdelrahim Riche"
 _v = tuple(int(x) for x in (VERSION.split(".") + ["0", "0", "0"])[:4])
 # Clic droit › Propriétés › Détails de Jarvis.exe : société, copyright, version
 INFOS_VERSION = VSVersionInfo(
