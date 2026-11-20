@@ -103,6 +103,10 @@ Vérification avant commit : `cd interface && npx tsc -p .`
   autorisations (micro, écran, accessibilité, fichiers). Sans certificat (signature ad hoc), elles sont perdues à
   chaque nouvelle version.
   Si `codesign` refuse (« resource fork… »), le script retire déjà les attributs Finder (`xattr -cr`).
+  Avec un certificat `Developer ID Application`, le script signe en runtime renforcé et, si `APPLE_ID`,
+  `APPLE_MDP_APPLI` (mot de passe pour app) et `APPLE_EQUIPE` (Team ID) sont définis, fait notariser le .dmg par Apple.
+  Sur GitHub Actions : secrets du dépôt `APPLE_CERT_P12` (le .p12 en base64), `APPLE_CERT_MDP`, `APPLE_ID`,
+  `APPLE_MDP_APPLI`, `APPLE_EQUIPE`. Sans eux, la construction continue en signature ad hoc.
 - **Windows** (sur un PC) : installer **Inno Setup 6** (`winget install JRSoftware.InnoSetup`), puis `construire.bat`
   → `installateur\JarvisSetup-<version>.exe`.
 - Un Mac ne peut pas construire le .exe et un PC ne peut pas construire le .dmg. Le workflow GitHub Actions

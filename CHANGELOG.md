@@ -3,6 +3,11 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.7.1
+- **Clé SSH générée par Jarvis** : dans le connecteur « Serveur SSH (VPS) », le bouton **Générer une clé** crée une clé rien que pour Jarvis et te donne la commande à copier pour l'ajouter à ton serveur. Fini le mot de passe et le code d'authentification à chaque connexion, et la clé suit ton compte sur tous tes appareils. « Voir la clé publique » la réaffiche à tout moment. / **Jarvis generates your SSH key** and gives you the command to add it to your server; no more password or 2FA code, and it follows your account.
+- **Appli Mac signée par Apple** : Jarvis est maintenant signé avec un certificat de développeur Apple et vérifié par Apple (notarisation). Il s'ouvre sans l'avertissement « développeur non identifié », et macOS garde tes autorisations (micro, écran, accessibilité) d'une mise à jour à l'autre. Après cette mise à jour, macOS te les redemandera **une dernière fois**. / **Mac app signed and notarized by Apple**: no more warning, and permissions are kept across updates (asked one last time).
+- **Développeur affiché** : « AbdelRMB » apparaît comme éditeur de Jarvis (installateur et Applications installées de Windows, informations de l'appli sur Mac). / The publisher is now shown as **AbdelRMB**.
+
 ## 1.7.0
 - **Liste « À faire »** : dis à Jarvis « souviens-toi que je dois appeler le garage » et il l'ajoute à ta liste. Chaque tâche passe par trois étapes : à faire, en cours, fait (« j'ai commencé le rapport », « c'est fait »). Demande « qu'est-ce que j'ai prévu ? » et il te donne la liste. Nouvel écran **À faire** pour tout voir et déplacer les tâches ; la liste est la même sur tous tes appareils. / **To-do list**: tell Jarvis what you need to do, ask what you've planned, track each task (to do, in progress, done).
 - **Tickets** : signale un bug, propose une amélioration ou une idée depuis le nouvel écran **Tickets**, ou en le disant à Jarvis (« signale un bug : … »). Tu es prévenu quand le développeur répond ou change le statut. / **Tickets**: send bugs, improvements and ideas to the developer and get notified of replies.

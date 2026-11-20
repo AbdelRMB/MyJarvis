@@ -2,8 +2,8 @@
 
 - La liste des connecteurs et leurs réglages non secrets sont dans le dossier partagé (connecteurs.json) :
   ils apparaissent sur tous tes PC.
-- Les mots de passe / jetons sont dans le Gestionnaire d'identifiants Windows (keyring) de CHAQUE PC :
-  ils ne partent jamais sur OneDrive. Sur un nouveau PC, il suffit de les ressaisir une fois.
+- Les mots de passe / jetons / clés sont dans le trousseau de chaque appareil (keyring) ET dans le coffre du compte
+  (chiffré avec le mot de passe du compte, illisible par le serveur) : ils suivent l'utilisateur sur ses appareils.
 """
 import asyncio
 import email
@@ -593,6 +593,41 @@ def commande_en_lecture(commande: str) -> bool:
     return bool(morceaux) and all(_LECTURE.match(m) for m in morceaux)
 
 
+def generer_cle_ssh(commentaire: str = "jarvis") -> dict:
+    """Nouvelle paire de clés Ed25519 : la privée va dans le connecteur (puis le coffre du compte),
+    la publique est à ajouter dans ~/.ssh/authorized_keys du serveur."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    k = Ed25519PrivateKey.generate()
+    privee = k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.OpenSSH,
+                             serialization.NoEncryption()).decode()
+    return {"privee": privee, "publique": _publique(k, commentaire)}
+
+
+def _publique(k, commentaire="jarvis") -> str:
+    from cryptography.hazmat.primitives import serialization
+    return k.public_key().public_bytes(serialization.Encoding.OpenSSH,
+                                       serialization.PublicFormat.OpenSSH).decode() + f" {commentaire}"
+
+
+def cle_publique_ssh(cid: str) -> str:
+    """Clé publique correspondant à la clé privée enregistrée dans un connecteur SSH (vide s'il n'y en a pas)."""
+    from cryptography.hazmat.primitives import serialization
+    privee = secret(cid, "cle_privee").strip()
+    if not privee:
+        return ""
+    phrase = (secret(cid, "phrase_cle") or "").encode() or None
+    donnees = (privee + "\n").encode()
+    erreur = None
+    for charger in (serialization.load_ssh_private_key, serialization.load_pem_private_key):
+        for mdp in dict.fromkeys((phrase, None)):   # une phrase restée d'une ancienne clé ne doit pas bloquer
+            try:
+                return _publique(charger(donnees, password=mdp))
+            except Exception as e:
+                erreur = e
+    raise RuntimeError(str(erreur))
+
+
 class SSH(Connecteur):
     type = "ssh"
     nom = "Serveur SSH (VPS)"
@@ -606,7 +641,8 @@ class SSH(Connecteur):
         {"nom": "mode", "libelle": "Ce que Jarvis a le droit de faire", "type": "choix",
          "choix": ["confirmation", "lecture", "libre"]},
         {"nom": "cle_privee", "libelle": "Clé privée SSH", "type": "secret", "requis": False, "multiligne": True,
-         "aide": "Contenu de la clé (-----BEGIN OPENSSH PRIVATE KEY----- …). Vide : clés de cet ordinateur (~/.ssh)."},
+         "aide": "Bouton « Générer une clé » ci-dessus, ou colle une clé existante (-----BEGIN OPENSSH PRIVATE KEY----- …). "
+                 "Collée ici, elle suit ton compte sur tous tes appareils. Vide : clés de cet ordinateur (~/.ssh)."},
         {"nom": "phrase_cle", "libelle": "Phrase de passe de la clé", "type": "secret", "requis": False},
         {"nom": "mot_de_passe", "libelle": "Mot de passe", "type": "secret", "requis": False,
          "aide": "Seulement si le serveur se connecte par mot de passe (une clé est plus sûre)."},

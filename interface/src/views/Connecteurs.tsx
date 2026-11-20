@@ -1,5 +1,5 @@
 import { t } from "../lib/i18n";
-import { Blocks, CalendarDays, Check, Server, GitBranch, Loader2, Mail, NotebookPen, Plug, Plus, Power, Trash2, X, Zap } from "lucide-react";
+import { Blocks, CalendarDays, Check, Copy, KeyRound, Server, GitBranch, Loader2, Mail, NotebookPen, Plug, Plus, Power, Trash2, X, Zap } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -25,6 +25,128 @@ const ICONES: Record<string, ReactNode> = {
 };
 const icone = (n: string) => ICONES[n] ?? <Plug />;
 
+/* ---------- clé SSH : génération + guide d'installation sur le serveur ---------- */
+function BlocCommande({ texte }: { texte: string }) {
+  const [copie, setCopie] = useState(false);
+  return (
+    <div className="relative">
+      <pre className="overflow-x-auto rounded-md border border-ligne-forte bg-surface-2 p-3 pr-10 font-mono text-[12px] leading-relaxed whitespace-pre-wrap break-all">{texte}</pre>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(texte);
+          setCopie(true);
+          setTimeout(() => setCopie(false), 1500);
+        }}
+        className="absolute top-2 right-2 rounded p-1 text-doux hover:text-texte"
+        aria-label={t("Copier")}
+        title={t("Copier")}
+      >
+        {copie ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      </button>
+    </div>
+  );
+}
+
+function GuideCleSSH({
+  cid,
+  conf,
+  cleEnregistree,
+  onCle,
+}: {
+  cid: string | null;
+  conf: Record<string, string>;
+  cleEnregistree: boolean;
+  onCle: (privee: string) => void;
+}) {
+  const [publique, setPublique] = useState("");
+  const [nouvelle, setNouvelle] = useState(false);
+  const [enCours, setEnCours] = useState(false);
+
+  const generer = async () => {
+    if (cleEnregistree && !confirm(t("Une clé est déjà enregistrée. La remplacer par une nouvelle ? Il faudra ajouter la nouvelle sur le serveur.")))
+      return;
+    setEnCours(true);
+    try {
+      const r = await api<{ privee: string; publique: string }>("/api/ssh/generer-cle", { method: "POST" });
+      onCle(r.privee);
+      setPublique(r.publique);
+      setNouvelle(true);
+    } catch (e) {
+      toast((e as Error).message, "erreur");
+    } finally {
+      setEnCours(false);
+    }
+  };
+  const afficher = async () => {
+    setEnCours(true);
+    try {
+      const r = await api<{ publique: string }>(`/api/ssh/cle-publique?cid=${encodeURIComponent(cid ?? "")}`);
+      if (r.publique) setPublique(r.publique);
+      else toast(t("Aucune clé enregistrée sur cet appareil."), "erreur");
+    } catch (e) {
+      toast((e as Error).message, "erreur");
+    } finally {
+      setEnCours(false);
+    }
+  };
+
+  const hote = (conf.hote ?? "").trim();
+  const utilisateur = (conf.utilisateur ?? "").trim();
+  const port = (conf.port ?? "").trim();
+  const surServeur = `mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${publique}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`;
+  const depuisPC = hote && utilisateur ? `ssh ${port && port !== "22" ? `-p ${port} ` : ""}${utilisateur}@${hote} "${surServeur}"` : "";
+
+  return (
+    <div className="space-y-3 rounded-md border border-ligne-forte p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <KeyRound className="size-4 text-hud" />
+        <span className="text-sm font-medium">{t("Clé SSH")}</span>
+        <div className="ml-auto flex gap-2">
+          {cid && cleEnregistree && !publique && (
+            <Bouton taille="sm" variante="fantome" onClick={afficher} chargement={enCours}>
+              {t("Voir la clé publique")}
+            </Bouton>
+          )}
+          <Bouton taille="sm" onClick={generer} chargement={enCours} icone={<KeyRound className="size-3.5" />}>
+            {t("Générer une clé")}
+          </Bouton>
+        </div>
+      </div>
+      {!publique && (
+        <p className="text-[12px] text-tres-doux">
+          {t("Jarvis crée une clé rien que pour lui et te guide pour l'ajouter au serveur. Avec une clé, plus besoin de mot de passe ni de code d'authentification, et elle suit ton compte sur tous tes appareils.")}
+        </p>
+      )}
+      {publique && (
+        <ol className="list-decimal space-y-3 pl-5 text-[13px] leading-relaxed">
+          {nouvelle && <li>{t("La clé privée est dans le formulaire ci-dessous (champ « Clé privée SSH »). Elle sera enregistrée quand tu cliqueras sur « Connecter ».")}</li>}
+          <li>
+            {depuisPC ? (
+              <>
+                {t("Ajoute la clé au serveur. Dans un terminal de ce PC (PowerShell sur Windows, Terminal sur Mac), colle cette commande. Le serveur te demande une dernière fois ton mot de passe et ton code d'authentification :")}
+                <BlocCommande texte={depuisPC} />
+                <span className="mt-2 block text-tres-doux">{t("Ou, si tu es déjà connecté au serveur, colle plutôt celle-ci :")}</span>
+                <BlocCommande texte={surServeur} />
+              </>
+            ) : (
+              <>
+                {t("Connecte-toi à ton serveur comme d'habitude (mot de passe + code), puis colle cette commande :")}
+                <BlocCommande texte={surServeur} />
+                <span className="mt-1 block text-tres-doux">{t("Remplis l'adresse et l'utilisateur pour avoir aussi la commande à taper depuis ce PC.")}</span>
+              </>
+            )}
+          </li>
+          <li>{t("Clique sur « Connecter », puis sur « Tester » sur la carte du serveur.")}</li>
+          <li>
+            {t("Le serveur demande encore un code même avec la clé ? Dans /etc/ssh/sshd_config, ajoute à la fin (remplace l'utilisateur), puis lance « sudo systemctl reload ssh ». Garde ta session ouverte pendant le test pour ne pas te bloquer dehors :")}
+            <BlocCommande texte={`Match User ${utilisateur || "tonutilisateur"}\n    AuthenticationMethods publickey`} />
+          </li>
+        </ol>
+      )}
+    </div>
+  );
+}
+
 /* ---------- formulaire ---------- */
 function Editeur({
   def,
@@ -44,6 +166,7 @@ function Editeur({
   const os = useOS();
   const [conf, setConf] = useState<Record<string, string>>({ mode: "commande", ...(existant?.conf ?? {}) });
   const [secrets, setSecrets] = useState<Record<string, string>>({});
+  const [aVider, setAVider] = useState<string[]>([]);   // secrets à effacer (ex. phrase de l'ancienne clé)
   const [envoi, setEnvoi] = useState(false);
   const visible = (c: ChampDef) =>
     def.type !== "mcp" || (conf.mode === "url" ? !["commande", "env"].includes(c.nom) : !["url", "entete"].includes(c.nom));
@@ -57,7 +180,7 @@ function Editeur({
     try {
       const r = await api<Installe>(`/api/connecteurs/${encodeURIComponent(id)}`, {
         method: "POST",
-        json: { type: def.type, conf, secrets: Object.fromEntries(Object.entries(secrets).filter(([, v]) => v !== "")), actif: true },
+        json: { type: def.type, conf, secrets: Object.fromEntries(Object.entries(secrets).filter(([k, v]) => v !== "" || aVider.includes(k))), actif: true },
       });
       if (r.erreur) toast(r.erreur, "erreur");
       else toast(`${def.nom} connecté — ${r.outils.length} outil(s) ajouté(s) à Jarvis.`, "succes");
@@ -82,6 +205,18 @@ function Editeur({
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           <p className="text-sm text-doux">{def.description}</p>
           {def.aide && <div className="rounded-md border border-hud/25 bg-hud/5 p-3 text-[13px] leading-relaxed whitespace-pre-wrap text-hud-clair">{def.aide}</div>}
+          {def.type === "ssh" && (
+            <GuideCleSSH
+              cid={cid}
+              conf={conf}
+              cleEnregistree={!!existant?.secrets.cle_privee}
+              onCle={(privee) => {
+                // nouvelle clé sans phrase de passe : on efface celle d'une éventuelle ancienne clé
+                setSecrets((s) => ({ ...s, cle_privee: privee, phrase_cle: "" }));
+                setAVider((v) => [...v, "phrase_cle"]);
+              }}
+            />
+          )}
           {def.champs.filter(visible).map((c) => (
             <label key={c.nom} className="block">
               <span className="mb-1.5 block text-sm">

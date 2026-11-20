@@ -2,6 +2,21 @@
 # Recette PyInstaller de l'application Jarvis : .venv\Scripts\pyinstaller jarvis.spec --noconfirm
 # Produit dist\Jarvis\Jarvis.exe (dossier complet, sans console), ensuite empaqueté par installateur.iss.
 from PyInstaller.utils.hooks import collect_all, collect_submodules
+from PyInstaller.utils.win32.versioninfo import (FixedFileInfo, StringFileInfo, StringStruct, StringTable,
+                                                 VarFileInfo, VarStruct, VSVersionInfo)
+
+VERSION = open("jarvis/version.py", encoding="utf-8").read().split('VERSION = "')[1].split('"')[0]
+DEVELOPPEUR = "AbdelRMB"
+_v = tuple(int(x) for x in (VERSION.split(".") + ["0", "0", "0"])[:4])
+# Clic droit › Propriétés › Détails de Jarvis.exe : société, copyright, version
+INFOS_VERSION = VSVersionInfo(
+    ffi=FixedFileInfo(filevers=_v, prodvers=_v),
+    kids=[StringFileInfo([StringTable("040C04B0", [
+        StringStruct("CompanyName", DEVELOPPEUR), StringStruct("FileDescription", "Jarvis"),
+        StringStruct("FileVersion", VERSION), StringStruct("InternalName", "Jarvis"),
+        StringStruct("LegalCopyright", f"© {DEVELOPPEUR}"), StringStruct("OriginalFilename", "Jarvis.exe"),
+        StringStruct("ProductName", "Jarvis"), StringStruct("ProductVersion", VERSION)])]),
+          VarFileInfo([VarStruct("Translation", [0x040C, 1200])])])
 
 datas = [("jarvis/static", "jarvis/static"), ("voix", "voix"), ("jarvis.ico", ".")]
 binaries = []
@@ -38,6 +53,6 @@ exe = EXE(
     name="Jarvis",
     icon="jarvis.ico",
     console=False,          # pas de fenêtre noire
-    version=None,
+    version=INFOS_VERSION,
 )
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="Jarvis")

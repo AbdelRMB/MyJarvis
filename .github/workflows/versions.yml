@@ -73,10 +73,36 @@ jobs:
         with: { python-version: "3.12" }
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
+      # Signature Developer ID + notarisation, si les secrets du dépôt sont définis (sinon : signature ad hoc).
+      # Secrets : APPLE_CERT_P12 (certificat « Developer ID Application » exporté en .p12, encodé en base64),
+      # APPLE_CERT_MDP (mot de passe du .p12), APPLE_ID, APPLE_MDP_APPLI (mot de passe pour app), APPLE_EQUIPE (Team ID).
+      - name: Certificat Apple
+        env:
+          CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+          CERT_MDP: ${{ secrets.APPLE_CERT_MDP }}
+        run: |
+          if [ -z "$CERT_P12" ]; then echo "Pas de certificat dans les secrets : signature ad hoc."; exit 0; fi
+          TROUSSEAU="$RUNNER_TEMP/jarvis.keychain-db"
+          MDP=$(openssl rand -hex 16)
+          security create-keychain -p "$MDP" "$TROUSSEAU"
+          security set-keychain-settings -lut 21600 "$TROUSSEAU"
+          security unlock-keychain -p "$MDP" "$TROUSSEAU"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -P "$CERT_MDP" -A -t cert -f pkcs12 -k "$TROUSSEAU"
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MDP" "$TROUSSEAU" >/dev/null
+          security list-keychains -d user -s "$TROUSSEAU" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$TROUSSEAU"
       - name: Construire et publier le .dmg
         env:
           PYTHON: python
           GH_TOKEN: ${{ github.token }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_MDP_APPLI: ${{ secrets.APPLE_MDP_APPLI }}
+          APPLE_EQUIPE: ${{ secrets.APPLE_EQUIPE }}
         run: |
           bash construire-mac.sh
           .venv-mac/bin/python publier.py "installateur/Jarvis-${{ needs.version.outputs.version }}-mac-$(uname -m).dmg"
+      - name: Retirer le certificat
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/jarvis.keychain-db" 2>/dev/null || true

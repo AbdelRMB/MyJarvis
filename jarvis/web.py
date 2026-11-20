@@ -448,6 +448,21 @@ def liste_connecteurs(req: Request):
     return {"catalogue": connecteurs.catalogue(), "installes": connecteurs.etat()}
 
 
+@app.post("/api/ssh/generer-cle")
+def generer_cle_ssh(req: Request):
+    _verifier(req)
+    return connecteurs.generer_cle_ssh()
+
+
+@app.get("/api/ssh/cle-publique")
+def cle_publique_ssh(cid: str, req: Request):
+    _verifier(req)
+    try:
+        return {"publique": connecteurs.cle_publique_ssh(cid)}
+    except Exception as e:
+        raise HTTPException(400, f"Clé enregistrée illisible : {e}"[:300])
+
+
 @app.post("/api/connecteurs/{cid:path}/tester")
 async def tester_connecteur(cid: str, req: Request):
     _verifier(req)

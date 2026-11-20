@@ -39,7 +39,19 @@ xattr -cr "$SORTIE/dist/Jarvis.app"   # retire les attributs Finder (sinon codes
 # Choix : $JARVIS_SIGNATURE, sinon Developer ID Application, sinon Apple Development, sinon ad hoc.
 IDENTITE=${JARVIS_SIGNATURE:-$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application[^"]*"' | head -1 | tr -d '"' || true)}
 [ -n "$IDENTITE" ] || IDENTITE=$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Apple Development[^"]*"' | head -1 | tr -d '"' || true)
-if [ -n "$IDENTITE" ]; then
+if [[ "$IDENTITE" == "Developer ID Application"* ]]; then
+  # Distribution : runtime renforcé + horodatage (exigés par la notarisation Apple). On signe d'abord chaque
+  # binaire intérieur (.so, .dylib, exécutables), puis les frameworks, puis l'appli elle-même.
+  echo "    signature : $IDENTITE (runtime renforcé)"
+  APP="$SORTIE/dist/Jarvis.app"
+  SIGNER=(codesign --force --timestamp --options runtime --entitlements entitlements.plist --sign "$IDENTITE")
+  find "$APP/Contents" -type f \( -perm -u+x -o -name "*.so" -o -name "*.dylib" \) -print0 |
+    while IFS= read -r -d '' f; do
+      if file -b "$f" | grep -q "Mach-O"; then "${SIGNER[@]}" "$f"; fi
+    done
+  find "$APP/Contents" -type d -name "*.framework" -print0 | while IFS= read -r -d '' f; do "${SIGNER[@]}" "$f"; done
+  "${SIGNER[@]}" "$APP"
+elif [ -n "$IDENTITE" ]; then
   echo "    signature : $IDENTITE"
   codesign --force --deep --sign "$IDENTITE" --entitlements entitlements.plist "$SORTIE/dist/Jarvis.app"
 else
@@ -59,6 +71,23 @@ ln -s /Applications "$TMP/Applications"
 rm -f "$DMG"
 hdiutil create -volname "Jarvis" -srcfolder "$TMP" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$TMP"
+
+# Notarisation Apple (seulement avec un certificat Developer ID et les identifiants Apple) : le .dmg s'ouvre
+# alors sans avertissement « développeur non identifié » sur n'importe quel Mac.
+if [[ "$IDENTITE" == "Developer ID Application"* && -n "${APPLE_ID:-}" && -n "${APPLE_MDP_APPLI:-}" && -n "${APPLE_EQUIPE:-}" ]]; then
+  echo "    notarisation par Apple (quelques minutes)..."
+  codesign --force --timestamp --sign "$IDENTITE" "$DMG"
+  xcrun notarytool submit "$DMG" --apple-id "$APPLE_ID" --password "$APPLE_MDP_APPLI" --team-id "$APPLE_EQUIPE" --wait     | tee "$SORTIE/notarisation.txt"
+  if ! grep -q "status: Accepted" "$SORTIE/notarisation.txt"; then
+    ID=$(grep -m1 -o 'id: [0-9a-f-]*' "$SORTIE/notarisation.txt" | cut -d' ' -f2)
+    [ -n "$ID" ] && xcrun notarytool log "$ID" --apple-id "$APPLE_ID" --password "$APPLE_MDP_APPLI" --team-id "$APPLE_EQUIPE" || true
+    echo "Notarisation refusée (détails ci-dessus)."; exit 1
+  fi
+  xcrun stapler staple "$DMG"
+  echo "    notarisé ✓"
+elif [[ "$IDENTITE" == "Developer ID Application"* ]]; then
+  echo "    (pas de notarisation : APPLE_ID, APPLE_MDP_APPLI ou APPLE_EQUIPE manquant)"
+fi
 echo
 echo "Terminé : $DMG"
 echo "Installe-le : ouvre le .dmg, glisse Jarvis dans Applications, puis clic droit > Ouvrir la première fois."

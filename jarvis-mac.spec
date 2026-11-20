@@ -51,6 +51,7 @@ app = BUNDLE(
         "CFBundleName": "Jarvis",
         "CFBundleDisplayName": "Jarvis",
         "CFBundleShortVersionString": VERSION,
+        "NSHumanReadableCopyright": "© AbdelRMB",
         "LSUIElement": True,                     # icône dans la barre des menus, pas dans le Dock
         "LSMinimumSystemVersion": "12.0",
         "NSHighResolutionCapable": True,
