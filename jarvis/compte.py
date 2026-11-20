@@ -567,6 +567,11 @@ def traiter_ticket(tid: int, statut: str = "", reponse=None):
     return _appel("PATCH", f"/v1/admin/tickets/{int(tid)}", json=corps)
 
 
+def statistiques(jours: int = 30) -> dict:
+    """(Administrateur) Statistiques d'utilisation de l'appli : comptes, activité, appareils, versions."""
+    return _appel("GET", "/v1/admin/stats", params={"jours": int(jours)})
+
+
 def supprimer_ticket(tid: int):
     return _appel("DELETE", f"/v1/admin/tickets/{int(tid)}")
 

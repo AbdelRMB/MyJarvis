@@ -708,6 +708,78 @@ def supprimer_ticket(tid: int, uid: int = Depends(_admin)):
     return {"ok": True}
 
 
+@app.get("/v1/admin/stats")
+def statistiques(jours: int = 30, uid: int = Depends(_admin)):
+    """Statistiques d'utilisation de l'appli (administrateurs) : comptes, activité, appareils, versions.
+    Aucun contenu (messages, souvenirs) : seulement des comptes et des dates."""
+    jours = max(7, min(int(jours), 180))
+    t = time.time()
+    debut = t - jours * 86400
+    jour_debut = time.strftime("%Y-%m-%d", time.localtime(debut))
+    # demande = ligne d'historique qui n'est pas une réponse de Jarvis (« [HH:MM] Jarvis: … »)
+    pas_jarvis = "substr(ligne, 9, 7) != 'Jarvis:'"
+    with db() as c:
+        un = lambda sql, *a: c.execute(sql, a).fetchone()[0] or 0   # noqa: E731
+        # dernière activité d'un compte : présence d'un appareil ou utilisation d'une session
+        vu_sql = ("SELECT u.id, MAX(COALESCE((SELECT MAX(vu) FROM appareils a WHERE a.utilisateur = u.id), 0), "
+                  "COALESCE((SELECT MAX(vu) FROM sessions s WHERE s.utilisateur = u.id), 0)) AS vu FROM utilisateurs u")
+        vus = [r["vu"] for r in c.execute(vu_sql)]
+        resume = {
+            "comptes": un("SELECT COUNT(*) FROM utilisateurs"),
+            "nouveaux_7j": un("SELECT COUNT(*) FROM utilisateurs WHERE cree > ?", t - 7 * 86400),
+            "nouveaux_periode": un("SELECT COUNT(*) FROM utilisateurs WHERE cree > ?", debut),
+            "actifs_24h": sum(v > t - 86400 for v in vus),
+            "actifs_7j": sum(v > t - 7 * 86400 for v in vus),
+            "actifs_30j": sum(v > t - 30 * 86400 for v in vus),
+            "appareils": un("SELECT COUNT(*) FROM appareils WHERE vu > ?", t - 30 * 86400),
+            "en_ligne": un("SELECT COUNT(*) FROM appareils WHERE vu > ?", t - EN_LIGNE),
+            "demandes_periode": un(f"SELECT COUNT(*) FROM historique WHERE jour >= ? AND {pas_jarvis}", jour_debut),
+            "souvenirs": un("SELECT COUNT(*) FROM faits WHERE supprime = 0"),
+            "ordres_periode": un("SELECT COUNT(*) FROM ordres WHERE cree > ?", debut),
+            "tickets_ouverts": un("SELECT COUNT(*) FROM tickets WHERE statut NOT IN ('resolu', 'ferme')"),
+        }
+        # séries par jour (les jours sans rien valent 0)
+        jours_liste = [time.strftime("%Y-%m-%d", time.localtime(t - i * 86400)) for i in range(jours - 1, -1, -1)]
+        def serie(sql, *a):
+            d = {r[0]: r[1] for r in c.execute(sql, a)}
+            return [d.get(j, 0) for j in jours_liste]
+        par_jour = {
+            "jours": jours_liste,
+            "inscriptions": serie("SELECT date(cree, 'unixepoch', 'localtime') j, COUNT(*) FROM utilisateurs "
+                                  "WHERE cree > ? GROUP BY j", debut),
+            "utilisateurs_actifs": serie(f"SELECT jour, COUNT(DISTINCT utilisateur) FROM historique WHERE jour >= ? "
+                                         f"AND {pas_jarvis} GROUP BY jour", jour_debut),
+            "demandes": serie(f"SELECT jour, COUNT(*) FROM historique WHERE jour >= ? AND {pas_jarvis} GROUP BY jour",
+                              jour_debut),
+            "ordres": serie("SELECT date(cree, 'unixepoch', 'localtime') j, COUNT(*) FROM ordres WHERE cree > ? "
+                            "GROUP BY j", debut),
+        }
+        recents = "FROM appareils WHERE vu > ? AND plateforme != ''"
+        repartition = {
+            "plateformes": [dict(r) for r in c.execute(
+                f"SELECT plateforme AS nom, COUNT(*) AS n {recents} GROUP BY plateforme ORDER BY n DESC", (t - 30 * 86400,))],
+            "versions": [dict(r) for r in c.execute(
+                f"SELECT version AS nom, COUNT(*) AS n {recents} AND version != '' GROUP BY version", (t - 30 * 86400,))],
+            "tickets": [dict(r) for r in c.execute("SELECT statut AS nom, COUNT(*) AS n FROM tickets GROUP BY statut")],
+        }
+        repartition["versions"].sort(key=lambda r: [int(x) if x.isdigit() else 0 for x in r["nom"].split(".")], reverse=True)
+        comptes = [dict(r) for r in c.execute(
+            "SELECT u.id, u.prenom, u.email, u.cree, u.admin, "
+            "MAX(COALESCE((SELECT MAX(vu) FROM appareils a WHERE a.utilisateur = u.id), 0), "
+            "    COALESCE((SELECT MAX(vu) FROM sessions s WHERE s.utilisateur = u.id), 0)) AS vu, "
+            "(SELECT COUNT(*) FROM sessions s WHERE s.utilisateur = u.id) AS appareils, "
+            "(SELECT GROUP_CONCAT(DISTINCT a.plateforme) FROM appareils a WHERE a.utilisateur = u.id AND a.plateforme != '') AS plateformes, "
+            "(SELECT a.version FROM appareils a WHERE a.utilisateur = u.id AND a.version != '' ORDER BY a.vu DESC LIMIT 1) AS version, "
+            "(SELECT COUNT(*) FROM faits f WHERE f.utilisateur = u.id AND f.supprime = 0) AS souvenirs, "
+            f"(SELECT COUNT(*) FROM historique h WHERE h.utilisateur = u.id AND h.jour >= ? AND {pas_jarvis}) AS demandes "
+            "FROM utilisateurs u ORDER BY vu DESC LIMIT 1000", (jour_debut,))]
+    for u in comptes:
+        u["admin"] = bool(u["admin"])
+        u["en_ligne"] = t - (u["vu"] or 0) < EN_LIGNE
+    return {"genere": t, "periode": jours, "resume": resume, "par_jour": par_jour, "repartition": repartition,
+            "comptes": comptes}
+
+
 @app.get("/v1/sante")
 def sante():
     return {"ok": True}

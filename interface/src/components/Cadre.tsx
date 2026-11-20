@@ -21,6 +21,8 @@ import {
   Laptop,
   ListChecks,
   LifeBuoy,
+  ChartColumnBig,
+  ChevronDown,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { micro } from "../audio/micro";
@@ -49,7 +51,19 @@ const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
   { id: "reglages", libelle: t("Réglages"), icone: Settings },
   { id: "majs", libelle: t("Mises à jour"), icone: Download },
   { id: "tickets", libelle: t("Tickets"), icone: LifeBuoy },
+  { id: "stats", libelle: t("Statistiques"), icone: ChartColumnBig },
 ];
+
+/** Sections de la barre latérale (la première n'a pas de titre). */
+const GROUPES: { id: string; libelle: string; vues: Vue[]; admin?: boolean }[] = [
+  { id: "principal", libelle: "", vues: ["assistant", "afaire"] },
+  { id: "memoire", libelle: t("Ma mémoire"), vues: ["historique", "memoire"] },
+  { id: "automatiser", libelle: t("Automatiser"), vues: ["taches", "automatisations", "connecteurs"] },
+  { id: "machines", libelle: t("Mes machines"), vues: ["appareils", "systeme", "activite", "arsenal"] },
+  { id: "jarvis", libelle: t("Jarvis"), vues: ["reglages", "majs", "tickets"] },
+  { id: "admin", libelle: t("Administration"), vues: ["stats"], admin: true },
+];
+const PAR_ID = Object.fromEntries(NAV.map((n) => [n.id, n])) as Record<Vue, (typeof NAV)[number]>;
 
 function MiniReacteur({ actif }: { actif: boolean }) {
   return (
@@ -61,8 +75,8 @@ function MiniReacteur({ actif }: { actif: boolean }) {
   );
 }
 
-export function BarreLaterale() {
-  const { vue, menuReduit, maj } = useReglages();
+export function BarreLaterale({ admin = false }: { admin?: boolean }) {
+  const { vue, menuReduit, groupesFermes, maj } = useReglages();
   const connecte = useJarvis((s) => s.connecte);
   const occupe = useJarvis((s) => s.occupe);
   const nom = useJarvis((s) => s.session?.nom ?? "");
@@ -86,25 +100,51 @@ export function BarreLaterale() {
         )}
       </div>
 
-      <ul className="flex-1 space-y-1 p-2.5">
-        {NAV.map(({ id, libelle, icone: I }) => (
-          <li key={id}>
-            <button
-              onClick={() => maj({ vue: id })}
-              title={libelle}
-              className={cx(
-                "group relative flex h-10 w-full items-center gap-3 rounded-md text-sm transition-colors",
-                menuReduit ? "justify-center" : "px-3",
-                vue === id ? "bg-hud/12 text-hud" : "text-doux hover:bg-white/[0.04] hover:text-texte",
+      <div className="flex-1 overflow-y-auto p-2.5">
+        {GROUPES.filter((g) => !g.admin || admin).map((g, i) => {
+          // une section qui contient l'écran ouvert reste dépliée
+          const ouvert = !g.libelle || menuReduit || !groupesFermes.includes(g.id) || g.vues.includes(vue);
+          return (
+            <div key={g.id} className={cx(i > 0 && (menuReduit ? "mt-2 border-t border-ligne pt-2" : "mt-3"))}>
+              {g.libelle && !menuReduit && (
+                <button
+                  onClick={() => maj({ groupesFermes: groupesFermes.includes(g.id) ? groupesFermes.filter((x) => x !== g.id) : [...groupesFermes, g.id] })}
+                  aria-expanded={ouvert}
+                  className="flex h-7 w-full items-center gap-2 px-3 text-[10px] font-semibold tracking-[0.18em] text-tres-doux uppercase hover:text-doux"
+                >
+                  {g.libelle}
+                  <ChevronDown className={cx("ml-auto size-3.5 transition-transform", !ouvert && "-rotate-90")} />
+                </button>
               )}
-            >
-              {vue === id && <span className="absolute inset-y-2 left-0 w-0.5 rounded bg-hud shadow-glow" />}
-              <I className="size-[18px] flex-none" />
-              {!menuReduit && libelle}
-            </button>
-          </li>
-        ))}
-      </ul>
+              {ouvert && (
+                <ul className="space-y-0.5">
+                  {g.vues.map((id) => {
+                    const { libelle, icone: I } = PAR_ID[id];
+                    return (
+                      <li key={id}>
+                        <button
+                          onClick={() => maj({ vue: id })}
+                          title={libelle}
+                          aria-current={vue === id ? "page" : undefined}
+                          className={cx(
+                            "group relative flex h-9 w-full items-center gap-3 rounded-md text-sm transition-colors",
+                            menuReduit ? "justify-center" : "px-3",
+                            vue === id ? "bg-hud/12 text-hud" : "text-doux hover:bg-white/[0.04] hover:text-texte",
+                          )}
+                        >
+                          {vue === id && <span className="absolute inset-y-2 left-0 w-0.5 rounded bg-hud shadow-glow" />}
+                          <I className="size-[18px] flex-none" />
+                          {!menuReduit && libelle}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       <div className={cx("space-y-2 border-t border-ligne p-4", menuReduit && "flex flex-col items-center px-2")}>
         {menuReduit ? (
@@ -138,7 +178,7 @@ export function NavMobile() {
   const { vue, maj } = useReglages();
   return (
     <nav className="flex border-t border-ligne bg-surface md:hidden">
-      {NAV.filter((n) => !["arsenal", "activite", "tickets"].includes(n.id)).map(({ id, libelle, icone: I }) => (
+      {NAV.filter((n) => !["arsenal", "activite", "tickets", "stats"].includes(n.id)).map(({ id, libelle, icone: I }) => (
         <button
           key={id}
           onClick={() => maj({ vue: id })}

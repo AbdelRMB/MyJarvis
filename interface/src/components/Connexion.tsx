@@ -8,7 +8,7 @@ import { useJarvis } from "../stores/jarvis";
 import { toast } from "../stores/toasts";
 import { Bouton, Champ } from "./ui";
 
-export type Compte = { connecte: boolean; mode: "" | "local" | "en_ligne"; email: string; prenom: string; serveur: string; machine: string };
+export type Compte = { connecte: boolean; mode: "" | "local" | "en_ligne"; email: string; prenom: string; serveur: string; machine: string; admin?: boolean };
 type Reponse = Compte & { import?: { faits: number; lignes: number; erreur?: string } | null };
 
 /** Écran affiché tant que personne n'est connecté : chaque utilisateur a sa mémoire, sa clé, ses connecteurs. */

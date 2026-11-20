@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 export type ModeMicro = "ptt" | "auto" | "eveil";
-export type Vue = "assistant" | "historique" | "memoire" | "connecteurs" | "activite" | "arsenal" | "systeme" | "reglages" | "majs" | "automatisations" | "taches" | "appareils" | "afaire" | "tickets";
+export type Vue = "assistant" | "historique" | "memoire" | "connecteurs" | "activite" | "arsenal" | "systeme" | "reglages" | "majs" | "automatisations" | "taches" | "appareils" | "afaire" | "tickets" | "stats";
 
 export type Reglages = {
   mode: ModeMicro;
@@ -26,6 +26,7 @@ export type Reglages = {
   animations: "completes" | "legeres" | "aucunes";
   langue: string;
   menuReduit: boolean;
+  groupesFermes: string[]; // sections de la barre latérale repliées
   vue: Vue;
 };
 
@@ -51,6 +52,7 @@ export const DEFAUT: Reglages = {
   animations: "legeres",
   langue: "fr",
   menuReduit: false,
+  groupesFermes: [],
   vue: "assistant",
 };
 

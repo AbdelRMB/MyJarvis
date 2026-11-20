@@ -30,8 +30,9 @@ import { VueMisesAJour } from "./views/MisesAJour";
 import { VueSysteme } from "./views/Systeme";
 import { VueAFaire } from "./views/AFaire";
 import { VueTickets } from "./views/Tickets";
+import { VueStats } from "./views/Stats";
 
-const VUES: Vue[] = ["assistant", "afaire", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "appareils", "systeme", "reglages", "majs", "tickets"];
+const VUES: Vue[] = ["assistant", "afaire", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "appareils", "systeme", "reglages", "majs", "tickets", "stats"];
 
 function useRaccourcis() {
   useEffect(() => {
@@ -155,7 +156,7 @@ export default function App() {
       {compte && (compte.connecte || compte.mode === "local") && FENETRE_BUREAU && <BandeauAutorisations />}
       {!demarre && !FENETRE_BUREAU && <Demarrage pret={!!session} erreur={erreur} nbOutils={session?.nb_outils ?? 0} onDemarrer={demarrer} />}
       <div className="flex min-h-0 flex-1">
-        <BarreLaterale />
+        <BarreLaterale admin={!!compte?.admin} />
         <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <BarreHaut />
           <div className="min-h-0 flex-1">
@@ -174,6 +175,7 @@ export default function App() {
             {vue === "appareils" && <VueAppareils />}
             {vue === "afaire" && <VueAFaire />}
             {vue === "tickets" && <VueTickets />}
+            {vue === "stats" && (compte?.admin ? <VueStats /> : <VueAssistant />)}
             </GardeVue>
           </div>
         </main>
