@@ -36,6 +36,8 @@ SERVEUR_DEFAUT = "https://jarvis.abdelrahimriche.com"
 # qu'un 404. Ce n'est qu'un filtre : la vraie protection, ce sont le mot de passe du compte et le chiffrement.
 CLE_APPLI_DEFAUT = "5l4xUaEzf2zcv9N56ZrvDH6Lo8MGCGgwqtTcnzeiK-w"   # serveur officiel ; autre serveur : "cle_appli" dans config.json
 ETAT_FICHIER = RACINE / "compte.json"
+# Version de la politique de confidentialité acceptée en créant un compte (même valeur que POLITIQUE dans serveur/app.py)
+POLITIQUE = "2026-11-21"
 SERVICE = "Jarvis"
 _verrou = threading.RLock()
 _coffre: dict = {}            # secrets déchiffrés (en mémoire seulement)
@@ -187,7 +189,8 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
     _definir_secret_local("compte:cle_coffre", base64.b64encode(cle_coffre).decode())
     venait_du_local = etat().get("mode_precedent") == "local"
     e = {"mode": "en_ligne", "id": reponse["id"], "email": reponse["email"], "prenom": reponse.get("prenom", ""),
-         "serveur": serveur()}
+         "serveur": serveur(), "politique": reponse.get("politique", ""),
+         "politique_actuelle": reponse.get("politique_actuelle", "")}
     importe = [] if venait_du_local else etat().get("importe", [])   # du local vers le compte : tout part
     e["importe"] = importe
     _sauver_etat(e)
@@ -218,12 +221,14 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
     return resultat
 
 
-def inscrire(email: str, mot_de_passe: str, prenom: str) -> dict:
+def inscrire(email: str, mot_de_passe: str, prenom: str, politique_acceptee: bool = False) -> dict:
+    if not politique_acceptee:
+        raise ErreurCompte("Accepte la politique de confidentialité pour créer ton compte.")
     if len(mot_de_passe) < 8:
         raise ErreurCompte("Mot de passe trop court (8 caractères minimum).")
     cle_auth, cle_coffre = _deriver(email, mot_de_passe)
     r = _appel("POST", "/v1/inscription", json={"email": email, "cle_auth": cle_auth, "prenom": prenom,
-                                                "appareil": MACHINE})
+                                                "appareil": MACHINE, "politique": POLITIQUE})
     return _ouvrir(r, email, cle_coffre, nouveau=True)
 
 
@@ -253,6 +258,50 @@ def deconnecter():
     e = etat()
     _sauver_etat({"importe": e.get("importe", [])})   # retour à l'écran de choix (en ligne ou local)
     activer_dossiers()
+
+
+# ---------- confidentialité : politique, export, suppression du compte ----------
+def politique_a_accepter() -> bool:
+    """Vrai si le serveur a une politique plus récente que celle acceptée par ce compte."""
+    e = etat()
+    return connecte() and bool(e.get("politique_actuelle")) and e.get("politique") != e.get("politique_actuelle")
+
+
+def accepter_politique():
+    p = _appel("POST", "/v1/moi/politique")
+    e = etat()
+    e.update(politique=p.get("politique", ""), politique_actuelle=p.get("politique_actuelle", ""))
+    _sauver_etat(e)
+
+
+def exporter_donnees() -> Path:
+    """Écrit toutes les données du compte dans un fichier JSON (Téléchargements) et renvoie son chemin."""
+    from datetime import datetime
+    donnees = _appel("GET", "/v1/moi/export", timeout=120)
+    dossier_dl = Path.home() / "Downloads"
+    if not dossier_dl.is_dir():
+        dossier_dl = Path.home()
+    f = dossier_dl / f"jarvis-mes-donnees-{datetime.now():%Y-%m-%d-%H%M}.json"
+    f.write_text(json.dumps(donnees, ensure_ascii=False, indent=1), encoding="utf-8")
+    return f
+
+
+def supprimer_compte(mot_de_passe: str):
+    """Supprime définitivement le compte et toutes ses données sur le serveur, puis sur cet appareil."""
+    import shutil
+    e = etat()
+    if not connecte():
+        raise ErreurCompte("Aucun compte connecté.")
+    cle_auth, _ = _deriver(e.get("email", ""), mot_de_passe)
+    try:
+        _appel("POST", "/v1/moi/supprimer", json={"cle_auth": cle_auth})
+    except ErreurCompte as x:
+        if x.statut == 403:
+            raise ErreurCompte("Mot de passe incorrect.") from x
+        raise
+    cache = dossier(e.get("id"))
+    deconnecter()   # la session n'existe déjà plus : retire les secrets de cet appareil
+    shutil.rmtree(cache, ignore_errors=True)   # copie locale de la mémoire et de l'historique de ce compte
 
 
 # ---------- coffre ----------
@@ -508,9 +557,11 @@ def synchroniser() -> dict:
             if e.statut != 404:
                 raise
         moi = _appel("GET", "/v1/moi")
-        if bool(moi.get("admin")) != bool(etat().get("admin")):
-            e = etat()
-            e["admin"] = bool(moi.get("admin"))
+        e = etat()
+        nouveau = {"admin": bool(moi.get("admin")), "politique": moi.get("politique", ""),
+                   "politique_actuelle": moi.get("politique_actuelle", "")}
+        if any(e.get(k) != v for k, v in nouveau.items()):
+            e.update(nouveau)
             _sauver_etat(e)
         _surveiller_tickets(bool(moi.get("admin")))
         if moi.get("prenom") and moi["prenom"] != CONFIG.get("nom_utilisateur"):

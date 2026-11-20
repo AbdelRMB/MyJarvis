@@ -91,6 +91,7 @@ def _connexion():
     c.row_factory = sqlite3.Row
     c.execute("PRAGMA foreign_keys = ON")
     c.execute("PRAGMA journal_mode = WAL")
+    c.execute("PRAGMA secure_delete = ON")   # données supprimées réellement effacées du fichier (RGPD)
     return c
 
 
@@ -102,6 +103,10 @@ with _connexion() as _c:
     # administrateurs : voient et traitent les tickets de tous les utilisateurs (mis à 1 à la main dans la base)
     if "admin" not in [r[1] for r in _c.execute("PRAGMA table_info(utilisateurs)")]:
         _c.execute("ALTER TABLE utilisateurs ADD COLUMN admin INTEGER NOT NULL DEFAULT 0")
+    # politique de confidentialité : version acceptée et date (preuve du consentement)
+    if "politique" not in [r[1] for r in _c.execute("PRAGMA table_info(utilisateurs)")]:
+        _c.execute("ALTER TABLE utilisateurs ADD COLUMN politique TEXT NOT NULL DEFAULT ''")
+        _c.execute("ALTER TABLE utilisateurs ADD COLUMN politique_acceptee REAL NOT NULL DEFAULT 0")
     # souvenirs : identifiant stable, date de dernière action, suppression conservée (« pierre tombale »)
     colonnes = [r[1] for r in _c.execute("PRAGMA table_info(faits)")]
     for col, decl in (("fid", "TEXT"), ("modifie", "REAL NOT NULL DEFAULT 0"), ("supprime", "INTEGER NOT NULL DEFAULT 0"),
@@ -186,11 +191,17 @@ def _ouvrir_session(c, uid: int, appareil: str) -> str:
 
 
 # ---------- comptes ----------
+# Version de la politique de confidentialité (mobile/confidentialite.html) : la changer quand le texte change
+# de façon importante, pour que chaque utilisateur l'accepte à nouveau dans l'appli.
+POLITIQUE = "2026-11-21"
+
+
 class Inscription(BaseModel):
     email: str = Field(min_length=3, max_length=200)
     cle_auth: str = Field(min_length=32, max_length=200)
     prenom: str = Field("", max_length=60)
     appareil: str = Field("", max_length=80)
+    politique: str = Field("", max_length=20)   # version acceptée en cochant la case (vide : ancienne appli)
 
 
 class Connexion(BaseModel):
@@ -199,10 +210,15 @@ class Connexion(BaseModel):
     appareil: str = Field("", max_length=80)
 
 
+class CleAuth(BaseModel):
+    cle_auth: str = Field(min_length=32, max_length=200)
+
+
 def _profil(c, uid):
-    u = c.execute("SELECT id, email, prenom, coffre, revision, admin FROM utilisateurs WHERE id = ?", (uid,)).fetchone()
+    u = c.execute("SELECT id, email, prenom, coffre, revision, admin, politique FROM utilisateurs WHERE id = ?",
+                  (uid,)).fetchone()
     return {"id": u["id"], "email": u["email"], "prenom": u["prenom"], "coffre": u["coffre"], "revision": u["revision"],
-            "admin": bool(u["admin"])}
+            "admin": bool(u["admin"]), "politique": u["politique"], "politique_actuelle": POLITIQUE}
 
 
 @app.post("/v1/inscription")
@@ -215,8 +231,10 @@ def inscription(d: Inscription, req: Request):
     with db() as c:
         if c.execute("SELECT 1 FROM utilisateurs WHERE email = ?", (email,)).fetchone():
             raise HTTPException(409, "Un compte existe déjà avec cette adresse.")
-        uid = c.execute("INSERT INTO utilisateurs (email, prenom, auth_sel, auth_hash, cree) VALUES (?, ?, ?, ?, ?)",
-                        (email, d.prenom.strip(), sel, _hacher(d.cle_auth, sel), time.time())).lastrowid
+        uid = c.execute("INSERT INTO utilisateurs (email, prenom, auth_sel, auth_hash, cree, politique, politique_acceptee) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (email, d.prenom.strip(), sel, _hacher(d.cle_auth, sel), time.time(), d.politique,
+                         time.time() if d.politique else 0)).lastrowid
         return {"jeton": _ouvrir_session(c, uid, d.appareil), **_profil(c, uid)}
 
 
@@ -238,6 +256,55 @@ def connexion(d: Connexion, req: Request):
 def deconnexion(authorization: str = Header("")):
     with db() as c:
         c.execute("DELETE FROM sessions WHERE jeton_hash = ?", (_empreinte(authorization.removeprefix("Bearer ").strip()),))
+    return {"ok": True}
+
+
+# ---------- confidentialité (RGPD) : consentement, export, suppression ----------
+@app.post("/v1/moi/politique")
+def accepter_politique(uid: int = Depends(utilisateur)):
+    """L'utilisateur accepte la version actuelle de la politique de confidentialité."""
+    with db() as c:
+        c.execute("UPDATE utilisateurs SET politique = ?, politique_acceptee = ? WHERE id = ?", (POLITIQUE, time.time(), uid))
+        return _profil(c, uid)
+
+
+@app.get("/v1/moi/export")
+def exporter_mes_donnees(uid: int = Depends(utilisateur)):
+    """Toutes les données du compte (droit d'accès et de portabilité). Le coffre reste chiffré : seule l'appli,
+    avec le mot de passe, peut le lire ; elle n'en exporte pas le contenu."""
+    with db() as c:
+        tout = lambda sql: [dict(r) for r in c.execute(sql, (uid,))]   # noqa: E731
+        u = c.execute("SELECT email, prenom, cree, admin, politique, politique_acceptee FROM utilisateurs WHERE id = ?",
+                      (uid,)).fetchone()
+        return {
+            "format": "jarvis-export-1", "exporte_le": time.time(),
+            "compte": dict(u),
+            "souvenirs": tout("SELECT fid, fait, categorie, date, modifie, appareil FROM faits WHERE utilisateur = ? "
+                              "AND supprime = 0 ORDER BY id"),
+            "journal_memoire": tout("SELECT action, fait, categorie, appareil, ts FROM journal_memoire WHERE utilisateur = ? "
+                                    "ORDER BY ts"),
+            "historique": tout("SELECT jour, machine, ligne FROM historique WHERE utilisateur = ? ORDER BY id"),
+            "documents": tout("SELECT nom, contenu, modifie FROM documents WHERE utilisateur = ?"),
+            "appareils": tout("SELECT nom, plateforme, version, vu, cree FROM appareils WHERE utilisateur = ?"),
+            "sessions": tout("SELECT appareil, cree, vu FROM sessions WHERE utilisateur = ?"),
+            "tickets": tout("SELECT genre, titre, description, statut, reponse, version, plateforme, cree, modifie "
+                            "FROM tickets WHERE utilisateur = ? ORDER BY cree"),
+            "ordres": tout("SELECT de, vers, cree, repondu FROM ordres WHERE utilisateur = ? ORDER BY cree"),
+        }
+
+
+@app.post("/v1/moi/supprimer")
+def supprimer_mon_compte(d: CleAuth, uid: int = Depends(utilisateur)):
+    """Supprime définitivement le compte et TOUTES ses données (droit à l'effacement). Le mot de passe est
+    redemandé : un appareil volé ou une session oubliée ne suffit pas."""
+    _limiter(f"suppr:{uid}", maxi=5, fenetre=3600)
+    with db() as c:
+        u = c.execute("SELECT auth_sel, auth_hash FROM utilisateurs WHERE id = ?", (uid,)).fetchone()
+        if not u or not hmac.compare_digest(u["auth_hash"], _hacher(d.cle_auth, u["auth_sel"])):
+            raise HTTPException(403, "Mot de passe incorrect.")
+        for table in ("sessions", "faits", "historique", "journal_memoire", "appareils", "ordres", "tickets", "documents"):
+            c.execute(f"DELETE FROM {table} WHERE utilisateur = ?", (uid,))   # en plus du ON DELETE CASCADE
+        c.execute("DELETE FROM utilisateurs WHERE id = ?", (uid,))
     return {"ok": True}
 
 

@@ -1,14 +1,16 @@
 import { LANGUE, t } from "../lib/i18n";
 import { choisirLangue } from "../views/Reglages";
 import { Cloud, HardDrive, LogIn, UserPlus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ouvrirLien } from "../lib/liens";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { useJarvis } from "../stores/jarvis";
 import { toast } from "../stores/toasts";
 import { Bouton, Champ } from "./ui";
 
-export type Compte = { connecte: boolean; mode: "" | "local" | "en_ligne"; email: string; prenom: string; serveur: string; machine: string; admin?: boolean };
+export type Compte = { connecte: boolean; mode: "" | "local" | "en_ligne"; email: string; prenom: string; serveur: string; machine: string; admin?: boolean;
+  politique_a_accepter?: boolean; url_confidentialite?: string; url_mentions?: string };
 type Reponse = Compte & { import?: { faits: number; lignes: number; erreur?: string } | null };
 
 /** Écran affiché tant que personne n'est connecté : chaque utilisateur a sa mémoire, sa clé, ses connecteurs. */
@@ -20,14 +22,22 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
   const [mdp2, setMdp2] = useState("");
   const [prenom, setPrenom] = useState("");
   const [envoi, setEnvoi] = useState(false);
+  const [accepte, setAccepte] = useState(false);
+  const [urls, setUrls] = useState<{ conf: string; mentions: string }>({ conf: "", mentions: "" });
   const inscription = mode === "inscription";
+  useEffect(() => {
+    api<Compte>("/api/compte")
+      .then((c) => setUrls({ conf: c.url_confidentialite ?? "", mentions: c.url_mentions ?? "" }))
+      .catch(() => {});
+  }, []);
 
   const valider = async (e: React.FormEvent) => {
     e.preventDefault();
     if (inscription && mdp !== mdp2) return toast(t("Les deux mots de passe ne sont pas identiques."), "erreur");
+    if (inscription && !accepte) return toast(t("Accepte la politique de confidentialité pour créer ton compte."), "erreur");
     setEnvoi(true);
     try {
-      const r = await api<Reponse>(`/api/compte/${mode}`, { method: "POST", json: { email, mot_de_passe: mdp, prenom } });
+      const r = await api<Reponse>(`/api/compte/${mode}`, { method: "POST", json: { email, mot_de_passe: mdp, prenom, politique: inscription && accepte } });
       if (r.import && !r.import.erreur && (r.import.faits || r.import.lignes))
         toast(`Mémoire de cet appareil ajoutée à ton compte : ${r.import.faits} souvenir(s), ${r.import.lignes} ligne(s) d'historique.`, "succes");
       else if (r.import?.erreur) toast(`Import de la mémoire de cet appareil : ${r.import.erreur}`, "erreur");
@@ -131,6 +141,18 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
             {t("Ton mot de passe ne quitte jamais cet appareil : il chiffre ta clé API et les mots de passe de tes connecteurs avant l'envoi, le serveur ne peut pas les lire. Choisis-le bien : la récupération d'un mot de passe oublié arrive dans une prochaine version.")}
           </p>
         )}
+        {inscription && (
+          <label className="mt-4 flex items-start gap-2.5 text-[13px] leading-relaxed">
+            <input type="checkbox" checked={accepte} onChange={(e) => setAccepte(e.target.checked)} className="mt-1 accent-hud" required />
+            <span>
+              {t("J'ai lu et j'accepte la")}{" "}
+              <button type="button" onClick={() => urls.conf && ouvrirLien(urls.conf)} className="text-hud underline underline-offset-2">
+                {t("politique de confidentialité")}
+              </button>
+              .
+            </span>
+          </label>
+        )}
         <Bouton type="submit" variante="primaire" className="mt-5 w-full justify-center" chargement={envoi} icone={inscription ? <UserPlus /> : <LogIn />}>
           {inscription ? "Créer mon compte" : "Se connecter"}
         </Bouton>
@@ -140,6 +162,14 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
             {t("← Utiliser Jarvis en local plutôt")}
           </button>
         )}
+        <div className="mt-4 flex justify-center gap-4 text-[11px] text-tres-doux">
+          <button type="button" onClick={() => urls.conf && ouvrirLien(urls.conf)} className="hover:text-doux">
+            {t("Confidentialité")}
+          </button>
+          <button type="button" onClick={() => urls.mentions && ouvrirLien(urls.mentions)} className="hover:text-doux">
+            {t("Mentions légales")}
+          </button>
+        </div>
       </form>
     </div>
   );

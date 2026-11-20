@@ -14,7 +14,6 @@ utilisateur dans un **compte en ligne**.
 2. Demande à l'utilisateur ce qu'il veut, s'il ne l'a pas dit :
    - **« Utiliser Jarvis »** (cas normal) → partie 1 : installer l'appli publiée.
    - **« Développer / modifier Jarvis »** → partie 2 : installation depuis le code source.
-   - **« Héberger mon propre serveur de comptes »** (optionnel, avancé) → partie 4.
 3. Demande confirmation avant d'installer un logiciel système (Homebrew, Python, Node, Inno Setup…) et
    préviens si une étape demande son mot de passe (sudo, fenêtre d'autorisation) : c'est lui qui le tape.
 
@@ -114,21 +113,14 @@ Vérification avant commit : `cd interface && npx tsc -p .`
 - La version vient de `jarvis/version.py` ; la description de chaque version, de `CHANGELOG.md`.
 - Les installateurs (~250 Mo) ne vont jamais dans git (limite GitHub de 100 Mo) : ils sont publiés dans les Releases.
 
-## 4. Héberger son propre serveur de comptes (optionnel)
+## 4. Serveur de comptes
 
-Par défaut, l'appli utilise le serveur de comptes officiel. Pour héberger le sien (Linux avec Docker + un
-sous-domaine en HTTPS) :
-```bash
-scp -r serveur/ utilisateur@serveur:~/jarvis-serveur/
-ssh utilisateur@serveur
-cd ~/jarvis-serveur
-echo "JARVIS_CLE_APPLI=$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')" > .env && chmod 600 .env
-docker compose up -d --build                      # API sur 127.0.0.1:8020, base SQLite dans le volume « donnees »
-```
-Puis un proxy HTTPS devant : exemple Apache dans `serveur/apache-jarvis.conf` + `serveur/installer-apache.sh`
-(remplacer le domaine et la clé d'appli ; `sudo` requis). Dans l'appli, `config.json` :
+L'appli utilise le serveur de comptes officiel. Son code est dans `serveur/` (`app.py` : API FastAPI + SQLite,
+`mobile/` : appli web du téléphone et pages légales). La configuration de déploiement (Docker, Apache, scripts du
+VPS) n'est **pas publiée** : ces fichiers sont ignorés par git et restent sur la machine du mainteneur
+(voir `CLAUDE.local.md`). Pour un autre serveur : lancer `app.py` avec uvicorn derrière un proxy HTTPS
+(variables `JARVIS_DB` et `JARVIS_CLE_APPLI`), puis dans `config.json` de l'appli :
 `"serveur_comptes": "https://ton-sous-domaine"` et `"cle_appli": "<valeur de JARVIS_CLE_APPLI>"`.
-Sauvegarder le volume Docker `donnees` : il contient tous les comptes.
 
 ## 5. Dépannage
 
@@ -145,7 +137,7 @@ Sauvegarder le volume Docker `donnees` : il contient tous les comptes.
 
 - Messages, commits, CHANGELOG et textes de l'interface **en français**.
 - Ne committe jamais de données personnelles ou secrets : `.env`, `config.json`, `memoire/`, `logs/`, `comptes/`,
-  `serveur/.env`, jetons, clés.
+  `serveur/.env`, jetons, clés, ni les fichiers de déploiement du serveur (Docker, Apache).
 - Un changement de l'appli = nouvelle version dans `jarvis/version.py` + section `## x.y.z` décrite pour
   l'utilisateur en haut de `CHANGELOG.md` (l'écran « Mises à jour » affiche ces descriptions).
 - Le fichier `CLAUDE.local.md` (non versionné), s'il existe, contient les notes privées du mainteneur

@@ -1,5 +1,5 @@
 import { changerLangue, LANGUE, t, type Langue } from "../lib/i18n";
-import { AppWindow, Brain, Cloud, Code2, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Volume2, Zap } from "lucide-react";
+import { AppWindow, Brain, Cloud, Code2, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Trash2, Volume2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { crete, micro } from "../audio/micro";
 import { sons } from "../audio/bips";
@@ -9,6 +9,7 @@ import { OngletAutorisations } from "../components/Autorisations";
 import { Bouton, Champ, Curseur, EnTetePage, Interrupteur, Onglets, Panneau, Selecteur } from "../components/ui";
 import { VuMetre } from "../components/VuMetre";
 import { api } from "../lib/api";
+import { ouvrirLien } from "../lib/liens";
 import { cx } from "../lib/format";
 import type { ConfigServeur } from "../lib/types";
 import { useOS } from "../lib/os";
@@ -126,10 +127,12 @@ function OngletApplication() {
   useEffect(() => {
     api<EtatAppli>("/api/appli").then(setE).catch((x) => toast(x.message, "erreur"));
   }, []);
-  const [compte, setCompte] = useState<{ email: string; prenom: string; serveur: string; machine: string; mode: string } | null>(null);
+  const [compte, setCompte] = useState<{ email: string; prenom: string; serveur: string; machine: string; mode: string; url_confidentialite?: string; url_mentions?: string } | null>(null);
   const [action, setAction] = useState("");
   useEffect(() => {
-    api<{ email: string; prenom: string; serveur: string; machine: string; mode: string }>("/api/compte").then(setCompte).catch(() => {});
+    api<{ email: string; prenom: string; serveur: string; machine: string; mode: string; url_confidentialite?: string; url_mentions?: string }>("/api/compte")
+      .then(setCompte)
+      .catch(() => {});
   }, []);
   const agir = async (a: "importer" | "synchroniser" | "deconnexion" | "changer_mode") => {
     setAction(a);
@@ -237,8 +240,81 @@ function OngletApplication() {
         <p className="mt-2 text-[13px] text-doux">
           {t("« Envoyer » ajoute à ton compte ce que cet appareil savait avant (anciennes versions, OneDrive). Rien n'est écrasé, les doublons sont ignorés.")}
         </p>
+        <MesDonnees urlConf={compte?.url_confidentialite ?? ""} urlMentions={compte?.url_mentions ?? ""} />
       </Panneau>
       )}
+    </div>
+  );
+}
+
+/** Confidentialité : pages légales, export des données, suppression du compte (RGPD). */
+function MesDonnees({ urlConf, urlMentions }: { urlConf: string; urlMentions: string }) {
+  const [export_, setExport] = useState(false);
+  const [suppression, setSuppression] = useState(false);
+  const [mdp, setMdp] = useState("");
+  const [confirme, setConfirme] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+
+  const exporter = async () => {
+    setExport(true);
+    try {
+      const r = await api<{ fichier: string }>("/api/compte/exporter", { method: "POST" });
+      toast(t("Tes données sont dans {f}", { f: r.fichier }), "succes");
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setExport(false);
+    }
+  };
+  const supprimer = async () => {
+    setEnvoi(true);
+    try {
+      await api("/api/compte/supprimer", { method: "POST", json: { mot_de_passe: mdp } });
+      toast(t("Ton compte et toutes ses données ont été supprimés."), "succes");
+      setTimeout(() => location.reload(), 1500); // retour à l'écran de choix
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+      setEnvoi(false);
+    }
+  };
+
+  return (
+    <div className="mt-5 border-t border-ligne pt-4">
+      <h3 className="mb-2 text-sm font-medium">{t("Mes données")}</h3>
+      <div className="flex flex-wrap gap-2">
+        <Bouton taille="sm" icone={<Download className="size-3.5" />} chargement={export_} onClick={exporter}>
+          {t("Télécharger mes données")}
+        </Bouton>
+        <Bouton taille="sm" variante="danger" icone={<Trash2 className="size-3.5" />} onClick={() => setSuppression(!suppression)}>
+          {t("Supprimer mon compte")}
+        </Bouton>
+      </div>
+      <p className="mt-2 text-[12px] text-tres-doux">
+        {t("Le téléchargement crée un fichier avec tout ce que ton compte contient (souvenirs, historique, réglages, appareils, tickets) dans ton dossier Téléchargements.")}
+      </p>
+      {suppression && (
+        <div className="mt-3 space-y-2.5 rounded-md border border-rouge/40 bg-rouge/5 p-3">
+          <p className="text-[13px] leading-relaxed text-rouge">
+            {t("Ton compte, ta mémoire, ton historique, tes réglages, tes clés et tes tickets seront effacés du serveur pour toujours, et tous tes appareils seront déconnectés. Ce n'est pas réversible.")}
+          </p>
+          <Champ type="password" placeholder={t("Ton mot de passe, pour confirmer")} value={mdp} onChange={(e) => setMdp(e.target.value)} autoComplete="current-password" />
+          <label className="flex items-center gap-2 text-[13px]">
+            <input type="checkbox" checked={confirme} onChange={(e) => setConfirme(e.target.checked)} className="accent-hud" />
+            {t("Je comprends que tout sera supprimé définitivement")}
+          </label>
+          <Bouton variante="danger" disabled={!mdp || !confirme} chargement={envoi} onClick={supprimer} icone={<Trash2 className="size-4" />}>
+            {t("Supprimer définitivement")}
+          </Bouton>
+        </div>
+      )}
+      <div className="mt-3 flex gap-4 text-[12px]">
+        <button onClick={() => urlConf && ouvrirLien(urlConf)} className="text-hud hover:underline">
+          {t("Politique de confidentialité")}
+        </button>
+        <button onClick={() => urlMentions && ouvrirLien(urlMentions)} className="text-hud hover:underline">
+          {t("Mentions légales")}
+        </button>
+      </div>
     </div>
   );
 }

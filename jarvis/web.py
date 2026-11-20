@@ -517,7 +517,23 @@ def _etat_compte():
     from . import compte
     e = compte.etat()
     return {"connecte": compte.connecte(), "mode": compte.mode(), "email": e.get("email", ""),
-            "prenom": e.get("prenom", ""), "serveur": compte.serveur(), "machine": MACHINE, "admin": compte.est_admin()}
+            "prenom": e.get("prenom", ""), "serveur": compte.serveur(), "machine": MACHINE, "admin": compte.est_admin(),
+            "politique_a_accepter": compte.politique_a_accepter(),
+            "url_confidentialite": compte.serveur() + "/mobile/confidentialite.html",
+            "url_mentions": compte.serveur() + "/mobile/mentions-legales.html"}
+
+
+@app.post("/api/ouvrir-lien")
+async def ouvrir_lien(req: Request):
+    """Ouvre une page dans le navigateur de l'ordinateur (la fenêtre de Jarvis n'en est pas un)."""
+    _verifier(req)
+    from . import compte
+    url = str((await req.json()).get("url", ""))
+    # seulement les pages du serveur de comptes et du dépôt GitHub : jamais une adresse quelconque
+    if not (url.startswith(compte.serveur() + "/") or url.startswith("https://github.com/")):
+        raise HTTPException(400, "Adresse non autorisée.")
+    webbrowser.open(url)
+    return {"ok": True}
 
 
 def _apres_connexion():
@@ -540,10 +556,25 @@ def lire_compte(req: Request):
 async def agir_compte(action: str, req: Request):
     _verifier(req)
     from . import compte
-    d = await req.json() if action in ("inscription", "connexion") else {}
+    d = await req.json() if action in ("inscription", "connexion", "supprimer") else {}
     try:
         if action == "inscription":
-            r = await asyncio.to_thread(compte.inscrire, d.get("email", ""), d.get("mot_de_passe", ""), d.get("prenom", ""))
+            r = await asyncio.to_thread(compte.inscrire, d.get("email", ""), d.get("mot_de_passe", ""), d.get("prenom", ""),
+                                        bool(d.get("politique")))
+        elif action == "politique":   # accepte la version actuelle de la politique de confidentialité
+            await asyncio.to_thread(compte.accepter_politique)
+            r = {}
+        elif action == "exporter":    # « Télécharger mes données » : fichier JSON dans Téléchargements
+            f = await asyncio.to_thread(compte.exporter_donnees)
+            r = {"fichier": str(f)}
+            try:
+                from .plateforme import ouvrir_chemin
+                ouvrir_chemin(str(f.parent))   # montre le dossier Téléchargements
+            except Exception:
+                pass
+        elif action == "supprimer":   # « Supprimer mon compte » (mot de passe redemandé)
+            await asyncio.to_thread(compte.supprimer_compte, d.get("mot_de_passe", ""))
+            r = {"supprime": True}
         elif action == "connexion":
             r = await asyncio.to_thread(compte.connecter, d.get("email", ""), d.get("mot_de_passe", ""))
         elif action == "deconnexion":
@@ -565,7 +596,7 @@ async def agir_compte(action: str, req: Request):
             raise HTTPException(404, "Action inconnue.")
     except compte.ErreurCompte as e:
         raise HTTPException(400, str(e))
-    if action in ("inscription", "connexion", "deconnexion", "importer", "local"):
+    if action in ("inscription", "connexion", "deconnexion", "importer", "local", "supprimer"):
         _apres_connexion()
     return {**_etat_compte(), **r}
 

@@ -1,133 +1,143 @@
-# J.A.R.V.I.S. — ton assistant personnel de bureau
+<p align="center">
+  <strong>English</strong> · <a href="README.fr.md">Français</a>
+</p>
 
-Jarvis est un assistant qui **pilote ton ordinateur** à ta place : il ouvre tes applis, gère tes fichiers, clique et
-tape pour toi, regarde ton écran, code dans VS Code, cherche sur le web… Tu lui parles à la voix (« Jarvis, ouvre
-Discord ») ou par écrit, et il te répond à voix haute.
+# J.A.R.V.I.S. — your personal desktop assistant
 
-- **macOS** (puce Apple) et **Windows 10/11**.
-- **Cerveau au choix** : Claude (API Anthropic, le plus intelligent) ou Ollama (gratuit, 100 % local).
-- **Un compte par personne** : ta mémoire, ton historique, tes connecteurs et tes réglages te suivent sur tous tes
-  appareils. Ta clé API et tes mots de passe sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.
-- **Mises à jour intégrées** : l'appli affiche les nouvelles versions et ce qu'elles contiennent, et s'installe en un clic.
+Jarvis is an assistant that **drives your computer** for you: it opens your apps, manages your files, clicks and
+types for you, looks at your screen, codes in VS Code, searches the web… Talk to it ("Jarvis, open Discord") or type,
+and it answers out loud.
+
+- **macOS** (Apple silicon) and **Windows 10/11**.
+- **Pick its brain**: Claude (Anthropic API, the smartest), OpenAI, or Ollama (free, 100% local).
+- **One account per person**: your memory, history, connectors and settings follow you on all your devices. Your
+  API key and passwords are encrypted with your password: the server cannot read them.
+- **Built-in updates**: the app shows new versions and what they contain, and installs them in one click.
+
+> The app's interface is available in French and English (Settings › Interface). Jarvis speaks French by default.
 
 ---
 
-## Installer Jarvis avec Claude (le plus simple)
+## Install Jarvis with Claude (easiest)
 
-Ce dépôt contient un guide d'installation pour [Claude Code](https://claude.com/claude-code) (`CLAUDE.md`) :
-**Claude peut installer Jarvis tout seul**, de bout en bout.
+This repository includes an installation guide for [Claude Code](https://claude.com/claude-code) (`CLAUDE.md`):
+**Claude can install Jarvis by itself**, end to end.
 
-1. Installe Claude Code, puis récupère le projet :
+1. Install Claude Code, then get the project:
    ```bash
    git clone https://github.com/AbdelRMB/MyJarvis.git
    cd MyJarvis
    claude
    ```
-2. Dis-lui simplement : **« Installe Jarvis »**.
+2. Just tell it: **"Install Jarvis"**.
 
-Claude détecte ton système et te demande si tu veux juste utiliser Jarvis ou le développer. Il télécharge et
-installe tout, puis te guide pour les autorisations et la création de ton compte. Il te demande ton accord avant
-d'installer un logiciel sur ton ordinateur, et c'est toi qui tapes les mots de passe éventuels.
+Claude detects your system and asks whether you just want to use Jarvis or develop it. It downloads and installs
+everything, then walks you through permissions and creating your account. It asks before installing any software on
+your computer, and you type any passwords yourself.
 
 ---
 
-## Installer Jarvis à la main
+## Install Jarvis manually
 
-### 1. Télécharger
+### 1. Download
 
-Va dans l'onglet **[Releases](https://github.com/AbdelRMB/MyJarvis/releases)** et prends la dernière version :
+Open the **[Releases](https://github.com/AbdelRMB/MyJarvis/releases)** tab and get the latest version:
 
-| Ton ordinateur | Fichier |
+| Your computer | File |
 |---|---|
-| Mac avec puce Apple (M1, M2, M3…) | `Jarvis-<version>-mac-arm64.dmg` |
-| PC Windows 10/11 | `JarvisSetup-<version>.exe` |
+| Mac with Apple silicon (M1, M2, M3…) | `Jarvis-<version>-mac-arm64.dmg` |
+| Windows 10/11 PC | `JarvisSetup-<version>.exe` |
 
-### 2. Installer
+### 2. Install
 
-**Sur Mac**
-1. Ouvre le `.dmg` et glisse **Jarvis** dans **Applications**.
-2. La première fois : **clic droit sur Jarvis › Ouvrir**, puis « Ouvrir » (l'appli n'est pas signée par Apple).
-   Si macOS dit qu'elle est « endommagée », tape dans le Terminal :
-   `xattr -dr com.apple.quarantine /Applications/Jarvis.app`
-3. Dans **Réglages Système › Confidentialité et sécurité**, autorise Jarvis pour le **Micro**, l'**Accessibilité**
-   (raccourcis, souris, clavier) et l'**Enregistrement de l'écran** (pour qu'il voie ton écran).
+**On Mac**
+1. Open the `.dmg` and drag **Jarvis** into **Applications**. The app is signed and notarized by Apple: it opens
+   normally.
+2. In **System Settings › Privacy & Security**, allow Jarvis for the **Microphone**, **Accessibility** (shortcuts,
+   mouse, keyboard) and **Screen Recording** (so it can see your screen).
 
-Jarvis vit dans la **barre des menus**, en haut à droite. Il se lance tout seul à l'ouverture de ta session.
+Jarvis lives in the **menu bar**, top right. It starts automatically when you log in.
 
-**Sur Windows**
-1. Lance `JarvisSetup-<version>.exe` (pas besoin de droits administrateur).
-2. Coche **« Lancer Jarvis au démarrage de Windows »** si tu veux qu'il soit toujours prêt.
+**On Windows**
+1. Run `JarvisSetup-<version>.exe` (no administrator rights needed). If Windows shows "Windows protected your PC",
+   click **More info › Run anyway**.
+2. Tick **"Start Jarvis with Windows"** if you want it always ready.
 
-Jarvis vit près de l'**horloge** (zone de notification).
+Jarvis lives next to the **clock** (notification area).
 
-### 3. Premier lancement
+### 3. First launch
 
-1. **Crée ton compte** (prénom, e-mail, mot de passe) ou connecte-toi.
-   - Si cet ordinateur avait déjà une mémoire Jarvis (ancienne version, OneDrive), elle est ajoutée à ton compte
-     automatiquement, sans doublon.
-2. **Choisis le cerveau** dans **Réglages › Cerveau** :
-   - **Claude** : colle ta clé API, à créer sur [platform.claude.com](https://platform.claude.com) › API keys.
-     C'est payant à l'usage, et l'abonnement Claude Pro n'inclut pas de crédit API.
-   - **Ollama** : gratuit et local. Installe [Ollama](https://ollama.com), puis tape `ollama pull qwen3.5:9b`.
-     Il faut une carte graphique avec environ 8 Go de mémoire.
-3. C'est prêt. Dis **« Jarvis, … »**.
+1. **Create your account** (first name, email, password) or sign in. You can also use Jarvis **locally**, without an
+   account: nothing is then sent to the server.
+   - If this computer already had a Jarvis memory (older version, OneDrive), it is added to your account
+     automatically, without duplicates.
+2. **Pick the brain** in **Settings › Brain**:
+   - **Claude**: paste your API key, created at [platform.claude.com](https://platform.claude.com) › API keys.
+     It's pay-as-you-go, and a Claude Pro subscription doesn't include API credit.
+   - **Ollama**: free and local. Install [Ollama](https://ollama.com), then run `ollama pull qwen3.5:9b`.
+     You need a graphics card with about 8 GB of memory.
+3. You're set. Say **"Jarvis, …"**.
 
-### Mettre à jour
+### Updating
 
-- Dans l'appli : écran **Mises à jour**. Tu vois chaque nouvelle version avec sa description, et tu installes la
-  dernière ou une version précise. Pas besoin de désinstaller.
-- Ou cherche **« Mettre à jour Jarvis »** dans le menu Démarrer (Windows) ou Spotlight (Mac).
+- In the app: **Updates** screen. You see each new version with its description, and install the latest one or a
+  specific version. No need to uninstall.
+- Or search for **"Mettre à jour Jarvis"** in the Start menu (Windows) or Spotlight (Mac).
 
 ---
 
-## Utiliser Jarvis
+## Using Jarvis
 
-| Action | Comment |
+| Action | How |
 |---|---|
-| L'appeler | Dis **« Jarvis, ouvre Discord »** d'une traite, ou « Jarvis » puis ta demande. Ou `Ctrl+Alt+J` (Windows) / `⌃ Ctrl + ⌥ Option + J` (Mac), ou clic sur l'icône. |
-| Le faire taire | **« Jarvis, stop »** (même pendant qu'il parle), ou `Ctrl+Alt+S` / `⌃⌥S`, même fenêtre cachée. |
-| Fermer la fenêtre | Elle se cache seulement. Pour quitter : icône Jarvis › Quitter. |
-| Raccourcis dans la fenêtre | `Échap` = stop · `Ctrl+K` = écrire · `Alt+1…9` = écrans |
+| Call it | Say **"Jarvis, open Discord"** in one go, or "Jarvis" then your request. Or `Ctrl+Alt+J` (Windows) / `⌃ Ctrl + ⌥ Option + J` (Mac), or click the icon. |
+| Silence it | **"Jarvis, stop"** (even while it's talking), or `Ctrl+Alt+S` / `⌃⌥S`, even with the window hidden. |
+| Close the window | It only hides. To quit: Jarvis icon › Quit. |
+| Shortcuts in the window | `Esc` = stop · `Ctrl+K` = type · `Alt+1…9` = screens |
 
-- **Démarrage discret** : à l'allumage, Jarvis tourne en fond sans ouvrir son interface ; elle apparaît quand tu l'appelles.
-- **Écoute 100 % locale** : le mot « Jarvis » est reconnu sur ton ordinateur (openWakeWord + petit Whisper).
-  Rien n'est envoyé tant qu'il n'a pas entendu son nom.
-- **Voix** : Microsoft neuronal (Henri, très naturel, en ligne) ou Piper (100 % local). Réglages › Voix.
+- **Quiet start**: at startup, Jarvis runs in the background without opening its window; it appears when you call it.
+- **100% local listening**: the word "Jarvis" is recognized on your computer (openWakeWord + a small Whisper).
+  Nothing is sent until it hears its name.
+- **Voice**: Microsoft neural (very natural, online) or Piper (100% local). Settings › Voice.
 
-### Ce qu'il sait faire (52 outils)
-- **Système** : terminal (PowerShell / zsh), scripts Python, ouvrir n'importe quelle appli, fichier ou URL, processus, verrouiller/éteindre
-- **Fichiers** : lire, écrire, modifier, chercher (nom + contenu), déplacer, copier, supprimer (→ corbeille)
-- **Souris et clavier** : déplacer, cliquer, glisser, défiler, taper, raccourcis, média/volume, presse-papier
-- **Fenêtres** : lister, activer, maximiser, fermer, cliquer un bouton par son texte
-- **Vision** : regarder l'écran, trouver un élément et cliquer dessus, analyser une image
-- **Code** : ouvrir dans VS Code (fichier:ligne), git, créer un projet (Vite / Next / Node / Python)
-- **Web** : recherche, actualités, lire une page, météo, télécharger
-- **Mémoire** : retient ce qu'il apprend sur toi, avec un historique de vos conversations sur tous tes appareils
-- **Connecteurs** : Gmail, autre messagerie IMAP, agenda (iCal), GitHub, Notion, et **n'importe quel serveur MCP**
-  (Spotify, Slack, Home Assistant…)
+### What it can do
+- **System**: terminal (PowerShell / zsh), Python scripts, open any app, file or URL, processes, lock/shut down
+- **Files**: read, write, edit, search (name + content), move, copy, delete (→ trash)
+- **Mouse and keyboard**: move, click, drag, scroll, type, shortcuts, media/volume, clipboard
+- **Windows**: list, focus, maximize, close, click a button by its text
+- **Vision**: look at the screen, find an element and click it, analyze an image
+- **Code**: open in VS Code (file:line), git, create a project (Vite / Next / Node / Python)
+- **Web**: search, news, read a page, weather, download
+- **Memory**: remembers what it learns about you, with a history of your conversations across all your devices
+- **Connectors**: Gmail, other IMAP mail, calendar (iCal), GitHub, Notion, SSH servers (VPS), and
+  **any MCP server** (Spotify, Slack, Home Assistant…)
+- **Your other devices**: "on my PC, launch Discord", including from your phone
 
-### Écrans
-**Assistant** (chat, cartes d'outils, réacteur animé) · **Historique** · **Mémoire** · **Connecteurs** ·
-**Activité** (journal des actions) · **Arsenal** (les outils) · **Système** (jauges, VRAM) · **Réglages** ·
-**Mises à jour**.
+### Screens
+Grouped into sections in the left sidebar: **Assistant**, **To-do** · *My memory*: History, Memory ·
+*Automate*: Tasks, Automations, Connectors · *My machines*: My devices, System, Activity, Arsenal ·
+*Jarvis*: Settings, Updates, Tickets.
 
-### Sécurité et vie privée
-- L'interface locale n'écoute que sur `127.0.0.1` (Host vérifié, jeton par session, Origin vérifiée).
-- **Compte** : ton mot de passe ne quitte jamais l'appareil. Il sert à dériver une clé de connexion et une clé de
-  coffre, qui chiffre ta clé API et tes mots de passe avant l'envoi.
-- Le serveur de comptes n'accepte que l'appli Jarvis, et bloque les essais de mot de passe en rafale.
-- Avec le cerveau Claude, tes messages, souvenirs et résultats d'outils sont envoyés à Anthropic. Avec Ollama, rien
-  ne sort de ton ordinateur.
-- **Arrêt d'urgence** : souris dans le coin haut-gauche de l'écran (pyautogui coupe l'action). Toutes les actions
-  sont journalisées (`logs/actions.log`).
+### Security and privacy
+- The local interface only listens on `127.0.0.1` (checked Host, per-session token, checked Origin).
+- **Account**: your password never leaves the device. It derives a sign-in key and a vault key, which encrypts your
+  API key and passwords before they are sent. Your memory and history are stored on the server, protected but not
+  end-to-end encrypted.
+- **Your data is yours**: Settings › My account › **Download my data** or **Delete my account** (everything is
+  erased from the server). Details in the
+  [privacy policy](https://jarvis.abdelrahimriche.com/mobile/confidentialite.html) (in French).
+- With the Claude or OpenAI brain, your messages, memories and tool results are sent to that provider. With Ollama,
+  nothing leaves your computer.
+- **Emergency stop**: move the mouse to the top-left corner of the screen (pyautogui aborts the action). Every action
+  is logged (`logs/actions.log`).
 
 ---
 
-## Développer
+## Development
 
-Le détail des commandes est dans [`CLAUDE.md`](CLAUDE.md), qui sert aussi de guide pour Claude. En bref :
+Full commands are in [`CLAUDE.md`](CLAUDE.md) (in French), which is also Claude's guide. In short:
 
-**Prérequis** : Python **3.12**, Node.js **22+**, git. Optionnel : Ollama.
+**Requirements**: Python **3.12**, Node.js **22+**, git. Optional: Ollama.
 
 ```bash
 # Mac
@@ -139,72 +149,74 @@ python3.12 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.tx
 # Windows
 py -3.12 -m venv .venv; .venv\Scripts\pip install -r requirements.txt -r requirements-voix.txt
 cd interface; npm ci; npm run build; cd ..
-.venv\Scripts\pythonw lanceur.pyw          # ou jarvis-web.bat (navigateur) / jarvis.bat (terminal)
+.venv\Scripts\pythonw lanceur.pyw          # or jarvis-web.bat (browser) / jarvis.bat (terminal)
 ```
 
-### Structure
-| Dossier / fichier | Rôle |
+### Layout
+| Folder / file | Role |
 |---|---|
-| `jarvis/` | Le cœur en Python : agent, outils (`outils/`), voix, écoute, serveur local (`web.py`), compte (`compte.py`), mises à jour |
-| `interface/` | Interface React + TypeScript + Tailwind, compilée dans `jarvis/static/` |
-| `serveur/` | Serveur des comptes (FastAPI + SQLite, Docker) |
-| `jarvis.spec` / `jarvis-mac.spec` | Recettes PyInstaller (Windows / Mac) |
-| `installateur.iss` | Installateur Windows (Inno Setup) |
-| `construire.bat` / `construire-mac.sh` | Construire les installateurs |
-| `jarvis/version.py` + `CHANGELOG.md` | Version, et description de chaque mise à jour |
+| `jarvis/` | The Python core: agent, tools (`outils/`), voice, listening, local server (`web.py`), account (`compte.py`), updates |
+| `interface/` | React + TypeScript + Tailwind interface, built into `jarvis/static/` |
+| `serveur/` | Account server (FastAPI + SQLite), mobile app and legal pages (`mobile/`) |
+| `jarvis.spec` / `jarvis-mac.spec` | PyInstaller recipes (Windows / Mac) |
+| `installateur.iss` | Windows installer (Inno Setup) |
+| `construire.bat` / `construire-mac.sh` | Build the installers |
+| `jarvis/version.py` + `CHANGELOG.md` | Version, and the description of each update |
 
-### Interface en direct
+The code, comments and commit messages are in French.
+
+### Live interface
 ```bash
 cd interface
-npm run dev        # http://localhost:5173, branchée sur le serveur Python lancé à côté
-npm run build      # recompile jarvis/static
+npm run dev        # http://localhost:5173, wired to the Python server running alongside
+npm run build      # rebuilds jarvis/static
 ```
 
-### Ajouter un outil
-Dans `jarvis/outils/*.py` :
+### Adding a tool
+In `jarvis/outils/*.py`:
 ```python
 @outil
-def mon_outil(param: str):
-    """Description pour le modèle.
-    param: description du paramètre"""
-    return "résultat"
+def my_tool(param: str):
+    """Description for the model.
+    param: description of the parameter"""
+    return "result"
 ```
 
-### Construire les installateurs
-- Mac : `bash construire-mac.sh` → `installateur/Jarvis-<version>-mac-arm64.dmg`
-- Windows : `construire.bat` (Inno Setup 6 requis) → `installateur\JarvisSetup-<version>.exe`
-- Ou sur GitHub : **Actions › Versions de Jarvis › Run workflow** (case Windows et/ou Mac).
+### Building the installers
+- Mac: `bash construire-mac.sh` → `installateur/Jarvis-<version>-mac-arm64.dmg` (signed and notarized when a
+  Developer ID certificate is available)
+- Windows: `construire.bat` (requires Inno Setup 6) → `installateur\JarvisSetup-<version>.exe`
+- Or on GitHub: **Actions › Versions de Jarvis › Run workflow** (Windows and/or Mac box).
 
-### Publier une version
-1. Incrémente `jarvis/version.py`.
-2. Décris la version en haut de `CHANGELOG.md` (section `## x.y.z`, écrite pour l'utilisateur).
-3. Pousse sur `main`, puis lance `./publier-mac.sh` (Mac) ou `publier.bat` (Windows). Le script construit
-   l'installateur de ta machine, crée la version dans les Releases, et demande à GitHub de construire celui de
-   l'autre système.
+### Publishing a version
+1. Bump `jarvis/version.py`.
+2. Describe the version at the top of `CHANGELOG.md` (`## x.y.z` section, written for users).
+3. Push to `main`, then run `./publier-mac.sh` (Mac) or `publier.bat` (Windows). The script builds your machine's
+   installer, creates the version in Releases, and asks GitHub to build the other system's one.
 
-### Héberger ton propre serveur de comptes
-Voir la partie 4 de [`CLAUDE.md`](CLAUDE.md). En bref : `docker compose up -d --build` dans `serveur/` avec un
-`.env` contenant `JARVIS_CLE_APPLI`, un proxy HTTPS devant (exemple Apache fourni), puis dans le `config.json` de
-l'appli : `"serveur_comptes"` et `"cle_appli"`.
+### Account server
+The server code is in `serveur/app.py`. The official server's deployment configuration is not published. To use your
+own server: run `app.py` with uvicorn behind an HTTPS proxy (`JARVIS_DB` and `JARVIS_CLE_APPLI` variables), then set
+`"serveur_comptes"` and `"cle_appli"` in the app's `config.json`.
 
 ---
 
-## Où sont mes données ?
+## Where is my data?
 
 | | Mac | Windows |
 |---|---|---|
-| Réglages de l'appareil, journaux, cache du compte | `~/Library/Application Support/Jarvis` | `%LOCALAPPDATA%\Jarvis` |
-| Mémoire, historique, connecteurs, réglages communs | dans ton **compte** (et en cache local) | idem |
-| Clé API, mots de passe des connecteurs | Trousseau macOS + coffre chiffré du compte | Gestionnaire d'identifiants + coffre chiffré du compte |
+| Device settings, logs, account cache | `~/Library/Application Support/Jarvis` | `%LOCALAPPDATA%\Jarvis` |
+| Memory, history, connectors, shared settings | in your **account** (and cached locally) | same |
+| API key, connector passwords | macOS Keychain + encrypted account vault | Credential Manager + encrypted account vault |
 
-Diagnostic : `logs/jarvis.log` (démarrage, erreurs), `logs/perf.log` (vitesse du modèle), `logs/couts.json`
-(dépenses estimées de l'API Claude).
+Diagnostics: `logs/jarvis.log` (startup, errors), `logs/perf.log` (model speed), `logs/couts.json`
+(estimated Claude API spending).
 
-## Licence
+## License
 
 Copyright (C) 2026 Abdelrahim Riche
 
-Jarvis est un logiciel libre : tu peux le redistribuer et le modifier selon les termes de la
-**GNU General Public License version 3** (ou toute version ultérieure), publiée par la Free Software Foundation.
-Toute version modifiée que tu distribues doit rester sous cette même licence, avec son code source.
-Jarvis est fourni **sans aucune garantie**. Texte complet : [LICENSE](LICENSE).
+Jarvis is free software: you can redistribute it and/or modify it under the terms of the
+**GNU General Public License version 3** (or any later version), as published by the Free Software Foundation.
+Any modified version you distribute must stay under this same license, with its source code.
+Jarvis comes **with absolutely no warranty**. Full text: [LICENSE](LICENSE).

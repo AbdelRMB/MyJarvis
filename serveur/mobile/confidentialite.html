@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Confidentialité — Jarvis</title>
+  <link rel="icon" href="icone-192.png" />
+  <link rel="stylesheet" href="legal.css" />
+</head>
+<body>
+<main>
+  <nav>
+    <a class="logo" href="index.html">JARVIS</a>
+    <a href="confidentialite.html" aria-current="page">Confidentialité</a>
+    <a href="mentions-legales.html">Mentions légales</a>
+  </nav>
+
+  <h1>Politique de confidentialité</h1>
+  <p class="date">Version du 21 novembre 2026</p>
+
+  <div class="resume">
+    <strong>En bref</strong>
+    <ul>
+      <li>Ton compte sert à retrouver ta mémoire, ton historique et tes réglages sur tous tes appareils.</li>
+      <li>Ton mot de passe ne quitte jamais ton appareil. Tes clés API et mots de passe de connecteurs sont chiffrés
+        avant l'envoi : le serveur ne peut pas les lire.</li>
+      <li>Ta mémoire et l'historique de tes conversations sont stockés sur le serveur, protégés mais <strong>pas chiffrés
+        de bout en bout</strong>.</li>
+      <li>Rien n'est vendu, rien ne sert à la publicité.</li>
+      <li>Tu peux télécharger toutes tes données ou supprimer ton compte à tout moment dans Jarvis › Réglages › Mon compte.</li>
+    </ul>
+  </div>
+
+  <h2>1. Qui est responsable de tes données</h2>
+  <p>Jarvis est développé et exploité par <strong>Abdelrahim Riche</strong>, à titre personnel, qui est responsable du
+    traitement de tes données. Pour toute question ou demande : <span class="completer">[adresse e-mail de contact à compléter]</span>.</p>
+
+  <h2>2. Les données conservées sur le serveur de comptes</h2>
+  <div class="tableau">
+  <table>
+    <thead><tr><th>Donnée</th><th>Détail</th><th>Protection</th></tr></thead>
+    <tbody>
+      <tr><td>Compte</td><td>Adresse e-mail, prénom, date d'inscription, version de cette politique acceptée.</td>
+        <td>Le mot de passe n'est jamais envoyé : le serveur ne reçoit qu'une clé qui en est dérivée, et n'en garde qu'une empreinte.</td></tr>
+      <tr><td>Mémoire</td><td>Les souvenirs que Jarvis retient sur toi, et le journal de leurs modifications.</td>
+        <td>Transmis en HTTPS, stockés sur le serveur sans chiffrement de bout en bout.</td></tr>
+      <tr><td>Historique</td><td>Les messages échangés avec Jarvis (date, appareil, texte).</td>
+        <td>Transmis en HTTPS, stockés sur le serveur sans chiffrement de bout en bout.</td></tr>
+      <tr><td>Coffre</td><td>Clés API (Claude, OpenAI), mots de passe et clés des connecteurs.</td>
+        <td>Chiffrés sur ton appareil (AES-256-GCM) avec une clé tirée de ton mot de passe : illisibles pour le serveur.</td></tr>
+      <tr><td>Réglages</td><td>Profil, liste des connecteurs (sans leurs secrets), automatisations, liste « À faire ».</td>
+        <td>Transmis en HTTPS.</td></tr>
+      <tr><td>Appareils</td><td>Nom de chaque appareil connecté, système, version de Jarvis, dernière présence.</td>
+        <td>Transmis en HTTPS.</td></tr>
+      <tr><td>Ordres entre appareils</td><td>Ce que tu demandes à un appareil depuis un autre (ou depuis ton téléphone).</td>
+        <td>Contenu chiffré de bout en bout : le serveur ne voit que l'expéditeur, le destinataire et l'heure.</td></tr>
+      <tr><td>Tickets</td><td>Les bugs, idées et questions que tu envoies, et les réponses.</td><td>Transmis en HTTPS.</td></tr>
+      <tr><td>Journaux techniques</td><td>Adresse IP, date, adresse demandée, pour la sécurité et le dépannage.</td>
+        <td>Accès réservé à l'administrateur.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>3. Pourquoi ces données sont utilisées</h2>
+  <ul>
+    <li><strong>Faire fonctionner le service</strong> que tu demandes en créant un compte : synchroniser ta mémoire, ton
+      historique et tes réglages, piloter tes appareils à distance, répondre à tes tickets. Base légale : l'exécution du service.</li>
+    <li><strong>Sécurité</strong> : limiter les tentatives de connexion, détecter les abus. Base légale : l'intérêt légitime.</li>
+    <li><strong>Statistiques d'utilisation</strong> pour améliorer Jarvis : nombre de comptes, d'utilisateurs actifs, de
+      demandes par jour, systèmes et versions utilisés. L'administrateur voit la liste des comptes (prénom, e-mail, dates,
+      nombre d'appareils et de demandes), mais pas le contenu de tes messages ou de ta mémoire dans cet écran. Base légale : l'intérêt légitime.</li>
+  </ul>
+  <p>Tes données ne sont jamais vendues, louées, ni utilisées pour de la publicité ou pour entraîner une intelligence artificielle.</p>
+
+  <h2>4. Ce qui reste sur ton ordinateur</h2>
+  <p>Ta voix est transcrite sur ton ordinateur (le son n'est pas envoyé au serveur Jarvis). Les captures d'écran, tes
+    fichiers et les secrets en clair restent sur ton appareil (dans le trousseau du système). Si tu utilises Jarvis
+    « en local », sans compte, rien n'est envoyé au serveur de comptes.</p>
+
+  <h2>5. Les services utilisés par l'appli, depuis ton ordinateur</h2>
+  <p>Selon tes réglages, l'appli contacte directement d'autres services. Ce que tu leur envoies est soumis à leurs
+    propres conditions :</p>
+  <ul>
+    <li><strong>Anthropic (Claude) ou OpenAI</strong>, si tu choisis l'un de ces « cerveaux » avec ta clé : tes messages,
+      le contexte utile (mémoire) et, si tu le demandes, des captures d'écran. Avec <strong>Ollama</strong>, tout reste sur ton ordinateur.</li>
+    <li><strong>Microsoft</strong>, pour la voix « Edge » de Jarvis : le texte que Jarvis prononce. Les voix « Piper » et
+      « navigateur » fonctionnent sans envoi.</li>
+    <li><strong>DuckDuckGo</strong>, quand Jarvis fait une recherche sur le web : la recherche.</li>
+    <li><strong>GitHub</strong>, pour vérifier et télécharger les mises à jour.</li>
+    <li><strong>Hugging Face</strong>, pour télécharger une fois les modèles de reconnaissance vocale.</li>
+    <li><strong>Les services que tu connectes</strong> (Gmail, agenda, GitHub, Notion, tes serveurs SSH, serveurs MCP…),
+      quand tu demandes à Jarvis de s'en servir.</li>
+  </ul>
+
+  <h2>6. Où sont hébergées les données</h2>
+  <ul>
+    <li>Serveur de comptes : <span class="completer">[nom de l'hébergeur et pays à compléter]</span>.</li>
+    <li>Le trafic passe par <strong>Cloudflare</strong> (protection et acheminement du réseau), qui voit les adresses IP et
+      peut traiter des données hors de l'Union européenne, encadrées par les clauses contractuelles types de la Commission européenne.</li>
+    <li>Les installateurs et les mises à jour sont distribués par <strong>GitHub</strong>.</li>
+  </ul>
+
+  <h2>7. Combien de temps</h2>
+  <ul>
+    <li>Les données de ton compte sont gardées <strong>tant que ton compte existe</strong>.</li>
+    <li>Quand tu supprimes ton compte, toutes ses données sont <strong>effacées immédiatement et définitivement</strong> du serveur.</li>
+    <li>Un souvenir que tu supprimes disparaît de la mémoire de Jarvis, mais reste dans le journal des modifications de
+      ta mémoire (visible seulement par toi) jusqu'à la suppression de ton compte.</li>
+    <li>Les journaux techniques sont conservés <strong>6 mois au maximum</strong>.</li>
+  </ul>
+
+  <h2>8. Tes droits</h2>
+  <p>Tu disposes des droits d'accès, de rectification, d'effacement, de limitation, d'opposition et de portabilité de tes données :</p>
+  <ul>
+    <li><strong>Télécharger toutes tes données</strong> : Jarvis › Réglages › Mon compte › « Télécharger mes données » (fichier JSON).</li>
+    <li><strong>Supprimer ton compte et tes données</strong> : Jarvis › Réglages › Mon compte › « Supprimer mon compte ».</li>
+    <li><strong>Corriger</strong> : ton prénom et tes souvenirs se modifient dans l'appli.</li>
+    <li>Pour toute autre demande : <span class="completer">[adresse e-mail de contact à compléter]</span>. Réponse sous un mois.</li>
+  </ul>
+  <p>Si tu estimes que tes droits ne sont pas respectés, tu peux adresser une réclamation à la
+    <a href="https://www.cnil.fr/fr/plaintes" rel="noopener">CNIL</a>.</p>
+
+  <h2>9. Sécurité</h2>
+  <p>Connexions chiffrées (HTTPS), mot de passe jamais transmis, coffre chiffré sur ton appareil, ordres entre appareils
+    chiffrés de bout en bout, nombre de tentatives de connexion limité, accès au serveur réservé à l'administrateur.
+    Aucun système n'est infaillible : choisis un mot de passe solide et unique.</p>
+
+  <h2>10. Âge minimum</h2>
+  <p>Jarvis s'adresse aux personnes de <strong>15 ans et plus</strong>. En dessous, l'accord d'un parent est nécessaire.</p>
+
+  <h2>11. Changements</h2>
+  <p>Si cette politique change de façon importante, Jarvis te la présente à nouveau et te demande de l'accepter. La date
+    de la version est indiquée en haut de cette page.</p>
+
+  <footer>Jarvis est un logiciel libre (GPL-3.0). Son code, y compris celui du serveur de comptes, est public :
+    <a href="https://github.com/AbdelRMB/MyJarvis" rel="noopener">github.com/AbdelRMB/MyJarvis</a>.</footer>
+</main>
+</body>
+</html>
