@@ -49,16 +49,86 @@ function BlocCommande({ texte }: { texte: string }) {
   );
 }
 
+type Droits = "aucun" | "limites" | "complets";
+// Droits limités : chaque permission = commandes autorisées sans mot de passe (chemins trouvés sur le serveur).
+const PERMISSIONS: { id: string; libelle: string; alerte?: string; regle: string }[] = [
+  {
+    id: "services",
+    libelle: "Démarrer, arrêter, redémarrer des services (systemctl)",
+    regle: 'p=$(command -v systemctl) && echo "$U ALL=(root) NOPASSWD: $p start *, $p stop *, $p restart *, $p reload *, $p status *"',
+  },
+  { id: "journaux", libelle: "Lire les journaux système (journalctl)", regle: 'p=$(command -v journalctl) && echo "$U ALL=(root) NOPASSWD: $p"' },
+  {
+    id: "web",
+    libelle: "Serveur web : tester et recharger Apache / Nginx",
+    regle:
+      'p=$(command -v apache2ctl) && echo "$U ALL=(root) NOPASSWD: $p configtest, $p -t, $p -S, $p graceful"\n' +
+      '  p=$(command -v nginx) && echo "$U ALL=(root) NOPASSWD: $p -t, $p -s reload"',
+  },
+  { id: "certbot", libelle: "Certificats HTTPS (certbot)", regle: 'p=$(command -v certbot) && echo "$U ALL=(root) NOPASSWD: $p renew, $p certificates"' },
+  {
+    id: "maj",
+    libelle: "Mettre à jour le système (apt)",
+    regle: 'p=$(command -v apt-get) && echo "$U ALL=(root) NOPASSWD: $p update, $p upgrade -y, $p autoremove -y"',
+  },
+  {
+    id: "docker",
+    libelle: "Gérer Docker",
+    alerte: "Avec Docker, on peut obtenir tous les droits sur le serveur : autant que « Tous les droits ».",
+    regle: 'p=$(command -v docker) && echo "$U ALL=(root) NOPASSWD: $p"',
+  },
+];
+
+/** Bloc de commandes à coller sur le serveur (avec le compte habituel de l'utilisateur, qui a sudo). */
+function scriptServeur(u: string, publique: string, droits: Droits, permis: string[], deuxFA: boolean): string {
+  const f = `/etc/sudoers.d/jarvis-${u}`;
+  const l = [
+    `# Jarvis : préparation du serveur pour l'utilisateur ${u}`,
+    `U=${u}; PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"`,
+    `id -u "$U" >/dev/null 2>&1 || sudo adduser --disabled-password --gecos "" "$U"`,
+    `H=$(getent passwd "$U" | cut -d: -f6); G=$(id -gn "$U")`,
+    `sudo install -d -m 700 -o "$U" -g "$G" "$H/.ssh"`,
+    `CLE='${publique}'`,
+    `sudo grep -qxF "$CLE" "$H/.ssh/authorized_keys" 2>/dev/null || echo "$CLE" | sudo tee -a "$H/.ssh/authorized_keys" >/dev/null`,
+    `sudo chown "$U:$G" "$H/.ssh/authorized_keys" && sudo chmod 600 "$H/.ssh/authorized_keys"`,
+  ];
+  if (droits === "aucun") l.push(`sudo rm -f ${f}`);
+  else {
+    if (droits === "complets") l.push(`echo "$U ALL=(ALL) NOPASSWD: ALL" | sudo tee ${f} >/dev/null`);
+    else {
+      const regles = PERMISSIONS.filter((p) => permis.includes(p.id)).map((p) => "  " + p.regle);
+      l.push("{", ...(regles.length ? regles : ["  true"]), `} | sudo tee ${f} >/dev/null`);
+    }
+    l.push(
+      `sudo chmod 440 ${f}`,
+      `sudo visudo -cf ${f} >/dev/null || { echo "Règle sudo invalide : retirée."; sudo rm -f ${f}; }`,
+    );
+  }
+  if (deuxFA)
+    l.push(
+      `if ! sudo grep -q "^Match User $U\\$" /etc/ssh/sshd_config; then`,
+      `  sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.avant-jarvis`,
+      `  printf '\\nMatch User %s\\n    AuthenticationMethods publickey\\n' "$U" | sudo tee -a /etc/ssh/sshd_config >/dev/null`,
+      `  if sudo sshd -t; then sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd`,
+      `  else sudo cp /etc/ssh/sshd_config.avant-jarvis /etc/ssh/sshd_config; echo "Config SSH refusée : remise comme avant."; fi`,
+      `fi`,
+    );
+  l.push(`echo; echo "== Jarvis : $U prêt =="; sudo -l -U "$U" 2>/dev/null | sed -n '/NOPASSWD/p' || true`);
+  return l.join("\n");
+}
+
 function GuideCleSSH({
   cid,
   conf,
   cleEnregistree,
   onCle,
+  onSudo,
 }: {
   cid: string | null;
   conf: Record<string, string>;
   cleEnregistree: boolean;
   onCle: (privee: string) => void;
+  onSudo: (oui: boolean) => void;
 }) {
   const [publique, setPublique] = useState("");
   const [nouvelle, setNouvelle] = useState(false);
@@ -95,8 +165,16 @@ function GuideCleSSH({
   const hote = (conf.hote ?? "").trim();
   const utilisateur = (conf.utilisateur ?? "").trim();
   const port = (conf.port ?? "").trim();
-  const surServeur = `mkdir -p ~/.ssh && chmod 700 ~/.ssh && echo '${publique}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys`;
-  const depuisPC = hote && utilisateur ? `ssh ${port && port !== "22" ? `-p ${port} ` : ""}${utilisateur}@${hote} "${surServeur}"` : "";
+  const [droits, setDroitsEtat] = useState<Droits>(conf.sudo === "oui" ? "complets" : "aucun");
+  const [permis, setPermis] = useState<string[]>(["services", "journaux"]);
+  const [deuxFA, setDeuxFA] = useState(false);
+  const setDroits = (d: Droits) => {
+    setDroitsEtat(d);
+    onSudo(d !== "aucun"); // l'option « Droits administrateur » du connecteur suit ce choix
+  };
+  const nomValide = /^[a-z_][a-z0-9_-]{0,31}$/.test(utilisateur);
+  const script = publique && nomValide ? scriptServeur(utilisateur, publique, droits, permis, deuxFA) : "";
+  const connexion = hote ? `ssh ${port && port !== "22" ? `-p ${port} ` : ""}ton-compte@${hote}` : "";
 
   return (
     <div className="space-y-3 rounded-md border border-ligne-forte p-3">
@@ -122,27 +200,66 @@ function GuideCleSSH({
       {publique && (
         <ol className="list-decimal space-y-3 pl-5 text-[13px] leading-relaxed">
           {nouvelle && <li>{t("La clé privée est dans le formulaire ci-dessous (champ « Clé privée SSH »). Elle sera enregistrée quand tu cliqueras sur « Connecter ».")}</li>}
+          <li className="space-y-2">
+            <span className="block">{t("Choisis ce que Jarvis pourra faire sur le serveur :")}</span>
+            <div className="space-y-1.5 rounded-md border border-ligne p-2.5">
+              {(
+                [
+                  ["aucun", "Aucun droit administrateur (pas de sudo)"],
+                  ["limites", "Droits limités : seulement ce que je coche"],
+                  ["complets", "Tous les droits (sudo complet, équivaut à root)"],
+                ] as [Droits, string][]
+              ).map(([v, l]) => (
+                <label key={v} className="flex items-center gap-2">
+                  <input type="radio" checked={droits === v} onChange={() => setDroits(v)} className="accent-hud" />
+                  {t(l)}
+                </label>
+              ))}
+              {droits === "limites" && (
+                <div className="ml-6 space-y-1 border-l border-ligne pl-3">
+                  {PERMISSIONS.map((p) => (
+                    <label key={p.id} className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        className="mt-1 accent-hud"
+                        checked={permis.includes(p.id)}
+                        onChange={(e) => setPermis(e.target.checked ? [...permis, p.id] : permis.filter((x) => x !== p.id))}
+                      />
+                      <span>
+                        {t(p.libelle)}
+                        {p.alerte && <span className="block text-[12px] text-ambre">{t(p.alerte)}</span>}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {droits === "complets" && (
+                <p className="ml-6 text-[12px] text-ambre">
+                  {t("Jarvis pourra tout faire sur le serveur. Chaque commande sudo te demandera quand même « Autoriser / Refuser ».")}
+                </p>
+              )}
+              <label className="flex items-center gap-2 border-t border-ligne pt-1.5">
+                <input type="checkbox" checked={deuxFA} onChange={(e) => setDeuxFA(e.target.checked)} className="accent-hud" />
+                {t("Mon serveur demande un code d'authentification (2FA) : la clé de Jarvis suffira")}
+              </label>
+            </div>
+          </li>
           <li>
-            {depuisPC ? (
-              <>
-                {t("Ajoute la clé au serveur. Dans un terminal de ce PC (PowerShell sur Windows, Terminal sur Mac), colle cette commande. Le serveur te demande une dernière fois ton mot de passe et ton code d'authentification :")}
-                <BlocCommande texte={depuisPC} />
-                <span className="mt-2 block text-tres-doux">{t("Ou, si tu es déjà connecté au serveur, colle plutôt celle-ci :")}</span>
-                <BlocCommande texte={surServeur} />
-              </>
+            {!nomValide ? (
+              <span className="text-ambre">{t("Remplis d'abord le champ « Utilisateur » ci-dessous (par exemple jarvis) : le bloc de commandes apparaîtra ici.")}</span>
             ) : (
               <>
-                {t("Connecte-toi à ton serveur comme d'habitude (mot de passe + code), puis colle cette commande :")}
-                <BlocCommande texte={surServeur} />
-                <span className="mt-1 block text-tres-doux">{t("Remplis l'adresse et l'utilisateur pour avoir aussi la commande à taper depuis ce PC.")}</span>
+                {connexion
+                  ? t("Connecte-toi au serveur avec ton compte habituel ({connexion}), puis colle ce bloc en entier :", { connexion })
+                  : t("Connecte-toi au serveur avec ton compte habituel, puis colle ce bloc en entier :")}
+                <BlocCommande texte={script} />
+                <span className="mt-1 block text-[12px] text-tres-doux">
+                  {t("Il crée l'utilisateur {u} s'il n'existe pas, installe la clé, règle les droits et affiche une vérification à la fin. Tu peux le relancer après avoir changé tes choix.", { u: utilisateur })}
+                </span>
               </>
             )}
           </li>
           <li>{t("Clique sur « Connecter », puis sur « Tester » sur la carte du serveur.")}</li>
-          <li>
-            {t("Le serveur demande encore un code même avec la clé ? Dans /etc/ssh/sshd_config, ajoute à la fin (remplace l'utilisateur), puis lance « sudo systemctl reload ssh ». Garde ta session ouverte pendant le test pour ne pas te bloquer dehors :")}
-            <BlocCommande texte={`Match User ${utilisateur || "tonutilisateur"}\n    AuthenticationMethods publickey`} />
-          </li>
         </ol>
       )}
     </div>
@@ -217,6 +334,7 @@ function Editeur({
                 setSecrets((s) => ({ ...s, cle_privee: privee, phrase_cle: "" }));
                 setAVider((v) => [...v, "phrase_cle"]);
               }}
+              onSudo={(oui) => setConf((c) => ({ ...c, sudo: oui ? "oui" : "non" }))}
             />
           )}
           {def.champs.filter(visible).map((c) => (
