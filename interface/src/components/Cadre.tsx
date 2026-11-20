@@ -19,6 +19,8 @@ import {
   Zap,
   ListTodo,
   Laptop,
+  ListChecks,
+  LifeBuoy,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { micro } from "../audio/micro";
@@ -34,6 +36,7 @@ import { Pastille } from "./ui";
 
 const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
   { id: "assistant", libelle: t("Assistant"), icone: MessageSquare },
+  { id: "afaire", libelle: t("À faire"), icone: ListChecks },
   { id: "historique", libelle: t("Historique"), icone: History },
   { id: "memoire", libelle: t("Mémoire"), icone: Brain },
   { id: "connecteurs", libelle: t("Connecteurs"), icone: Plug },
@@ -45,6 +48,7 @@ const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
   { id: "systeme", libelle: t("Système"), icone: Cpu },
   { id: "reglages", libelle: t("Réglages"), icone: Settings },
   { id: "majs", libelle: t("Mises à jour"), icone: Download },
+  { id: "tickets", libelle: t("Tickets"), icone: LifeBuoy },
 ];
 
 function MiniReacteur({ actif }: { actif: boolean }) {
@@ -134,7 +138,7 @@ export function NavMobile() {
   const { vue, maj } = useReglages();
   return (
     <nav className="flex border-t border-ligne bg-surface md:hidden">
-      {NAV.filter((n) => n.id !== "arsenal" && n.id !== "activite").map(({ id, libelle, icone: I }) => (
+      {NAV.filter((n) => !["arsenal", "activite", "tickets"].includes(n.id)).map(({ id, libelle, icone: I }) => (
         <button
           key={id}
           onClick={() => maj({ vue: id })}

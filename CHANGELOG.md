@@ -3,6 +3,10 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.7.0
+- **Liste « À faire »** : dis à Jarvis « souviens-toi que je dois appeler le garage » et il l'ajoute à ta liste. Chaque tâche passe par trois étapes : à faire, en cours, fait (« j'ai commencé le rapport », « c'est fait »). Demande « qu'est-ce que j'ai prévu ? » et il te donne la liste. Nouvel écran **À faire** pour tout voir et déplacer les tâches ; la liste est la même sur tous tes appareils. / **To-do list**: tell Jarvis what you need to do, ask what you've planned, track each task (to do, in progress, done).
+- **Tickets** : signale un bug, propose une amélioration ou une idée depuis le nouvel écran **Tickets**, ou en le disant à Jarvis (« signale un bug : … »). Tu es prévenu quand le développeur répond ou change le statut. / **Tickets**: send bugs, improvements and ideas to the developer and get notified of replies.
+
 ## 1.6.1
 - **Écran noir (Windows)** : si le moteur d'affichage de la fenêtre plante, Jarvis recharge l'interface tout seul, ou se relance si besoin, au lieu de rester noir. La cause est notée dans le journal. / **Black window on Windows**: Jarvis now recovers by itself when the display engine crashes.
 - **Tâches Claude Code qui échouaient** à cause de certains caractères dans la sortie de l'agent : corrigé. / **Fixed Claude Code tasks failing** on some characters.

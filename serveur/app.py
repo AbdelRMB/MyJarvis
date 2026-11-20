@@ -73,6 +73,12 @@ CREATE TABLE IF NOT EXISTS ordres (
     id TEXT PRIMARY KEY, utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
     de TEXT NOT NULL, vers TEXT NOT NULL, blob TEXT NOT NULL, reponse TEXT, livre INTEGER NOT NULL DEFAULT 0,
     cree REAL NOT NULL, repondu REAL);
+CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY, utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    genre TEXT NOT NULL DEFAULT 'bug', titre TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+    statut TEXT NOT NULL DEFAULT 'ouvert', reponse TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '',
+    plateforme TEXT NOT NULL DEFAULT '', appareil TEXT NOT NULL DEFAULT '', cree REAL NOT NULL, modifie REAL NOT NULL);
+CREATE INDEX IF NOT EXISTS tickets_par_utilisateur ON tickets (utilisateur, modifie);
 CREATE TABLE IF NOT EXISTS documents (
     utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE, nom TEXT NOT NULL,
     contenu TEXT NOT NULL, modifie REAL NOT NULL, PRIMARY KEY (utilisateur, nom));
@@ -93,6 +99,9 @@ with _connexion() as _c:
     # compteur de changements par compte : les appareils le surveillent pour se mettre à jour en temps réel
     if "revision" not in [r[1] for r in _c.execute("PRAGMA table_info(utilisateurs)")]:
         _c.execute("ALTER TABLE utilisateurs ADD COLUMN revision INTEGER NOT NULL DEFAULT 0")
+    # administrateurs : voient et traitent les tickets de tous les utilisateurs (mis à 1 à la main dans la base)
+    if "admin" not in [r[1] for r in _c.execute("PRAGMA table_info(utilisateurs)")]:
+        _c.execute("ALTER TABLE utilisateurs ADD COLUMN admin INTEGER NOT NULL DEFAULT 0")
     # souvenirs : identifiant stable, date de dernière action, suppression conservée (« pierre tombale »)
     colonnes = [r[1] for r in _c.execute("PRAGMA table_info(faits)")]
     for col, decl in (("fid", "TEXT"), ("modifie", "REAL NOT NULL DEFAULT 0"), ("supprime", "INTEGER NOT NULL DEFAULT 0"),
@@ -191,8 +200,9 @@ class Connexion(BaseModel):
 
 
 def _profil(c, uid):
-    u = c.execute("SELECT id, email, prenom, coffre, revision FROM utilisateurs WHERE id = ?", (uid,)).fetchone()
-    return {"id": u["id"], "email": u["email"], "prenom": u["prenom"], "coffre": u["coffre"], "revision": u["revision"]}
+    u = c.execute("SELECT id, email, prenom, coffre, revision, admin FROM utilisateurs WHERE id = ?", (uid,)).fetchone()
+    return {"id": u["id"], "email": u["email"], "prenom": u["prenom"], "coffre": u["coffre"], "revision": u["revision"],
+            "admin": bool(u["admin"])}
 
 
 @app.post("/v1/inscription")
@@ -427,7 +437,7 @@ def ecrire_historique(d: Lignes, uid: int = Depends(utilisateur)):
 
 
 # ---------- documents (réglages partagés, connecteurs) ----------
-NOMS_DOCS = {"profil", "connecteurs", "automatisations"}
+NOMS_DOCS = {"profil", "connecteurs", "automatisations", "afaire"}
 
 
 @app.get("/v1/documents/{nom}")
@@ -616,6 +626,86 @@ async def attendre_reponse(oid: str, s: tuple = Depends(session_courante)):
             return {"pret": True, "blob": r["reponse"], "recu": bool(r["livre"])}
         await asyncio.sleep(0.5)
     return {"pret": False, "recu": bool((await asyncio.to_thread(_reponse, uid, oid) or {}).get("livre"))}
+
+
+# ---------- tickets : bugs, améliorations, idées envoyés par les utilisateurs aux administrateurs ----------
+GENRES_TICKET = {"bug", "amelioration", "idee", "question", "autre"}
+STATUTS_TICKET = {"ouvert", "en_cours", "resolu", "ferme"}
+_COLONNES_TICKET = "t.id, t.genre, t.titre, t.description, t.statut, t.reponse, t.version, t.plateforme, t.appareil, t.cree, t.modifie"
+
+
+class NouveauTicket(BaseModel):
+    genre: str = Field("bug", max_length=20)
+    titre: str = Field(min_length=3, max_length=200)
+    description: str = Field("", max_length=10_000)
+    version: str = Field("", max_length=20)
+    plateforme: str = Field("", max_length=40)
+    appareil: str = Field("", max_length=80)
+
+
+class ReponseTicket(BaseModel):
+    statut: str = Field("", max_length=20)
+    reponse: str | None = Field(None, max_length=10_000)
+
+
+def _admin(uid: int = Depends(utilisateur)) -> int:
+    with db() as c:
+        if not c.execute("SELECT admin FROM utilisateurs WHERE id = ?", (uid,)).fetchone()["admin"]:
+            raise HTTPException(403, "Réservé aux administrateurs.")
+    return uid
+
+
+@app.post("/v1/tickets")
+def creer_ticket(d: NouveauTicket, uid: int = Depends(utilisateur)):
+    _limiter(f"ticket:{uid}", maxi=20, fenetre=3600)
+    genre = d.genre if d.genre in GENRES_TICKET else "autre"
+    t = time.time()
+    with db() as c:
+        tid = c.execute("INSERT INTO tickets (utilisateur, genre, titre, description, version, plateforme, appareil, cree, modifie) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (uid, genre, d.titre.strip(), d.description.strip(), d.version,
+                                                               d.plateforme, d.appareil, t, t)).lastrowid
+        for a in c.execute("SELECT id FROM utilisateurs WHERE admin = 1"):   # les admins sont prévenus en temps réel
+            _toucher(c, a["id"])
+    return {"id": tid}
+
+
+@app.get("/v1/tickets")
+def mes_tickets(uid: int = Depends(utilisateur)):
+    with db() as c:
+        return [dict(r) for r in c.execute(f"SELECT {_COLONNES_TICKET} FROM tickets t WHERE t.utilisateur = ? "
+                                           "ORDER BY t.modifie DESC LIMIT 500", (uid,))]
+
+
+@app.get("/v1/admin/tickets")
+def tous_les_tickets(uid: int = Depends(_admin)):
+    with db() as c:
+        return [dict(r) for r in c.execute(
+            f"SELECT {_COLONNES_TICKET}, u.email, u.prenom FROM tickets t JOIN utilisateurs u ON u.id = t.utilisateur "
+            "ORDER BY t.modifie DESC LIMIT 2000")]
+
+
+@app.patch("/v1/admin/tickets/{tid}")
+def traiter_ticket(tid: int, d: ReponseTicket, uid: int = Depends(_admin)):
+    if d.statut and d.statut not in STATUTS_TICKET:
+        raise HTTPException(400, "Statut inconnu.")
+    with db() as c:
+        r = c.execute("SELECT utilisateur FROM tickets WHERE id = ?", (tid,)).fetchone()
+        if not r:
+            raise HTTPException(404, "Ticket introuvable.")
+        if d.statut:
+            c.execute("UPDATE tickets SET statut = ? WHERE id = ?", (d.statut, tid))
+        if d.reponse is not None:
+            c.execute("UPDATE tickets SET reponse = ? WHERE id = ?", (d.reponse.strip(), tid))
+        c.execute("UPDATE tickets SET modifie = ? WHERE id = ?", (time.time(), tid))
+        _toucher(c, r["utilisateur"])   # l'auteur voit la réponse tout de suite
+    return {"ok": True}
+
+
+@app.delete("/v1/admin/tickets/{tid}")
+def supprimer_ticket(tid: int, uid: int = Depends(_admin)):
+    with db() as c:
+        c.execute("DELETE FROM tickets WHERE id = ?", (tid,))
+    return {"ok": True}
 
 
 @app.get("/v1/sante")

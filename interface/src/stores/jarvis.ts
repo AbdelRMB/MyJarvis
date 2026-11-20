@@ -93,6 +93,8 @@ type Evt =
   | { type: "tache_maj"; id: string }
   | { type: "notifications"; non_lues: number }
   | { type: "appareils_maj" }
+  | { type: "afaire_maj" }
+  | { type: "tickets_maj" }
   | { type: "compte_deconnecte" }
   | { type: "init"; conversation: ({ role: "user"; texte: string } | { role: "jarvis"; blocs: Bloc[] })[]; occupe: boolean }
   | { type: "utilisateur"; texte: string }
@@ -226,6 +228,12 @@ function recevoir(e: Evt) {
       break;
     case "notifications":
       emettre("notifications", e.non_lues);
+      break;
+    case "afaire_maj":
+      emettre("afaire_maj");
+      break;
+    case "tickets_maj":
+      emettre("tickets_maj");
       break;
     case "appareils_maj":
       emettre("appareils_maj");

@@ -502,7 +502,7 @@ def _etat_compte():
     from . import compte
     e = compte.etat()
     return {"connecte": compte.connecte(), "mode": compte.mode(), "email": e.get("email", ""),
-            "prenom": e.get("prenom", ""), "serveur": compte.serveur(), "machine": MACHINE}
+            "prenom": e.get("prenom", ""), "serveur": compte.serveur(), "machine": MACHINE, "admin": compte.est_admin()}
 
 
 def _apres_connexion():
@@ -834,6 +834,98 @@ async def tester_annonce(req: Request):
     annonces.annoncer("This is a test: this is how I'll let you know." if CONFIG.get("langue") == "en"
                       else "Ceci est un test : c'est comme ça que je te préviendrai.")
     return {"ok": True}
+
+
+# ---------- liste « À faire » ----------
+@app.get("/api/afaire")
+def lister_afaire(req: Request):
+    _verifier(req)
+    from . import afaire
+    return afaire.lister()
+
+
+@app.post("/api/afaire")
+async def creer_afaire(req: Request):
+    _verifier(req)
+    from . import afaire
+    d = await req.json()
+    if not str(d.get("titre", "")).strip():
+        raise HTTPException(400, "Indique la tâche.")
+    afaire.ajouter(d["titre"], d.get("note", ""), d.get("echeance", ""), d.get("priorite", "normale"), d.get("statut", "a_faire"))
+    return afaire.lister()
+
+
+@app.patch("/api/afaire/{tid}")
+async def modifier_afaire(tid: str, req: Request):
+    _verifier(req)
+    from . import afaire
+    d = await req.json()
+    afaire.modifier(tid, **{k: d.get(k) for k in ("titre", "note", "echeance", "priorite", "statut")})
+    return afaire.lister()
+
+
+@app.delete("/api/afaire/{tid}")
+def supprimer_afaire(tid: str, req: Request):
+    _verifier(req)
+    from . import afaire
+    if tid == "faits":
+        afaire.vider_faits()
+    else:
+        afaire.supprimer(tid)
+    return afaire.lister()
+
+
+# ---------- tickets (bugs, améliorations, idées) ----------
+@app.get("/api/tickets")
+async def lister_tickets(req: Request):
+    _verifier(req)
+    from . import compte
+    if not compte.connecte():
+        return {"connecte": False, "admin": False, "miens": [], "tous": []}
+    try:
+        miens = await asyncio.to_thread(compte.mes_tickets)
+        admin = compte.est_admin()
+        tous = await asyncio.to_thread(compte.tous_les_tickets) if admin else []
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return {"connecte": True, "admin": admin, "miens": miens, "tous": tous}
+
+
+@app.post("/api/tickets")
+async def creer_ticket(req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json()
+    if len(str(d.get("titre", "")).strip()) < 3:
+        raise HTTPException(400, "Donne un titre au ticket.")
+    try:
+        await asyncio.to_thread(compte.creer_ticket, d.get("genre", "bug"), d["titre"].strip(), d.get("description", ""))
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
+
+
+@app.patch("/api/tickets/{tid}")
+async def traiter_ticket(tid: int, req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json()
+    try:
+        await asyncio.to_thread(compte.traiter_ticket, tid, d.get("statut", ""), d.get("reponse"))
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
+
+
+@app.delete("/api/tickets/{tid}")
+async def supprimer_ticket(tid: int, req: Request):
+    _verifier(req)
+    from . import compte
+    try:
+        await asyncio.to_thread(compte.supprimer_ticket, tid)
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
 
 
 # ---------- autorisations du système (micro, écran, accessibilité, fichiers, applis) ----------

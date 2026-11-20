@@ -28,8 +28,10 @@ import { VueTaches } from "./views/Taches";
 import { VueAppareils } from "./views/Appareils";
 import { VueMisesAJour } from "./views/MisesAJour";
 import { VueSysteme } from "./views/Systeme";
+import { VueAFaire } from "./views/AFaire";
+import { VueTickets } from "./views/Tickets";
 
-const VUES: Vue[] = ["assistant", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "appareils", "systeme", "reglages", "majs"];
+const VUES: Vue[] = ["assistant", "afaire", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "appareils", "systeme", "reglages", "majs", "tickets"];
 
 function useRaccourcis() {
   useEffect(() => {
@@ -170,6 +172,8 @@ export default function App() {
             {vue === "automatisations" && <VueAutomatisations />}
             {vue === "taches" && <VueTaches />}
             {vue === "appareils" && <VueAppareils />}
+            {vue === "afaire" && <VueAFaire />}
+            {vue === "tickets" && <VueTickets />}
             </GardeVue>
           </div>
         </main>

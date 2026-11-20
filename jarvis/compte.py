@@ -139,7 +139,9 @@ def _dechiffrer(blob: str, cle: bytes) -> dict:
 
 # ---------- HTTP ----------
 class ErreurCompte(Exception):
-    pass
+    def __init__(self, message="", statut=0):
+        super().__init__(message)
+        self.statut = statut   # code HTTP renvoyé par le serveur (0 = pas de réponse)
 
 
 class SessionRevoquee(ErreurCompte):
@@ -160,7 +162,7 @@ def _appel(methode, chemin, jeton=None, http=None, **kw):
             msg = r.json().get("detail")
         except ValueError:
             msg = None
-        raise ErreurCompte(msg if isinstance(msg, str) else f"Erreur du serveur ({r.status_code}).")
+        raise ErreurCompte(msg if isinstance(msg, str) else f"Erreur du serveur ({r.status_code}).", r.status_code)
     return r.json()
 
 
@@ -391,7 +393,11 @@ def vider_attente():
                     _appel("POST", "/v1/faits/supprimer", json={"fid": op["fid"], "texte": op["texte"],
                                                               "ts": op["ts"], "appareil": MACHINE})
                 elif op["type"] == "doc":
-                    _appel("PUT", f"/v1/documents/{op['nom']}", json={"contenu": op["contenu"]})
+                    try:
+                        _appel("PUT", f"/v1/documents/{op['nom']}", json={"contenu": op["contenu"]})
+                    except ErreurCompte as e:
+                        if e.statut != 404:   # document inconnu d'un serveur plus ancien : ne bloque pas la file
+                            raise
             if lignes:
                 _appel("POST", "/v1/historique", json={"lignes": lignes})
         except ErreurCompte:
@@ -436,7 +442,7 @@ def synchroniser() -> dict:
     """Récupère du serveur l'état du compte : souvenirs ajoutés, modifiés ou supprimés sur un autre appareil,
     nouvel historique, réglages, connecteurs, secrets. Renvoie ce qui a changé ici."""
     changements = {"faits": False, "faits_texte": False, "historique": 0, "reglages": False, "connecteurs": False,
-                   "coffre": False, "automatisations": False}
+                   "coffre": False, "automatisations": False, "afaire": False}
     if not connecte():
         return changements
     from . import memoire
@@ -492,7 +498,21 @@ def synchroniser() -> dict:
                 if doc != connecteurs._lire():
                     connecteurs._ecrire(doc, synchro=False)
                     changements["connecteurs"] = True
+        try:
+            doc = _appel("GET", "/v1/documents/afaire")["contenu"]
+            from . import afaire
+            if doc is not None and doc != afaire.lister():
+                afaire._ecrire(doc, synchro=False)
+                changements["afaire"] = True
+        except ErreurCompte as e:
+            if e.statut != 404:
+                raise
         moi = _appel("GET", "/v1/moi")
+        if bool(moi.get("admin")) != bool(etat().get("admin")):
+            e = etat()
+            e["admin"] = bool(moi.get("admin"))
+            _sauver_etat(e)
+        _surveiller_tickets(bool(moi.get("admin")))
         if moi.get("prenom") and moi["prenom"] != CONFIG.get("nom_utilisateur"):
             CONFIG["nom_utilisateur"] = moi["prenom"]
             changements["reglages"] = True
@@ -515,6 +535,78 @@ def synchroniser() -> dict:
             except Exception as e:
                 print(f"  ! Après synchro : {e}")
     return changements
+
+
+# ---------- tickets (bugs, améliorations, idées) ----------
+def est_admin() -> bool:
+    return connecte() and bool(etat().get("admin"))
+
+
+def creer_ticket(genre: str, titre: str, description: str = "") -> dict:
+    from .version import VERSION
+    from .plateforme import MAC
+    if not connecte():
+        raise ErreurCompte("Il faut être connecté à un compte Jarvis pour envoyer un ticket.")
+    return _appel("POST", "/v1/tickets", json={"genre": genre, "titre": titre, "description": description,
+                                               "version": VERSION, "plateforme": "mac" if MAC else "windows",
+                                               "appareil": MACHINE})
+
+
+def mes_tickets() -> list:
+    return _appel("GET", "/v1/tickets") if connecte() else []
+
+
+def tous_les_tickets() -> list:
+    return _appel("GET", "/v1/admin/tickets")
+
+
+def traiter_ticket(tid: int, statut: str = "", reponse=None):
+    corps = {"statut": statut}
+    if reponse is not None:
+        corps["reponse"] = reponse
+    return _appel("PATCH", f"/v1/admin/tickets/{int(tid)}", json=corps)
+
+
+def supprimer_ticket(tid: int):
+    return _appel("DELETE", f"/v1/admin/tickets/{int(tid)}")
+
+
+def _surveiller_tickets(admin: bool):
+    """Notifie les nouveaux tickets (admin) et les réponses / changements de statut (auteur)."""
+    from . import notifications
+    f = dossier() / "tickets_vus.json"
+    try:
+        vus = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        vus = None   # premier passage : on mémorise l'état sans tout notifier
+    nouveau = dict(vus or {})
+    try:
+        if admin:
+            for t in tous_les_tickets():
+                cle = f"a{t['id']}"
+                if vus is not None and cle not in vus:
+                    notifications.ajouter(f"Nouveau ticket : {t['titre']}", f"{t.get('prenom') or t.get('email')} · {t['genre']}",
+                                          genre="info", vue="tickets", systeme=True)
+                nouveau[cle] = t["modifie"]
+        for t in _appel("GET", "/v1/tickets"):
+            cle, etat_t = f"m{t['id']}", f"{t['statut']}|{t['reponse']}"
+            if vus is not None and cle in vus and vus[cle] != etat_t:
+                notifications.ajouter(f"Ton ticket « {t['titre']} » a été mis à jour",
+                                      (t["reponse"] or "") + f" (statut : {t['statut'].replace('_', ' ')})",
+                                      genre="info", vue="tickets", systeme=True)
+            nouveau[cle] = etat_t
+    except ErreurCompte as e:
+        if e.statut in (404, 403):
+            return   # serveur plus ancien sans tickets
+        raise
+    if nouveau != vus:
+        f.write_text(json.dumps(nouveau), encoding="utf-8")
+    if vus is not None and nouveau != vus:
+        try:
+            from . import web
+            web.diffuser(type="tickets_maj")
+        except Exception:
+            pass
 
 
 def _session_revoquee():
