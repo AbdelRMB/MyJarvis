@@ -75,7 +75,8 @@ def _fichier_attendu(version: str) -> str:
 
 # ---------- liste ----------
 def lister() -> dict:
-    base = {"version": VERSION, "jeton": bool(jeton()), "installee": GELE, "majs": [], "journal": [], "erreur": ""}
+    base = {"version": VERSION, "jeton": bool(jeton()), "installee": GELE, "majs": [], "journal": [], "erreur": "",
+            "prete": version_prete()}
     try:
         r = requests.get(f"{API}/releases?per_page=50", headers=_entetes(), timeout=15)
     except requests.RequestException as e:
@@ -122,31 +123,46 @@ def installer(version: str, progression, quitter):
     threading.Thread(target=_installer, args=(maj, progression, quitter), daemon=True).start()
 
 
+def _telecharger(maj, cible: Path, progression=None):
+    """Télécharge l'installateur (fichier .part renommé à la fin) et vérifie sa taille."""
+    progression = progression or (lambda *a: None)
+    partiel = cible.with_name(cible.name + ".part")
+    # l'API renvoie vers un lien de stockage temporaire ; requests n'y renvoie pas le jeton
+    with requests.get(f"{API}/releases/assets/{maj['id_fichier']}", headers=_entetes(True), stream=True,
+                      timeout=60) as r:
+        r.raise_for_status()
+        total, recu, dernier = int(r.headers.get("content-length") or maj["taille"] or 0), 0, 0
+        with open(partiel, "wb") as f:
+            for bloc in r.iter_content(1 << 20):
+                f.write(bloc)
+                recu += len(bloc)
+                pct = int(recu * 100 / total) if total else 0
+                if pct != dernier:
+                    dernier = pct
+                    progression("telechargement", pct, f"Téléchargement… {recu >> 20} / {total >> 20} Mo")
+    if maj.get("taille") and partiel.stat().st_size != maj["taille"]:
+        partiel.unlink(missing_ok=True)
+        raise RuntimeError("téléchargement incomplet")
+    partiel.replace(cible)
+
+
+def _lancer_installateur(cible: Path, version: str, cache=False):
+    if sys.platform == "darwin":
+        _remplacer_mac(cible, version, cache)
+    else:
+        # même AppId : l'installateur remplace l'ancienne version en place, puis relance Jarvis
+        subprocess.Popen([str(cible), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"],
+                         creationflags=0x00000008 | 0x00000200)   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+
+
 def _installer(maj, progression, quitter):
     try:
         dossier = Path(tempfile.mkdtemp(prefix="jarvis-maj-"))
         cible = dossier / _fichier_attendu(maj["version"])
         progression("telechargement", 0, f"Téléchargement de Jarvis {maj['version']}…")
-        # l'API renvoie vers un lien de stockage temporaire ; requests n'y renvoie pas le jeton
-        with requests.get(f"{API}/releases/assets/{maj['id_fichier']}", headers=_entetes(True), stream=True,
-                          timeout=60) as r:
-            r.raise_for_status()
-            total, recu, dernier = int(r.headers.get("content-length") or maj["taille"] or 0), 0, 0
-            with open(cible, "wb") as f:
-                for bloc in r.iter_content(1 << 20):
-                    f.write(bloc)
-                    recu += len(bloc)
-                    pct = int(recu * 100 / total) if total else 0
-                    if pct != dernier:
-                        dernier = pct
-                        progression("telechargement", pct, f"Téléchargement… {recu >> 20} / {total >> 20} Mo")
+        _telecharger(maj, cible, progression)
         progression("installation", 100, "Installation : Jarvis va se fermer puis se relancer tout seul.")
-        if sys.platform == "darwin":
-            _remplacer_mac(cible, maj["version"])
-        else:
-            # même AppId : l'installateur remplace l'ancienne version en place, puis relance Jarvis
-            subprocess.Popen([str(cible), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"],
-                             creationflags=0x00000008 | 0x00000200)   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        _lancer_installateur(cible, maj["version"])
         ETAT["quitter_pour_maj"] = True   # app.py : fermeture immédiate, sans l'extraction des souvenirs
         time.sleep(1.5)
         quitter()
@@ -163,7 +179,7 @@ def _bundle_mac() -> Path:
     return Path(sys.executable).resolve().parents[2]
 
 
-def _remplacer_mac(dmg: Path, version: str):
+def _remplacer_mac(dmg: Path, version: str, cache: bool = False):
     """Script détaché : attend que Jarvis soit fermé (en le forçant au bout de 20 s), copie la nouvelle appli à côté,
     vérifie qu'elle est complète et dans la bonne version, puis échange les deux d'un coup (rien à moitié copié dans
     /Applications), relance Jarvis et le vérifie. Un verrou empêche deux installations en même temps."""
@@ -187,8 +203,8 @@ MNT=$(mktemp -d)
 fin() {{ hdiutil detach "$MNT" -quiet -force 2>/dev/null; rm -rf "$NEUVE" "$VERROU" "$(dirname "$DMG")"; }}
 trap fin EXIT
 relancer() {{
-  for i in 1 2 3; do open "$APPLI" && return 0; sleep 2; done
-  "$APPLI/Contents/MacOS/Jarvis" >/dev/null 2>&1 &
+  for i in 1 2 3; do open "$APPLI"{' --args --cache' if cache else ''} && return 0; sleep 2; done
+  "$APPLI/Contents/MacOS/Jarvis"{' --cache' if cache else ''} >/dev/null 2>&1 &
 }}
 log "début de la mise à jour vers $VERSION"
 # 1. Jarvis doit être fermé (20 s max, sinon on le force), ainsi que toute autre copie lancée entre-temps
@@ -228,6 +244,87 @@ log "Jarvis ne répond pas après la relance : nouvel essai"; relancer
     (RACINE / "logs").mkdir(exist_ok=True)
     log = open(RACINE / "logs" / "mise_a_jour.log", "a")
     subprocess.Popen(["/bin/bash", str(script)], stdout=log, stderr=log, stdin=subprocess.DEVNULL, start_new_session=True)
+
+
+# ---------- mises à jour automatiques : téléchargées en fond, installées au prochain démarrage ----------
+DOSSIER_AUTO = RACINE / "maj"
+
+
+def _pret() -> dict | None:
+    import json
+    try:
+        p = json.loads((DOSSIER_AUTO / "pret.json").read_text(encoding="utf-8"))
+        f = DOSSIER_AUTO / p["fichier"]
+        return p if f.exists() and (not p.get("taille") or f.stat().st_size == p["taille"]) else None
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def version_prete() -> str:
+    p = _pret()
+    return p["version"] if p and _num(p["version"]) > _num(VERSION) else ""
+
+
+def installer_au_demarrage(cache: bool) -> bool:
+    """Au lancement de l'appli : une version téléchargée en fond attend ? On l'installe tout de suite (Jarvis se
+    relance tout seul). Deux essais au plus par version, pour ne jamais tourner en boucle si ça échoue."""
+    import json
+    import shutil
+    from .config import CONFIG
+    if not GELE or not CONFIG.get("maj_auto", True):
+        return False
+    p = _pret()
+    if not p or _num(p["version"]) <= _num(VERSION):
+        shutil.rmtree(DOSSIER_AUTO, ignore_errors=True)   # déjà installée (ou rien) : on fait le ménage
+        return False
+    if p.get("essais", 0) >= 2:
+        return False
+    p["essais"] = p.get("essais", 0) + 1
+    (DOSSIER_AUTO / "pret.json").write_text(json.dumps(p), encoding="utf-8")
+    # le script d'installation supprime son dossier à la fin : on lui donne une copie
+    copie = Path(tempfile.mkdtemp(prefix="jarvis-maj-")) / p["fichier"]
+    shutil.copy2(DOSSIER_AUTO / p["fichier"], copie)
+    print(f"  Mise à jour automatique vers {p['version']}…")
+    _lancer_installateur(copie, p["version"], cache)
+    return True
+
+
+def _verifier_auto():
+    import json
+    from .config import CONFIG
+    if not GELE or not CONFIG.get("maj_auto", True) or ETAT["en_cours"]:
+        return
+    l = lister()
+    maj = next((m for m in l["majs"] if m["disponible"]), None)   # la plus récente disponible pour cet appareil
+    if not maj:
+        return
+    p = _pret()
+    if p and p["version"] == maj["version"]:
+        return
+    DOSSIER_AUTO.mkdir(parents=True, exist_ok=True)
+    for f in DOSSIER_AUTO.iterdir():   # une ancienne version téléchargée est remplacée
+        f.unlink(missing_ok=True)
+    nom = _fichier_attendu(maj["version"])
+    _telecharger(maj, DOSSIER_AUTO / nom)
+    (DOSSIER_AUTO / "pret.json").write_text(json.dumps({"version": maj["version"], "fichier": nom, "taille": maj["taille"]}),
+                                            encoding="utf-8")
+    from . import notifications
+    notifications.ajouter(f"Jarvis {maj['version']} est prêt",
+                          "Il s'installera tout seul au prochain démarrage de Jarvis (ou maintenant depuis l'écran Mises à jour).",
+                          genre="info", vue="majs")
+
+
+def demarrer_auto():
+    """Vérifie 3 minutes après le lancement, puis toutes les 6 heures."""
+    def boucle():
+        time.sleep(180)
+        while True:
+            try:
+                _verifier_auto()
+            except Exception as e:
+                print(f"  ! Mise à jour automatique : {e}")
+            time.sleep(6 * 3600)
+    threading.Thread(target=boucle, daemon=True, name="maj-auto").start()
 
 
 # ---------- raccourci « Mettre à jour Jarvis » (Spotlight / Launchpad) sur Mac ----------

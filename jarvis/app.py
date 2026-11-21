@@ -121,6 +121,9 @@ def main():
     if web._deja_lance(url):
         _appeler_instance(url, vue_maj)
         return
+    from . import mises_a_jour
+    if mises_a_jour.installer_au_demarrage(cache):   # version téléchargée en fond : installée, Jarvis se relance
+        __import__("os")._exit(0)   # (« os » est importé plus bas dans main : variable locale)
 
     if GELE and sys.platform == "darwin" and sys.executable.startswith("/Applications/") \
             and not CONFIG.get("demarrage_auto_initialise"):
@@ -137,7 +140,8 @@ def main():
 
     web.preparer()
     from . import rapport
-    rapport.au_demarrage()   # plantage lors de la session précédente : propose d'envoyer le rapport
+    rapport.au_demarrage()
+    mises_a_jour.demarrer_auto()   # plantage lors de la session précédente : propose d'envoyer le rapport
     import uvicorn
     serveur = uvicorn.Server(uvicorn.Config(web.app, host=web.HOTE, port=web.PORT, log_level="warning", log_config=None))
     threading.Thread(target=serveur.run, daemon=True, name="serveur").start()

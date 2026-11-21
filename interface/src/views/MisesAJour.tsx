@@ -9,7 +9,7 @@ import { toast } from "../stores/toasts";
 
 type Maj = { version: string; titre: string; description: string; date: string; disponible: boolean; taille: number };
 type Entree = { version: string; description: string; date: string; installee: boolean; plus_recente: boolean };
-type Etat = { version: string; jeton: boolean; installee: boolean; majs: Maj[]; journal: Entree[]; erreur: string };
+type Etat = { version: string; jeton: boolean; installee: boolean; majs: Maj[]; journal: Entree[]; erreur: string; prete?: string };
 type Progression = { etape: "telechargement" | "installation" | "erreur"; pct: number; texte: string };
 
 export function VueMisesAJour() {
@@ -101,6 +101,11 @@ export function VueMisesAJour() {
         </Panneau>
       )}
 
+      {e?.prete && (
+        <p className="mb-4 rounded-md border border-hud/40 bg-hud/5 p-3 text-sm text-hud">
+          {t("La version {v} est déjà téléchargée : elle s'installera toute seule au prochain démarrage de Jarvis.", { v: e.prete })}
+        </p>
+      )}
       {e?.erreur && <p className="mb-4 rounded-md border border-rouge/40 bg-rouge/5 p-3 text-sm text-rouge">{e.erreur}</p>}
       {e && !e.installee && (
         <p className="mb-4 rounded-md border border-ambre/40 bg-ambre/5 p-3 text-sm text-ambre">
