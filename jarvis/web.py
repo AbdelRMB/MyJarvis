@@ -1238,6 +1238,87 @@ async def tts_synthese(req: Request):
     return Response(audio, media_type=mime, headers={"x-moteur": moteur, "cache-control": "no-store"})
 
 
+# ---------- sites appris et navigateur de Jarvis ----------
+@app.get("/api/sites")
+def lister_sites(req: Request):
+    _verifier(req)
+    from . import navigateur, sites
+    return {"sites": [sites.resume(s) for s in sites.lister()], "navigateur": navigateur.etat(),
+            "exploration": {k: v for k, v in sites.EXPLO.items() if k != "arreter"}}
+
+
+@app.get("/api/sites/{sid}")
+def lire_site(sid: str, req: Request):
+    _verifier(req)
+    from . import sites
+    s = sites.lire(sid)
+    if not s:
+        raise HTTPException(404, "Site introuvable.")
+    return {**s, "procedures": [{**p, "texte": [sites.decrire_etape(e) for e in p["etapes"]]} for p in s.get("procedures", [])]}
+
+
+@app.post("/api/sites")
+async def ajouter_site(req: Request):
+    _verifier(req)
+    from . import sites
+    d = await req.json()
+    if not str(d.get("url", "")).strip():
+        raise HTTPException(400, "Indique l'adresse du site.")
+    return sites.resume(sites.ajouter(d.get("nom", ""), d["url"].strip()))
+
+
+@app.delete("/api/sites/{sid}")
+def supprimer_site(sid: str, req: Request):
+    _verifier(req)
+    from . import sites
+    sites.supprimer(sid)
+    return {"ok": True}
+
+
+@app.post("/api/navigateur/installer")
+def installer_navigateur(req: Request):
+    _verifier(req)
+    from . import navigateur
+    navigateur.installer_chrome()
+    return navigateur.etat()
+
+
+@app.post("/api/sites/{sid}/{action}")
+async def agir_site(sid: str, action: str, req: Request):
+    _verifier(req)
+    from . import navigateur, sites
+    d = await req.json() if (req.headers.get("content-length") or "0") != "0" else {}
+    s = sites.lire(sid)
+    if not s and action != "arreter":
+        raise HTTPException(404, "Site introuvable.")
+    try:
+        if action == "ouvrir":   # pour s'y connecter (identifiants, double authentification…)
+            await asyncio.to_thread(navigateur.ouvrir, s["url"])
+            await asyncio.to_thread(navigateur.afficher)
+        elif action == "explorer":
+            sites.explorer(sid, max(5, min(int(d.get("max_pages") or 80), 300)))
+        elif action == "arreter":
+            sites.EXPLO["arreter"] = True
+        elif action == "demo":   # démonstration : l'utilisateur fait la tâche, Jarvis enregistre
+            await asyncio.to_thread(navigateur.demarrer_enregistrement, sid)
+            if not ((await asyncio.to_thread(navigateur.instantane)) or {}).get("url", "").startswith("http"):
+                await asyncio.to_thread(navigateur.ouvrir, s["url"])
+        elif action == "demo_fin":
+            etapes = navigateur.arreter_enregistrement()
+            if d.get("garder", True) and etapes:
+                sites.ajouter_procedure(sid, d.get("nom", "") or "Procédure", etapes, d.get("description", ""))
+            return {"etapes": len(etapes), **(await asyncio.to_thread(sites.lire, sid))}
+        elif action == "astuce":
+            sites.noter(sid, d.get("texte", ""))
+        elif action == "retirer":
+            sites.retirer(sid, d.get("quoi", "astuces"), d.get("id", ""))
+        else:
+            raise HTTPException(404, "Action inconnue.")
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
 # ---------- voix Kyutai (locale, téléchargeable) ----------
 @app.get("/api/kyutai")
 def etat_kyutai(req: Request):

@@ -12,7 +12,7 @@ hiddenimports = (collect_submodules("jarvis") + collect_submodules("uvicorn") + 
 
 for paquet in ["webview", "openwakeword", "faster_whisper", "ctranslate2", "onnxruntime", "piper", "edge_tts",
                "sounddevice", "_sounddevice_data", "recurring_ical_events", "icalendar", "tokenizers", "certifi",
-               "ddgs", "objc", "Foundation", "AppKit", "WebKit", "Quartz", "ApplicationServices"]:
+               "ddgs", "objc", "Foundation", "AppKit", "WebKit", "Quartz", "ApplicationServices", "websockets"]:
     try:
         d, b, h = collect_all(paquet)
         datas += d

@@ -3,6 +3,14 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.10.0
+- **Jarvis apprend tes sites par cœur** (intranet, logiciels d'entreprise, sites complexes) : nouvel écran **Sites appris**. Ajoute un site, connecte-toi une fois dans le navigateur de Jarvis (la session est gardée), puis :
+  - **Explorer** : Jarvis parcourt le site sans rien modifier et retient chaque page avec le chemin pour y arriver (« Menu › Facturation › Nouvelle facture »), ses boutons et ses formulaires, puis rédige un guide du site ;
+  - **Démonstration** : fais une tâche devant lui, il enregistre tes étapes (jamais tes mots de passe) et sait la refaire ;
+  - **Astuces** : ajoute les tiennes ; lui aussi retient les raccourcis qu'il découvre.
+  Ensuite, demande-lui « où je pose mes congés sur l'intranet ? » ou « crée une facture sur Sage » : il sait directement où aller et quoi faire. Il te demande ton accord avant tout clic qui modifie quelque chose (supprimer, envoyer, payer, valider…). Ce qu'il apprend reste sur ton ordinateur. / **Jarvis learns your sites by heart**: explore, record demonstrations, add tips; it then knows where to go and what to do.
+- **Le navigateur de Jarvis** : il pilote son propre navigateur (Chrome, Edge ou Brave s'ils sont installés, sinon un bouton télécharge le Chrome officiel de Google pour l'automatisation, environ 150 Mo) pour ouvrir des pages, cliquer, remplir des formulaires et lire des tableaux. / **Jarvis's own browser** to act on websites.
+
 ## 1.9.0
 - **Jarvis beaucoup plus intelligent** (cerveau Claude) :
   - il **règle sa réflexion tout seul** : réponse immédiate pour « ouvre Discord », réflexion poussée pour « organise ma semaine » ou « pourquoi mon serveur est lent ? ». Dis « réfléchis bien » pour qu'il prenne vraiment son temps ;

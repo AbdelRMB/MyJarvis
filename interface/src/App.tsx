@@ -31,9 +31,10 @@ import { VueMisesAJour } from "./views/MisesAJour";
 import { VueSysteme } from "./views/Systeme";
 import { VueAFaire } from "./views/AFaire";
 import { VueTickets } from "./views/Tickets";
+import { VueSites } from "./views/Sites";
 import { VueStats } from "./views/Stats";
 
-const VUES: Vue[] = ["assistant", "afaire", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "appareils", "systeme", "reglages", "majs", "tickets", "stats"];
+const VUES: Vue[] = ["assistant", "afaire", "historique", "memoire", "connecteurs", "activite", "arsenal", "taches", "automatisations", "appareils", "systeme", "reglages", "majs", "tickets", "stats", "sites"];
 
 function useRaccourcis() {
   useEffect(() => {
@@ -177,6 +178,7 @@ export default function App() {
             {vue === "appareils" && <VueAppareils />}
             {vue === "afaire" && <VueAFaire />}
             {vue === "tickets" && <VueTickets />}
+            {vue === "sites" && <VueSites />}
             {vue === "stats" && (compte?.admin ? <VueStats /> : <VueAssistant />)}
             </GardeVue>
           </div>
