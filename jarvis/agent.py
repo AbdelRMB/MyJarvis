@@ -24,7 +24,11 @@ def _services() -> str:
         pass
     try:
         from . import automatisations
-        n = len([r for r in automatisations.lister() if r.get("actif")])
+        routines = [r for r in automatisations.lister() if r.get("actif") and r["declencheur"].get("type") == "commande"]
+        if routines:
+            lignes.append("- Routines (lancer_routine quand l'utilisateur dit leur nom) : "
+                          + ", ".join(f"« {r['declencheur'].get('phrase') or r['nom']} »" for r in routines))
+        n = len([r for r in automatisations.lister() if r.get("actif") and r["declencheur"].get("type") != "commande"])
         if n:
             lignes.append(f"- {n} automatisation(s) active(s) (lister_automatisations)")
     except Exception:

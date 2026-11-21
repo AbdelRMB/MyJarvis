@@ -45,12 +45,12 @@ def _ecrire(regles: list, synchro=True):
         compte.document_modifie("automatisations", regles)
 
 
-TYPES = ("mail", "horaire", "intervalle", "demarrage")
+TYPES = ("mail", "horaire", "intervalle", "demarrage", "commande")   # commande = routine lancée en la disant
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
 
 def creer(nom: str, expediteur="", sujet="", contient="", connecteur="", action="prevenir", consigne="",
-          type_declencheur="mail", heure="", jours=None, minutes=0, appareil=None, message="") -> dict:
+          type_declencheur="mail", heure="", jours=None, minutes=0, appareil=None, message="", phrase="") -> dict:
     """type_declencheur : mail | horaire (heure HH:MM, jours 0=lundi…6=dimanche, vide = tous) | intervalle (minutes)
     | demarrage (à chaque lancement de Jarvis). appareil : nom de l'appareil qui l'exécute (« » = tous)."""
     from .config import MACHINE
@@ -59,12 +59,13 @@ def creer(nom: str, expediteur="", sujet="", contient="", connecteur="", action=
              "declencheur": {"type": type_declencheur, "expediteur": expediteur.strip(), "sujet": sujet.strip(),
                              "contient": contient.strip(), "connecteur": connecteur.strip(), "heure": heure.strip(),
                              "jours": sorted({int(j) for j in (jours or []) if 0 <= int(j) <= 6}),
-                             "minutes": max(1, int(minutes or 0)) if type_declencheur == "intervalle" else 0},
+                             "minutes": max(1, int(minutes or 0)) if type_declencheur == "intervalle" else 0,
+                             "phrase": (phrase or nom).strip() if type_declencheur == "commande" else ""},
              "action": {"type": action if action in ("prevenir", "jarvis") else "prevenir", "consigne": consigne.strip(),
                         "message": message.strip()},
              # les règles « à heure fixe » ne s'exécutent par défaut que sur l'appareil où elles ont été créées
              # (sinon chaque ordinateur allumé dirait la même chose) ; les règles mail aussi sur tous
-             "appareil": (MACHINE if type_declencheur != "mail" else "") if appareil is None else appareil,
+             "appareil": (MACHINE if type_declencheur not in ("mail", "commande") else "") if appareil is None else appareil,
              "cree": datetime.now().isoformat(timespec="seconds")}
     with _verrou:
         _ecrire(lister() + [regle])
@@ -86,6 +87,20 @@ def modifier(rid: str, **champs) -> bool:
         return True
 
 
+def trouver_routine(nom: str) -> dict | None:
+    cle = nom.strip().strip("«»\"' ").lower()
+    routines = [r for r in lister() if r.get("actif") and r["declencheur"].get("type") == "commande"]
+    for r in routines:
+        if cle in ((r["declencheur"].get("phrase") or "").lower(), r["nom"].lower(), r["id"]):
+            return r
+    return next((r for r in routines if cle and (cle in (r["declencheur"].get("phrase") or "").lower() or cle in r["nom"].lower())), None)
+
+
+def consigne_routine(r: dict) -> str:
+    return (f"[Routine « {r['declencheur'].get('phrase') or r['nom']} »] Fais maintenant, dans l'ordre et avec tes outils, ce qui "
+            f"suit, puis résume en une phrase :\n{r['action'].get('consigne') or r['action'].get('message') or r['nom']}")
+
+
 def supprimer(rid: str) -> bool:
     with _verrou:
         regles = lister()
@@ -104,6 +119,8 @@ def decrire(r: dict) -> str:
         quand = f"Toutes les {d.get('minutes')} min"
     elif t == "demarrage":
         quand = "Au démarrage de Jarvis"
+    elif t == "commande":
+        quand = f"Quand tu dis « {d.get('phrase') or r['nom']} »"
     else:
         conditions = [f"de « {d['expediteur']} »" if d.get("expediteur") else "",
                       f"sujet contenant « {d['sujet']} »" if d.get("sujet") else "",
@@ -113,7 +130,7 @@ def decrire(r: dict) -> str:
         faire = f"Jarvis : « {a['consigne']} »"
     else:
         faire = f"te dire « {a['message']} »" if a.get("message") else "te prévenir à voix haute"
-    ou = f" (sur {r['appareil']})" if r.get("appareil") else " (sur tous tes appareils)"
+    ou = "" if t == "commande" else f" (sur {r['appareil']})" if r.get("appareil") else " (sur tous tes appareils)"
     return f"{quand} → {faire}{ou}"
 
 

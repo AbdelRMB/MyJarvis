@@ -853,7 +853,7 @@ async def creer_automatisation(req: Request):
     automatisations.creer(d.get("nom", ""), d.get("expediteur", ""), d.get("sujet", ""), d.get("contient", ""),
                           d.get("connecteur", ""), d.get("action", "prevenir"), d.get("consigne", ""), typ,
                           d.get("heure", ""), d.get("jours") or [], int(d.get("minutes") or 0),
-                          None if d.get("appareil") is None else d.get("appareil"), d.get("message", ""))
+                          None if d.get("appareil") is None else d.get("appareil"), d.get("message", ""), d.get("phrase", ""))
     return lister_automatisations(req)
 
 
@@ -871,6 +871,18 @@ def supprimer_automatisation(rid: str, req: Request):
     from . import automatisations
     automatisations.supprimer(rid)
     return lister_automatisations(req)
+
+
+@app.post("/api/automatisations/{rid}/lancer")
+def lancer_routine(rid: str, req: Request):
+    """Bouton « Lancer » d'une routine : Jarvis l'exécute dans la conversation, comme si tu l'avais demandée."""
+    _verifier(req)
+    from . import automatisations
+    r = next((x for x in automatisations.lister() if x["id"] == rid), None)
+    if not r:
+        raise HTTPException(404, "Routine introuvable.")
+    threading.Thread(target=executer, args=(automatisations.consigne_routine(r),), daemon=True).start()
+    return {"ok": True}
 
 
 @app.post("/api/automatisations/tester")
