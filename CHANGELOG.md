@@ -3,6 +3,16 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.9.0
+- **Rappels** : « rappelle-moi de sortir les poubelles à 20 h » et Jarvis te le dit à voix haute à l'heure. Une tâche avec une échéance à heure précise est rappelée une heure avant puis à l'heure, et chaque matin Jarvis signale gentiment les tâches en retard. Un champ « Rappel » est aussi dans l'écran À faire. / **Reminders**: Jarvis tells you out loud at the right time.
+- **Briefing du matin** : au premier échange de la journée, Jarvis commence par un résumé : ta liste À faire du jour, tes mails importants, ton agenda, la météo et l'état de tes serveurs. Tu peux aussi dire « fais-moi le briefing » à tout moment (à désactiver dans Réglages › Application). / **Morning briefing** at your first exchange of the day.
+- **Rapport de bug en un clic** : quand Jarvis rencontre une erreur ou s'arrête, il te propose d'envoyer un rapport au développeur (écran Tickets). Tu vois exactement ce qui part avant d'envoyer : version, système, erreur et fin du journal. / **One-click bug reports** when something goes wrong.
+- **Routines** : crée une routine (« mode travail », « fin de journée »…) dans Automatisations ou en le demandant à Jarvis, puis dis simplement sa phrase : il enchaîne toutes les étapes. / **Routines** started by saying a phrase.
+- **Conversation plus naturelle** : après une réponse à l'oral, Jarvis écoute ta suite quelques secondes sans que tu redises « Jarvis ». Tu peux aussi lui couper la parole directement : il se tait et écoute ta nouvelle demande. / **More natural conversation**: follow-up questions without the wake word, and interrupt him by just speaking.
+- **Mises à jour automatiques** : Jarvis télécharge les nouvelles versions en arrière-plan et les installe tout seul au prochain démarrage (à désactiver dans Réglages › Application). / **Automatic updates** installed at the next start.
+- **Sur ton téléphone** : la liste À faire et tes tickets sont dans l'appli mobile. Écris « ajoute du pain à ma liste », même ordinateur éteint. / **To-do list and tickets on your phone**.
+- **Pour les administrateurs** : « corrige le ticket 12 » (ou le bouton « Corriger avec Claude Code ») lance Claude Code sur le code de Jarvis et prévient l'auteur ; « marque le ticket 12 résolu » lui annonce la correction. / **Admins**: fix a ticket with Claude Code in one sentence.
+
 ## 1.8.2
 - **Mises à jour Mac en une seule fois** : il fallait parfois installer une mise à jour deux ou trois fois. Jarvis se ferme maintenant tout de suite pour la mise à jour, la nouvelle version est copiée et vérifiée avant de remplacer l'ancienne (jamais d'appli à moitié installée), puis Jarvis se relance tout seul. En cas de problème, l'ancienne version est gardée et relancée. Valable à partir de la prochaine mise à jour. / **Mac updates install on the first try**: Jarvis closes right away, the new version is copied and checked before replacing the old one, then relaunches.
 
