@@ -305,6 +305,14 @@ def main():
         except Exception:
             pass
         os._exit(0)
+    from . import mises_a_jour
+    if mises_a_jour.ETAT.get("quitter_pour_maj"):
+        # mise à jour : on libère la place tout de suite (l'installateur attend notre fin pour remplacer l'appli)
+        try:
+            ecoute.arreter()
+        except Exception:
+            pass
+        os._exit(0)
     try:
         print("Je mémorise ce que j'ai appris...")
         for f in web.jarvis.extraire_souvenirs():

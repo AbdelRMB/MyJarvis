@@ -3,6 +3,9 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.8.2
+- **Mises à jour Mac en une seule fois** : il fallait parfois installer une mise à jour deux ou trois fois. Jarvis se ferme maintenant tout de suite pour la mise à jour, la nouvelle version est copiée et vérifiée avant de remplacer l'ancienne (jamais d'appli à moitié installée), puis Jarvis se relance tout seul. En cas de problème, l'ancienne version est gardée et relancée. Valable à partir de la prochaine mise à jour. / **Mac updates install on the first try**: Jarvis closes right away, the new version is copied and checked before replacing the old one, then relaunches.
+
 ## 1.8.1
 - **Les nouveautés s'affichent enfin après une mise à jour** : la fenêtre de Jarvis gardait parfois l'ancienne interface en mémoire. L'appli était bien à jour, mais les nouveaux écrans (À faire, Tickets, menu en sections…) n'apparaissaient pas. C'est corrigé : chaque nouvelle version affiche sa propre interface. / **New features now show up after an update**: the window no longer keeps the old interface in its cache.
 

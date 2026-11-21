@@ -142,13 +142,17 @@ def _installer(maj, progression, quitter):
                         progression("telechargement", pct, f"Téléchargement… {recu >> 20} / {total >> 20} Mo")
         progression("installation", 100, "Installation : Jarvis va se fermer puis se relancer tout seul.")
         if sys.platform == "darwin":
-            _remplacer_mac(cible)
+            _remplacer_mac(cible, maj["version"])
         else:
             # même AppId : l'installateur remplace l'ancienne version en place, puis relance Jarvis
             subprocess.Popen([str(cible), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"],
                              creationflags=0x00000008 | 0x00000200)   # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+        ETAT["quitter_pour_maj"] = True   # app.py : fermeture immédiate, sans l'extraction des souvenirs
         time.sleep(1.5)
         quitter()
+        time.sleep(15)   # la fenêtre ne s'est pas fermée : on part quand même, l'installateur attend notre fin
+        import os
+        os._exit(0)
     except Exception as e:
         ETAT["en_cours"] = False
         progression("erreur", 0, f"Mise à jour impossible : {e}")
@@ -159,23 +163,71 @@ def _bundle_mac() -> Path:
     return Path(sys.executable).resolve().parents[2]
 
 
-def _remplacer_mac(dmg: Path):
+def _remplacer_mac(dmg: Path, version: str):
+    """Script détaché : attend que Jarvis soit fermé (en le forçant au bout de 20 s), copie la nouvelle appli à côté,
+    vérifie qu'elle est complète et dans la bonne version, puis échange les deux d'un coup (rien à moitié copié dans
+    /Applications), relance Jarvis et le vérifie. Un verrou empêche deux installations en même temps."""
+    import os
+    import shlex
     appli = _bundle_mac()
+    q = shlex.quote
+    neuve = appli.parent / ".Jarvis-maj.app"
+    ancienne = appli.parent / ".Jarvis-ancien.app"
     script = dmg.parent / "installer.sh"
     script.write_text(f"""#!/bin/bash
-# attend la fermeture de Jarvis, remplace l'appli par celle du .dmg, puis la relance
-while kill -0 {__import__('os').getpid()} 2>/dev/null; do sleep 0.5; done
+# Mise à jour de Jarvis {version} (journal : logs/mise_a_jour.log)
+APPLI={q(str(appli))}; NEUVE={q(str(neuve))}; ANCIENNE={q(str(ancienne))}; DMG={q(str(dmg))}
+VERSION={q(version)}; PID={os.getpid()}; VERROU=/tmp/jarvis-maj.verrou
+log() {{ echo "$(date '+%F %T') $*"; }}
+if ! mkdir "$VERROU" 2>/dev/null; then
+  if [ -n "$(find "$VERROU" -maxdepth 0 -mmin -15 2>/dev/null)" ]; then log "une autre installation est en cours : abandon"; exit 0; fi
+  rm -rf "$VERROU"; mkdir "$VERROU"
+fi
 MNT=$(mktemp -d)
-hdiutil attach -nobrowse -readonly -mountpoint "$MNT" "{dmg}" >/dev/null || exit 1
-rm -rf "{appli}.ancien"
-mv "{appli}" "{appli}.ancien" && ditto "$MNT/Jarvis.app" "{appli}" && rm -rf "{appli}.ancien" || mv "{appli}.ancien" "{appli}"
-hdiutil detach "$MNT" -quiet
-xattr -dr com.apple.quarantine "{appli}" 2>/dev/null
-open "{appli}"
-rm -rf "{dmg.parent}"
+fin() {{ hdiutil detach "$MNT" -quiet -force 2>/dev/null; rm -rf "$NEUVE" "$VERROU" "$(dirname "$DMG")"; }}
+trap fin EXIT
+relancer() {{
+  for i in 1 2 3; do open "$APPLI" && return 0; sleep 2; done
+  "$APPLI/Contents/MacOS/Jarvis" >/dev/null 2>&1 &
+}}
+log "début de la mise à jour vers $VERSION"
+# 1. Jarvis doit être fermé (20 s max, sinon on le force), ainsi que toute autre copie lancée entre-temps
+for i in $(seq 1 40); do kill -0 $PID 2>/dev/null || break; sleep 0.5; done
+kill -9 $PID 2>/dev/null
+pkill -9 -f "$APPLI/Contents/MacOS/" 2>/dev/null
+sleep 1
+# 2. Copie de la nouvelle version À CÔTÉ de l'ancienne, vérifiée, avec 3 essais
+ok=""
+for essai in 1 2 3; do
+  hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$MNT" "$DMG" >/dev/null || {{ log "montage impossible (essai $essai)"; sleep 2; continue; }}
+  rm -rf "$NEUVE"
+  if ditto "$MNT/Jarvis.app" "$NEUVE" \
+     && [ "$(defaults read "$NEUVE/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null)" = "$VERSION" ] \
+     && [ -x "$NEUVE/Contents/MacOS/Jarvis" ] \
+     && codesign --verify "$NEUVE" 2>/dev/null; then ok=1; break; fi
+  log "copie incomplète (essai $essai), nouvel essai"
+  hdiutil detach "$MNT" -quiet -force 2>/dev/null; sleep 2
+done
+if [ -z "$ok" ]; then log "ÉCHEC : la nouvelle version n'a pas pu être copiée, l'ancienne est gardée"; relancer; exit 1; fi
+# 3. Échange en une fois (renommages : instantanés), avec retour à l'ancienne si besoin
+pkill -9 -f "$APPLI/Contents/MacOS/" 2>/dev/null
+rm -rf "$ANCIENNE"
+[ -d "$APPLI" ] && ! mv "$APPLI" "$ANCIENNE" && {{ log "ÉCHEC : impossible de déplacer l'ancienne appli"; relancer; exit 1; }}
+if ! mv "$NEUVE" "$APPLI"; then
+  log "ÉCHEC : impossible de mettre la nouvelle appli en place, retour à l'ancienne"
+  [ -d "$ANCIENNE" ] && mv "$ANCIENNE" "$APPLI"; relancer; exit 1
+fi
+rm -rf "$ANCIENNE"
+xattr -dr com.apple.quarantine "$APPLI" 2>/dev/null
+log "Jarvis $VERSION installé"
+# 4. Relance (plusieurs essais) et vérification
+relancer
+for i in $(seq 1 60); do curl -s -o /dev/null --max-time 2 http://127.0.0.1:7777/api/session && {{ log "Jarvis relancé"; exit 0; }}; sleep 1; done
+log "Jarvis ne répond pas après la relance : nouvel essai"; relancer
 """, encoding="utf-8")
+    (RACINE / "logs").mkdir(exist_ok=True)
     log = open(RACINE / "logs" / "mise_a_jour.log", "a")
-    subprocess.Popen(["/bin/bash", str(script)], stdout=log, stderr=log, start_new_session=True)
+    subprocess.Popen(["/bin/bash", str(script)], stdout=log, stderr=log, stdin=subprocess.DEVNULL, start_new_session=True)
 
 
 # ---------- raccourci « Mettre à jour Jarvis » (Spotlight / Launchpad) sur Mac ----------
