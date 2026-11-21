@@ -3,6 +3,9 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.8.1
+- **Les nouveautés s'affichent enfin après une mise à jour** : la fenêtre de Jarvis gardait parfois l'ancienne interface en mémoire. L'appli était bien à jour, mais les nouveaux écrans (À faire, Tickets, menu en sections…) n'apparaissaient pas. C'est corrigé : chaque nouvelle version affiche sa propre interface. / **New features now show up after an update**: the window no longer keeps the old interface in its cache.
+
 ## 1.8.0
 - **sudo sur tes serveurs** : nouvelle option « Droits administrateur (sudo) » dans le connecteur Serveur SSH. Activée, Jarvis peut lancer des commandes administrateur (redémarrer un service, installer un paquet, modifier une configuration…), sans jamais te demander ton mot de passe. Chaque commande sudo attend toujours ton « Autoriser / Refuser », même en mode libre. Sur le serveur, sudo doit être autorisé sans mot de passe pour l'utilisateur de Jarvis. / **sudo on your servers**: optional admin rights for the SSH connector, always with your approval.
 - **Assistant de configuration du serveur** : dans le connecteur SSH, coche ce que Jarvis aura le droit de faire (aucun droit admin, droits limités : services, journaux, serveur web, certificats, mises à jour, Docker, ou tous les droits) et si ton serveur demande un code 2FA. Jarvis te donne un seul bloc de commandes à coller sur le serveur : il crée l'utilisateur, installe la clé, règle sudo et vérifie le tout. / **Server setup wizard**: tick what Jarvis may do, paste one block of commands on the server.

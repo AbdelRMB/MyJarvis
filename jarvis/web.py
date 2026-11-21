@@ -1295,12 +1295,15 @@ if (STATIC / "assets").exists():
 @app.get("/{chemin:path}", response_class=HTMLResponse)
 def front(chemin: str):
     f = (STATIC / chemin).resolve()
+    # Sans « no-cache », la fenêtre (WebKit sur Mac, WebView2 sur Windows) gardait l'ancienne page en cache :
+    # après une mise à jour, l'appli tournait en nouvelle version mais affichait l'ancienne interface.
+    # Les fichiers de assets/ changent de nom à chaque version : eux peuvent rester en cache.
     if chemin and f.is_file() and STATIC.resolve() in f.parents:
-        return FileResponse(f)
+        return FileResponse(f, headers={"Cache-Control": "no-cache"})
     index = STATIC / "index.html"
     if not index.exists():
         return HTMLResponse("<h1>Interface non compilée</h1><p>Lance <code>npm run build</code> dans le dossier interface.</p>", 503)
-    return FileResponse(index)
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 # ---------- lancement ----------

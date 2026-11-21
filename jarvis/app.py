@@ -147,7 +147,9 @@ def main():
     # Au démarrage de l'ordinateur (--cache) : juste le processus (serveur + écoute de fond).
     # L'interface n'est chargée qu'au premier appel (« Jarvis », raccourci, icône).
     vide = "<html><body style='background:#04090f'></body></html>"
-    url_fenetre = f"{url}/?appli=1" + (f"&vue={vue_maj}" if vue_maj else "")
+    from .version import VERSION
+    # la version dans l'adresse : après une mise à jour, la page en cache de l'ancienne version n'est jamais réutilisée
+    url_fenetre = f"{url}/?appli=1&v={VERSION}" + (f"&vue={vue_maj}" if vue_maj else "")
     fen = webview.create_window("J.A.R.V.I.S.", None if cache else url_fenetre, html=vide if cache else "",
                                 width=1320, height=860, min_size=(420, 560), hidden=cache,
                                 background_color="#04090f", text_select=True)
@@ -157,7 +159,7 @@ def main():
         try:
             if not etat["charge"]:
                 etat["charge"] = True
-                fen.load_url(f"{url}/?appli=1" + (f"&vue={vue}" if vue else ""))
+                fen.load_url(f"{url}/?appli=1&v={VERSION}" + (f"&vue={vue}" if vue else ""))
             elif vue:
                 web.diffuser(type="naviguer", vue=vue)
             fen.show()
