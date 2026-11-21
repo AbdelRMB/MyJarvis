@@ -59,7 +59,7 @@ DEFAUT = {
     "garder_modele": -1,          # -1 = garder le modèle en VRAM tant que Jarvis tourne (sinon Ollama le décharge après 5 min)
     "cerveau": "claude",          # "claude" (API Anthropic) ou "ollama" (local)
     "claude_modele": "claude-sonnet-5-5",
-    "claude_effort": "low",
+    "claude_effort": "auto",      # auto = bas pour une conversation, élevé pour une vraie tâche, très élevé sur demande
     "openai_modele": "",
     "langue": "fr",               # « fr » ou « en » : réponses de Jarvis, reconnaissance vocale, voix, interface        # vide = le meilleur modèle disponible avec ta clé OpenAI       # low = le plus réactif à l'oral ; medium pour les tâches longues avec outils
     "serveur_comptes": "",        # vide = serveur de comptes officiel ; sinon l'adresse HTTPS de ton propre serveur
@@ -71,6 +71,8 @@ DEFAUT = {
     "briefing_matin": True,       # au premier échange de la journée (5 h-12 h), Jarvis commence par le briefing
     "conversation_suivie": True,  # après une réponse à l'oral, il écoute la suite quelques secondes sans « Jarvis »
     "maj_auto": True,             # télécharge les mises à jour en fond et les installe au prochain démarrage
+    "conseiller": True,           # cerveau Sonnet : consulte Opus sur les décisions difficiles (outil advisor)
+    "recherche_web_native": True, # cerveau Claude : recherche et lecture web par Anthropic (sources citées)
 }
 
 CONFIG = {**DEFAUT, **(json.loads(FICHIER_CONFIG.read_text(encoding="utf-8")) if FICHIER_CONFIG.exists() else {})}

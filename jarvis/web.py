@@ -36,7 +36,7 @@ HOTES_OK = {"127.0.0.1", "localhost"}
 CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
                "max_etapes_outils", "whisper_modele", "nom_utilisateur",
                "cerveau", "claude_modele", "claude_effort", "openai_modele", "langue",
-               "briefing_matin", "conversation_suivie", "maj_auto"]
+               "briefing_matin", "conversation_suivie", "maj_auto", "conseiller", "recherche_web_native"]
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 jarvis: Jarvis | None = None
@@ -1218,7 +1218,9 @@ def commande_vocale(audio: np.ndarray):
 @app.get("/api/tts/voix")
 def tts_voix(req: Request):
     _verifier(req)
-    return {"edge": [{"id": i, "nom": n} for i, n in tts.VOIX_EDGE],
+    from . import kyutai
+    return {"kyutai": [{"id": i, "nom": n} for i, n in kyutai.VOIX],
+            "edge": [{"id": i, "nom": n} for i, n in tts.VOIX_EDGE],
             "piper": [{"id": v, "nom": v.replace("_", " ")} for v in tts.voix_piper()]}
 
 
@@ -1234,6 +1236,32 @@ async def tts_synthese(req: Request):
     except Exception as e:
         raise HTTPException(502, f"Synthèse impossible : {e}")
     return Response(audio, media_type=mime, headers={"x-moteur": moteur, "cache-control": "no-store"})
+
+
+# ---------- voix Kyutai (locale, téléchargeable) ----------
+@app.get("/api/kyutai")
+def etat_kyutai(req: Request):
+    _verifier(req)
+    from . import kyutai
+    return kyutai.etat()
+
+
+@app.post("/api/kyutai/{action}")
+async def agir_kyutai(action: str, req: Request):
+    _verifier(req)
+    from . import kyutai
+    try:
+        if action == "installer":
+            kyutai.installer()
+        elif action == "supprimer":
+            await asyncio.to_thread(kyutai.supprimer)
+        elif action == "demarrer":   # charge le modèle à l'avance (choix de la voix Kyutai dans les réglages)
+            threading.Thread(target=kyutai.demarrer_serveur, daemon=True).start()
+        else:
+            raise HTTPException(404, "Action inconnue.")
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return kyutai.etat()
 
 
 # ---------- modèle en mémoire vidéo ----------

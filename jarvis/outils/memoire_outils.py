@@ -11,6 +11,13 @@ def memoriser(fait: str, categorie: str = "general"):
 
 
 @outil
+def retenir_lecon(lecon: str):
+    """Enregistre une leçon de méthode pour faire mieux la prochaine fois : ce qui a marché après un échec, ou une correction de l'utilisateur sur ta façon de faire. Pas pour les faits sur l'utilisateur (memoriser).
+    lecon: la leçon, en une phrase concrète et réutilisable (quand / quoi faire / quoi éviter)"""
+    return memoire.ajouter(lecon, "lecon")
+
+
+@outil
 def oublier(texte: str):
     """Supprime de la mémoire les faits contenant ce texte.
     texte: texte à rechercher dans les faits à supprimer"""
@@ -27,7 +34,7 @@ def chercher_memoire(requete: str):
 @outil
 def lister_souvenirs(categorie: str = ""):
     """Liste tous les souvenirs sur l'utilisateur avec leur identifiant (pour en modifier ou en supprimer un précisément).
-    categorie: (optionnel) identite | preference | projet | contact | habitude | general"""
+    categorie: (optionnel) identite | preference | projet | contact | habitude | general | lecon"""
     faits = [f for f in memoire._charger() if not categorie or f.get("categorie") == categorie]
     return "\n".join(f"[{(f.get('fid') or '')[:8]}] ({f.get('categorie', 'general')}) {f['fait']}" for f in faits) or "Mémoire vide."
 
@@ -75,3 +82,13 @@ def historique_lire(jour: str, appareil: str = ""):
     lignes = [l for _, pc, l in memoire.lignes_du_jour(fichiers) if not appareil or appareil.lower() in pc.lower()]
     texte = "\n".join(lignes)
     return texte[-15000:] if len(texte) > 15000 else (texte or "Rien pour cet appareil ce jour-là.")
+
+
+@outil
+def apprendre_prononciation(mot: str, prononciation: str):
+    """Corrige la façon dont ta voix prononce un mot (« ne dis pas X, on dit Y », « tu prononces mal Kyutai »). Écris la prononciation comme elle se lit en français.
+    mot: le mot tel qu'il s'écrit (ex : Kyutai)
+    prononciation: comment le dire, écrit phonétiquement en français (ex : kyou-taï)"""
+    from .. import prononciation as p
+    p.apprendre(mot, prononciation)
+    return f"Noté : je dirai « {prononciation} » pour « {mot} »."

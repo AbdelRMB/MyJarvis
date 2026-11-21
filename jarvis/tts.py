@@ -66,7 +66,15 @@ def _piper_synth(texte: str, voix: str, debit: float) -> bytes:
 
 async def synthese(texte: str, moteur: str, voix: str, debit: float) -> tuple[bytes, str, str]:
     """Renvoie (audio, type MIME, moteur réellement utilisé). Bascule sur Piper si Edge échoue."""
-    texte = texte.strip()[:1200]
+    from .prononciation import preparer
+    texte = preparer(texte.strip())[:1200]   # mots techniques, sigles, versions, unités, liens… bien prononcés
+    if moteur == "kyutai":   # voix locale très naturelle ; si elle n'est pas prête, on passe à Microsoft
+        try:
+            from . import kyutai
+            return await asyncio.to_thread(kyutai.synthese, texte, voix), "audio/wav", "kyutai"
+        except Exception as e:
+            print(f"  ! Kyutai : {e}")
+            moteur, voix = "edge", ""
     if moteur == "edge":
         try:
             return await asyncio.wait_for(_edge(texte, voix or VOIX_EDGE[0][0], debit), 15), "audio/mpeg", "edge"

@@ -50,6 +50,8 @@ export type ConfigServeur = {
   openai_modele?: string;
   claude_modele: string;
   claude_effort: string;
+  conseiller?: boolean;
+  recherche_web_native?: boolean;
 };
 
 export type Fait = { fait: string; categorie: string; date?: string; fid?: string; modifie?: number };

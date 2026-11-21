@@ -15,7 +15,8 @@ export type Reglages = {
   agc: boolean;
   sourdine: boolean;
   tts: boolean;
-  ttsMoteur: "edge" | "piper" | "navigateur";
+  ttsMoteur: "edge" | "piper" | "navigateur" | "kyutai";
+  ttsVoixKyutai: string;
   ttsVoixEdge: string;
   ttsVoixPiper: string;
   voix: string;
@@ -44,6 +45,7 @@ export const DEFAUT: Reglages = {
   ttsMoteur: "edge",
   ttsVoixEdge: "fr-FR-HenriNeural",
   ttsVoixPiper: "fr_FR-tom-medium",
+  ttsVoixKyutai: "cml-tts/fr/10087_11650_000028-0002.wav",
   voix: "",
   debit: 1.05,
   hauteur: 0.92,

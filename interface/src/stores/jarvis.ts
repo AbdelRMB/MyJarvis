@@ -95,6 +95,7 @@ type Evt =
   | { type: "appareils_maj" }
   | { type: "afaire_maj" }
   | { type: "tickets_maj" }
+  | { type: "kyutai"; en_cours: boolean; etape: string; pct: number; erreur: string }
   | { type: "compte_deconnecte" }
   | { type: "init"; conversation: ({ role: "user"; texte: string } | { role: "jarvis"; blocs: Bloc[] })[]; occupe: boolean }
   | { type: "utilisateur"; texte: string }
@@ -234,6 +235,9 @@ function recevoir(e: Evt) {
       break;
     case "tickets_maj":
       emettre("tickets_maj");
+      break;
+    case "kyutai":
+      emettre("kyutai", e);
       break;
     case "appareils_maj":
       emettre("appareils_maj");

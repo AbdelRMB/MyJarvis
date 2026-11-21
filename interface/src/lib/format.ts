@@ -29,7 +29,7 @@ export function pourLaVoix(t: string) {
     .replace(/`([^`]+)`/g, "$1")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/https?:\/\/\S+/g, "le lien")
+    .replace(/https?:\/\/(?:www\.)?([^/\s]+)\S*/g, "$1") // le serveur dit « le lien vers github point com »
     .replace(/[*_#>|]/g, "")
     .replace(/\((J'ai atteint|Tâche interrompue)[^)]*\)/g, "")
     .trim();

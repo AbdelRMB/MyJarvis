@@ -14,7 +14,7 @@ import { cx } from "../lib/format";
 import type { ConfigServeur } from "../lib/types";
 import { useOS } from "../lib/os";
 import { majAudio, useAudio } from "../stores/audio";
-import { rescanner, useJarvis } from "../stores/jarvis";
+import { bus, rescanner, useJarvis } from "../stores/jarvis";
 import { DEFAUT, reglages, useReglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { rafraichirSysteme } from "../stores/systeme";
@@ -483,6 +483,86 @@ function OngletMicro() {
   );
 }
 
+type EtatKyutai = {
+  compatible: boolean;
+  raison: string;
+  installe: boolean;
+  en_cours: boolean;
+  etape: string;
+  pct: number;
+  erreur: string;
+  taille: string;
+  actif: boolean;
+};
+
+/** Voix Kyutai : téléchargement (environnement + modèle), progression, choix de la voix. */
+function PanneauKyutai({ voix }: { voix: { id: string; nom: string }[] }) {
+  const r = useReglages();
+  const [k, setK] = useState<EtatKyutai | null>(null);
+  const charger = () => api<EtatKyutai>("/api/kyutai").then(setK).catch(() => {});
+  useEffect(() => {
+    charger();
+    const sur = (e: Event) => setK((x) => (x ? { ...x, ...(e as CustomEvent<Partial<EtatKyutai>>).detail } : x));
+    bus.addEventListener("kyutai", sur);
+    const i = setInterval(charger, 5000);
+    return () => {
+      bus.removeEventListener("kyutai", sur);
+      clearInterval(i);
+    };
+  }, []);
+  const agir = async (action: "installer" | "supprimer" | "demarrer") => {
+    try {
+      setK(await api<EtatKyutai>(`/api/kyutai/${action}`, { method: "POST" }));
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  useEffect(() => {
+    if (k?.installe && !k.actif) agir("demarrer"); // charge le modèle à l'avance : la 1re phrase part plus vite
+  }, [k?.installe]);
+  if (!k) return null;
+  if (!k.compatible) return <p className="my-2 rounded border border-ambre/40 bg-ambre/5 p-3 text-[13px] text-ambre">{k.raison}</p>;
+  if (k.en_cours || (!k.installe && k.pct > 0 && !k.erreur))
+    return (
+      <div className="my-2 rounded-md border border-ligne p-3">
+        <div className="mb-2 flex justify-between text-[13px]">
+          <span>{k.etape}</span>
+          <span className="font-mono text-hud">{k.pct} %</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded bg-surface-3">
+          <div className="h-full bg-hud transition-all" style={{ width: `${k.pct}%` }} />
+        </div>
+        <p className="mt-2 text-[12px] text-doux">{t("Tu peux continuer à utiliser Jarvis pendant ce temps.")}</p>
+      </div>
+    );
+  if (!k.installe)
+    return (
+      <div className="my-2 rounded-md border border-ligne p-3">
+        <p className="text-[13px] text-doux">
+          {t("La voix Kyutai doit être téléchargée une fois ({taille}). Elle tourne ensuite entièrement sur ton ordinateur, sans Internet.", { taille: k.taille })}
+        </p>
+        {k.erreur && <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-black/30 p-2 text-[11px] text-rouge">{k.erreur}</pre>}
+        <Bouton className="mt-3" variante="primaire" icone={<Download className="size-4" />} onClick={() => agir("installer")}>
+          {k.erreur ? t("Réessayer") : t("Télécharger la voix Kyutai")}
+        </Bouton>
+      </div>
+    );
+  return (
+    <>
+      <Selecteur
+        label={t("Voix")}
+        valeur={r.ttsVoixKyutai}
+        options={voix.map((v) => ({ valeur: v.id, libelle: t(v.nom) }))}
+        onChange={(v) => r.maj({ ttsVoixKyutai: v })}
+        aide={k.actif ? t("Modèle chargé : prêt à parler.") : t("Chargement du modèle… (quelques secondes)")}
+      />
+      <button className="text-[12px] text-tres-doux hover:text-rouge" onClick={() => confirm(t("Supprimer la voix Kyutai de cet ordinateur ?")) && agir("supprimer")}>
+        {t("Supprimer la voix Kyutai (libère l'espace disque)")}
+      </button>
+    </>
+  );
+}
+
 function OngletVoix() {
   const r = useReglages();
   const voixNav = useAudio((s) => s.voix);
@@ -501,19 +581,23 @@ function OngletVoix() {
           label={t("Moteur")}
           valeur={r.ttsMoteur}
           options={[
+            { valeur: "kyutai", libelle: t("Kyutai — voix humaine, 100 % locale et gratuite (à télécharger)") },
             { valeur: "edge", libelle: t("Neuronal Microsoft — voix humaine (en ligne)") },
             { valeur: "piper", libelle: t("Piper — neuronal 100 % local") },
             { valeur: "navigateur", libelle: t("Navigateur — voix Windows (robotique)") },
           ]}
           onChange={(v) => r.maj({ ttsMoteur: v as typeof r.ttsMoteur })}
           aide={
-            r.ttsMoteur === "edge"
+            r.ttsMoteur === "kyutai"
+              ? t("Modèle du labo français Kyutai, sur ton ordinateur : très naturel, rien n'est envoyé. Le débit ne s'applique pas à cette voix.")
+              : r.ttsMoteur === "edge"
               ? "Le plus naturel. Le texte des réponses est envoyé à Microsoft pour être lu. Sans Internet, Jarvis bascule tout seul sur Piper."
               : r.ttsMoteur === "piper"
                 ? "Rien ne sort de ton PC. Un peu moins expressif que Microsoft."
                 : "Voix intégrées à Windows / au navigateur. Dépanne, mais sonne robotique."
           }
         />
+        {r.ttsMoteur === "kyutai" && <PanneauKyutai voix={voixServeur.kyutai ?? []} />}
         {r.ttsMoteur === "edge" && (
           <Selecteur label={t("Voix")} valeur={r.ttsVoixEdge} options={voixServeur.edge.map((v) => ({ valeur: v.id, libelle: v.nom }))} onChange={(v) => r.maj({ ttsVoixEdge: v })} />
         )}
@@ -651,11 +735,26 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
         label={t("Effort de réflexion")}
         valeur={cfg.claude_effort}
         options={[
-          { valeur: "low", libelle: t("Bas — le plus réactif, idéal à l'oral (recommandé)") },
-          { valeur: "medium", libelle: t("Moyen — mieux pour les longues tâches avec outils") },
+          { valeur: "auto", libelle: t("Automatique — réactif pour discuter, réfléchit à fond pour une vraie tâche (recommandé)") },
+          { valeur: "low", libelle: t("Bas — toujours le plus réactif") },
+          { valeur: "medium", libelle: t("Moyen") },
           { valeur: "high", libelle: t("Élevé — plus lent et plus cher") },
+          { valeur: "xhigh", libelle: t("Très élevé — le plus réfléchi, le plus lent") },
         ]}
         onChange={(v) => enregistrer({ claude_effort: v })}
+        aide={t("En automatique, dis « réfléchis bien » pour qu'il prenne le temps de réfléchir au maximum.")}
+      />
+      <Interrupteur
+        label={t("Conseiller Opus")}
+        aide={t("Avec Sonnet, Jarvis demande l'avis du modèle Opus (plus puissant) avant une décision difficile ou un plan complexe. Un peu plus cher, seulement quand c'est utile.")}
+        actif={cfg.conseiller !== false}
+        onChange={(v) => enregistrer({ conseiller: v })}
+      />
+      <Interrupteur
+        label={t("Recherche web de Claude")}
+        aide={t("Recherche et lecture de pages faites par Anthropic : résultats plus fiables et sources citées. Facturée en plus par Anthropic (environ 1 centime par recherche).")}
+        actif={cfg.recherche_web_native !== false}
+        onChange={(v) => enregistrer({ recherche_web_native: v })}
       />
       <div className="flex flex-wrap items-center gap-3 py-2">
         <Bouton icone={<Zap className="size-4" />} chargement={enCours} onClick={tester} disabled={!etat?.cle}>

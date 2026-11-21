@@ -104,7 +104,7 @@ async function synthetiser(texte: string): Promise<Blob | null> {
       body: JSON.stringify({
         texte,
         moteur: r.ttsMoteur,
-        voix: r.ttsMoteur === "edge" ? r.ttsVoixEdge : r.ttsVoixPiper,
+        voix: r.ttsMoteur === "edge" ? r.ttsVoixEdge : r.ttsMoteur === "kyutai" ? r.ttsVoixKyutai : r.ttsVoixPiper,
         debit: r.debit,
       }),
     });
@@ -210,5 +210,5 @@ export function parler(texte: string, force = false) {
   decouper(true);
 }
 
-export type VoixServeur = { edge: { id: string; nom: string }[]; piper: { id: string; nom: string }[] };
+export type VoixServeur = { edge: { id: string; nom: string }[]; piper: { id: string; nom: string }[]; kyutai?: { id: string; nom: string }[] };
 export const listerVoixServeur = () => api<VoixServeur>("/api/tts/voix");

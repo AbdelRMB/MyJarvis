@@ -58,6 +58,15 @@ Règles :
 - Dès que tu apprends un fait durable sur {CONFIG['nom_utilisateur']} (goût, projet, personne, habitude), appelle memoriser.
 - Si une action échoue, analyse l'erreur et essaie une autre approche.
 
+Comment tu travailles (c'est ce qui fait de toi un assistant vraiment utile) :
+- Comprends d'abord ce que {CONFIG['nom_utilisateur']} veut vraiment obtenir, pas seulement les mots. Si la demande est ambiguë ET qu'une erreur aurait des conséquences (supprimer, envoyer, payer, modifier un serveur), pose UNE question courte ; sinon choisis l'interprétation la plus probable et agis.
+- Pour une tâche en plusieurs étapes, fais-toi un plan rapide, puis exécute-le jusqu'au bout sans t'arrêter à la première difficulté.
+- Avant de dire « c'est fait », vérifie le résultat (relis le fichier, regarde l'écran, relance la commande de contrôle). Si tu n'as pas pu vérifier, dis-le.
+- Ce que tu crois savoir sur l'actualité, les prix, les versions de logiciels, les horaires ou les produits peut être périmé : reconnaître un nom n'est pas connaître son état actuel. Cherche sur le web (web_search / web_fetch, ou recherche_web) et cite d'où vient l'info.
+- Pour une décision difficile ou risquée (plan complexe, diagnostic qui résiste, choix qui engage), consulte ton conseiller (outil advisor) s'il est disponible, avant d'agir. Pas pour les demandes simples.
+- Apprends de tes erreurs : quand une méthode a échoué puis qu'une autre a marché, ou quand {CONFIG['nom_utilisateur']} te corrige sur ta façon de faire, enregistre la leçon avec retenir_lecon (ex : « Sur ce Mac, Spotify s'ouvre avec ouvrir_application('Spotify'), pas avec le terminal »). Les leçons de ta mémoire (catégorie « lecon ») sont des méthodes qui ont marché : applique-les.
+- Sois proactif quand ça aide vraiment : si tu remarques un problème lié à la demande (échéance dépassée, disque presque plein, erreur dans un fichier), signale-le en une phrase.
+
 Avant CHAQUE réponse, méthode :
 1. Relis ta mémoire ci-dessous (« Ce que tu sais sur… ») et la fin des conversations : sers-t'en, ne redemande pas ce que tu sais déjà.
 2. Si la demande fait référence au passé (« comme hier », « ce qu'on a fait », « tu te souviens »), consulte l'historique : historique_jours, historique_lire, chercher_memoire.
@@ -107,6 +116,7 @@ class Jarvis:
     def reset(self):
         self.messages = [{"role": "system", "content": prompt_systeme()}]
         self.histo_claude = []   # historique au format Anthropic (cerveau Claude), jamais modifié après coup
+        self.effort_claude = None   # effort en vigueur dans la conversation (réglé demande par demande)
         self.histo_openai = []   # historique au format OpenAI (cerveau OpenAI)
 
     @property
@@ -161,7 +171,7 @@ class Jarvis:
         if self.avec_openai:
             from . import openai_cerveau
             return openai_cerveau.demander(self, texte, sur_texte, sur_outil, sur_pensee)
-        memoire.journaliser("Abdel", texte)
+        memoire.journaliser(CONFIG.get("nom_utilisateur") or "Utilisateur", texte)
         self.messages.append({"role": "user", "content": texte})
         self._tronquer()
         final = ""

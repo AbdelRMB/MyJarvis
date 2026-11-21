@@ -35,6 +35,21 @@ PRIX = {
 
 _client = None
 _verrou_couts = threading.Lock()
+MAX_ETAPES = 60          # actions par demande (les longues tâches ne sont plus coupées à 25)
+CONSEILLER = "claude-opus-5-5"   # modèle plus puissant consulté par Sonnet sur les décisions difficiles
+# outils web de Jarvis remplacés par la recherche web native de Claude (meilleurs résultats, sources citées)
+OUTILS_WEB_REMPLACES = {"recherche_web", "lire_page_web", "actualites"}
+
+# Effort « auto » : le réglage par défaut passe de « low » fixe à « auto » (une seule fois, à la mise à jour)
+if not CONFIG.get("effort_auto_migre"):
+    if CONFIG.get("claude_effort") == "low":
+        CONFIG["claude_effort"] = "auto"
+    CONFIG["effort_auto_migre"] = True
+    try:
+        from .config import sauver_config
+        sauver_config(["claude_effort", "effort_auto_migre"])
+    except Exception:
+        pass
 
 
 # ---------- clé API ----------
@@ -130,29 +145,81 @@ def _journal_perf(rep, ttft, duree, cout):
 _outils_cache, _outils_version = None, -1
 
 
+def _web_natif() -> bool:
+    return bool(CONFIG.get("recherche_web_native", True))
+
+
+def _avec_conseiller() -> bool:
+    # le conseiller doit être au moins aussi puissant : utile seulement quand le cerveau est Sonnet
+    return bool(CONFIG.get("conseiller", True)) and CONFIG["claude_modele"] == "claude-sonnet-5-5"
+
+
 def outils_claude():
-    """Les outils au format Anthropic (ordre stable = cache stable ; recalculé si un connecteur change)."""
+    """Les outils au format Anthropic (ordre stable = cache stable ; recalculé si un connecteur ou un réglage change)."""
     global _outils_cache, _outils_version
-    if _outils_cache is None or _outils_version != outils.VERSION:
-        _outils_cache = [{"name": f["name"], "description": f["description"], "input_schema": f["parameters"]}
-                         for f in (s["function"] for s in outils.schemas())]
-        _outils_version = outils.VERSION
+    cle = (outils.VERSION, _web_natif(), _avec_conseiller())
+    if _outils_cache is None or _outils_version != cle:
+        liste = [{"name": f["name"], "description": f["description"], "input_schema": f["parameters"]}
+                 for f in (s["function"] for s in outils.schemas())
+                 if not (_web_natif() and f["name"] in OUTILS_WEB_REMPLACES)]
+        if _web_natif():   # recherche et lecture de pages par Anthropic : filtrage dynamique, sources citées
+            liste += [{"type": "web_search_20260209", "name": "web_search", "max_uses": 6},
+                      {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 6}]
+        if _avec_conseiller():
+            liste.append({"type": "advisor_20260301", "name": "advisor", "model": CONSEILLER, "max_uses": 2,
+                          "caching": {"type": "ephemeral", "ttl": "5m"}})
+        _outils_cache, _outils_version = liste, cle
     return _outils_cache
 
 
+# ---------- effort automatique : réfléchir plus quand la demande le mérite ----------
+import re as _re
+
+_RX_TRES = _re.compile(r"r[ée]fl[ée]chis (bien|vraiment|longtemps)|en profondeur|approfondi|analyse (compl[èe]te|d[ée]taill[ée]e)|"
+                       r"prends ton temps|think hard|in depth", _re.I)
+_RX_ELEVE = _re.compile(r"\b(cod[eé]|code|d[ée]velopp|corrig|d[ée]bug|bug|analys|compar|planifi|organis|pr[ée]pare|r[ée]dig|"
+                        r"[ée]cris (un|une|le|la|moi)|strat[ée]gi|optimis|explique pourquoi|pourquoi|diagnosti|conseil|"
+                        r"r[ée]sous|calcul|estime|configure|installe|migr|automatis|routine|plan|budget|r[ée]sum[ée] (de|du|des)|"
+                        r"debug|fix|analy[sz]e|compare|plan|write a|why|explain)|tu (en )?penses|ton avis|je devrais|faut-il|vaut-il mieux|"
+                        r"what do you think|should i", _re.I)
+
+
+def effort_pour(texte: str) -> str:
+    """Choisit l'effort de réflexion selon la demande : bas pour une conversation ou une commande simple
+    (réactif à l'oral), élevé pour une tâche en plusieurs étapes, très élevé si on lui demande de bien réfléchir."""
+    t = texte.strip()
+    if _RX_TRES.search(t):
+        return "xhigh"
+    if len(t) > 280 or _RX_ELEVE.search(t) or t.count("?") > 1 or _re.search(r"\b(puis|ensuite|et apr[èe]s|then)\b", t, _re.I):
+        return "high"
+    if len(t) > 120:
+        return "medium"
+    return "low"
+
+
+def _effort_de_base() -> str:
+    e = CONFIG.get("claude_effort") or "auto"
+    return "low" if e == "auto" else e
+
+
 def _parametres_requete():
+    betas = ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01",
+             "mid-conversation-output-config-2026-07-01"]
+    if _avec_conseiller():
+        betas.append("advisor-tool-2026-03-01")
     return dict(
         model=CONFIG["claude_modele"],
-        max_tokens=16000,
+        max_tokens=32000,
         # réflexion adaptative : à effort « low », le modèle saute la réflexion sur les demandes simples (réactif à l'oral)
         # la mémoire (dans les instructions) peut changer en cours de conversation (synchro entre appareils) :
         # les anciens blocs de réflexion sont alors ignorés au lieu de faire échouer la requête
         thinking={"type": "adaptive", "display": "summarized",
                   "block_binding": {"prefix_mismatch_behavior": "drop_block"}},
-        output_config={"effort": CONFIG["claude_effort"]},
+        # effort « auto » : la base reste fixe (cache intact) et chaque demande ajuste l'effort par un message système
+        output_config={"effort": _effort_de_base()},
         cache_control={"type": "ephemeral"},   # met en cache tout le début de conversation, automatiquement
         # si le modèle refuse une demande (faux positif de sécurité), l'API la rejoue sur un modèle de secours
-        betas=["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01"],
+        betas=betas,
         fallbacks="default",
     )
 
@@ -183,11 +250,18 @@ def _demander(j, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
     """Boucle agent avec Claude : streaming, appels d'outils, jusqu'à la réponse finale."""
     if not cle_configuree():
         raise RuntimeError("Clé API Claude manquante : ajoute-la dans Réglages > Cerveau.")
-    memoire.journaliser("Abdel", texte)
+    memoire.journaliser(CONFIG.get("nom_utilisateur") or "Utilisateur", texte)
     j.histo_claude.append({"role": "user", "content": texte})
+    # placé juste après la demande : règle l'effort de CETTE réponse ; ajouté à la suite (jamais retiré) pour garder
+    # le cache et les blocs de réflexion valides. Un effort réglé ainsi tient jusqu'au suivant, d'où le suivi.
+    reglage = CONFIG.get("claude_effort") or "auto"
+    effort = effort_pour(texte) if reglage == "auto" else reglage
+    if effort != (getattr(j, "effort_claude", None) or _effort_de_base()):
+        j.histo_claude.append({"role": "system", "content": [], "output_config": {"effort": effort}})
+        j.effort_claude = effort
     j.arreter = False
     final = ""
-    for _ in range(CONFIG["max_etapes_outils"]):
+    for _ in range(max(CONFIG["max_etapes_outils"], MAX_ETAPES)):
         if j.arreter:
             final += "\n(Tâche interrompue.)"
             break
@@ -257,6 +331,8 @@ def conversation_ui(histo):
     out = []
     for m in histo:
         c = m["content"]
+        if m["role"] == "system":   # réglage d'effort : invisible dans l'interface
+            continue
         if m["role"] == "user":
             if isinstance(c, str):
                 out.append({"role": "user", "texte": c})
