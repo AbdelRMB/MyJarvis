@@ -1,0 +1,43 @@
+name: 🐞 Bug
+description: Something doesn't work / Quelque chose ne marche pas
+labels: ["bug"]
+body:
+  - type: textarea
+    id: quoi
+    attributes:
+      label: What happened? / Que s'est-il passé ?
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Jarvis version / Version de Jarvis
+      placeholder: "1.10.0 (Settings › Updates)"
+    validations:
+      required: true
+  - type: dropdown
+    id: systeme
+    attributes:
+      label: System / Système
+      options:
+        - macOS (Apple silicon)
+        - Windows 10
+        - Windows 11
+        - Other / Autre
+    validations:
+      required: true
+  - type: dropdown
+    id: cerveau
+    attributes:
+      label: Brain / Cerveau
+      options:
+        - Claude
+        - OpenAI
+        - Ollama
+  - type: textarea
+    id: journal
+    attributes:
+      label: Log excerpt / Extrait du journal
+      description: "End of jarvis.log (Mac: ~/Library/Application Support/Jarvis/logs, Windows: %LOCALAPPDATA%\Jarvis\logs). Remove any personal data."
+      render: text
