@@ -88,7 +88,7 @@ type Evt =
   | { type: "naviguer"; vue: Vue }
   | { type: "memoire_maj"; faits: boolean; historique: number }
   | { type: "annonce"; texte: string }
-  | { type: "confirmation"; id: string; titre: string; detail: string }
+  | { type: "confirmation"; id: string; titre: string; detail: string; saisie?: boolean }
   | { type: "confirmation_fin"; id: string }
   | { type: "tache_maj"; id: string }
   | { type: "notifications"; non_lues: number }
@@ -221,7 +221,7 @@ function recevoir(e: Evt) {
       emettre("annonce", e.texte);
       break;
     case "confirmation":
-      emettre("confirmation", { id: e.id, titre: e.titre, detail: e.detail });
+      emettre("confirmation", { id: e.id, titre: e.titre, detail: e.detail, saisie: e.saisie });
       break;
     case "confirmation_fin":
       emettre("confirmation_fin", e.id);

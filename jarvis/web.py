@@ -631,6 +631,30 @@ def demander_confirmation(titre: str, detail: str = "", delai: float = 180) -> b
     return attente["ok"]
 
 
+def demander_texte(titre: str, detail: str = "", delai: float = 300) -> str:
+    """Jarvis a besoin d'une info (ex : le code reçu par SMS) : champ de saisie dans sa fenêtre, réponse attendue."""
+    import uuid
+    cid = uuid.uuid4().hex[:10]
+    attente = {"ev": threading.Event(), "ok": False, "texte": ""}
+    _confirmations[cid] = attente
+    if APPLI.get("afficher"):
+        try:
+            APPLI["afficher"]()
+        except Exception:
+            pass
+    debut = time.time()
+    try:
+        while time.time() - debut < delai and not attente["ev"].is_set():
+            if outils.ARRET.is_set():
+                break
+            diffuser(type="confirmation", id=cid, titre=titre, detail=detail[:2000], saisie=True)
+            attente["ev"].wait(2)
+    finally:
+        _confirmations.pop(cid, None)
+        diffuser(type="confirmation_fin", id=cid)
+    return attente["texte"] if attente["ok"] else ""
+
+
 @app.post("/api/confirmation")
 async def repondre_confirmation(req: Request):
     _verifier(req)
@@ -638,6 +662,7 @@ async def repondre_confirmation(req: Request):
     c = _confirmations.get(d.get("id"))
     if c:
         c["ok"] = bool(d.get("ok"))
+        c["texte"] = str(d.get("texte", ""))[:500]
         c["ev"].set()
     return {"ok": bool(c)}
 
@@ -1310,6 +1335,19 @@ async def agir_site(sid: str, action: str, req: Request):
             return {"etapes": len(etapes), **(await asyncio.to_thread(sites.lire, sid))}
         elif action == "astuce":
             sites.noter(sid, d.get("texte", ""))
+        elif action == "identifiants":   # rien n'est renvoyé : les secrets ne repartent jamais vers l'interface
+            try:
+                connexion = sites.definir_identifiants(sid, d.get("identifiant"), d.get("mot_de_passe"), d.get("totp"))
+            except Exception:
+                raise HTTPException(400, "Clé de double authentification invalide : copie la clé secrète (ou l'adresse otpauth://).")
+            return {"connexion": connexion}
+        elif action == "code":
+            c = sites.code_2fa(sid)
+            return {"code": c[0] if c else "", "reste": c[1] if c else 0}
+        elif action == "connecter":
+            r = await asyncio.to_thread(sites.se_connecter, sid, lambda q: demander_texte(q, "Saisis le code affiché par ton appli ou reçu par SMS."))
+            await asyncio.to_thread(navigateur.afficher)
+            return {"resultat": r.split("\n")[0]}
         elif action == "retirer":
             sites.retirer(sid, d.get("quoi", "astuces"), d.get("id", ""))
         else:

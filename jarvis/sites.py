@@ -295,3 +295,77 @@ def chercher(question: str, site: str = "") -> str:
             lignes.append("(rien de précis trouvé pour cette question : sers-toi du guide, ou ouvre le site et regarde)")
         sorties.append("\n".join(lignes))
     return "\n\n".join(sorties) or "Rien trouvé sur les sites appris pour cette question."
+
+
+# ---------- connexion automatique (identifiants dans le trousseau / coffre chiffré, jamais montrés au modèle) ----------
+def _cid(sid: str) -> str:
+    return f"site:{sid}"
+
+
+def definir_identifiants(sid: str, identifiant: str = None, mot_de_passe: str = None, totp: str = None):
+    from . import connecteurs
+    from . import totp as t
+    if totp:
+        t.lire(totp)   # clé invalide : erreur tout de suite
+    for champ, v in (("identifiant", identifiant), ("mot_de_passe", mot_de_passe), ("totp", totp)):
+        if v is not None:
+            connecteurs.definir_secret(_cid(sid), champ, v.strip())
+    s = lire(sid)
+    s["connexion"] = {c: bool(connecteurs.secret(_cid(sid), c)) for c in ("identifiant", "mot_de_passe", "totp")}
+    _ecrire(s)
+    return s["connexion"]
+
+
+def code_2fa(sid: str) -> tuple[str, int] | None:
+    from . import connecteurs, totp
+    cle = connecteurs.secret(_cid(sid), "totp")
+    return totp.code(cle) if cle else None
+
+
+_RX_IDENT = re.compile(r"identifiant|login|user|utilisateur|e-?mail|courriel|matricule|nom d.utilisateur|username|id\b|cuid|uid", re.I)
+_RX_CODE = re.compile(r"code|otp|totp|2fa|mfa|v[ée]rification|s[ée]curit[ée]|authentification|token|passcode|one.?time", re.I)
+
+
+def se_connecter(sid: str, demander=None) -> str:
+    """Remplit identifiant, mot de passe puis code de sécurité, page après page (portails en plusieurs étapes).
+    demander(question) -> str : demande un code à l'utilisateur quand Jarvis n'a pas la clé de son appli."""
+    from . import connecteurs, navigateur, totp
+    s = lire(sid)
+    cid = _cid(sid)
+    ident, mdp, cle = (connecteurs.secret(cid, c) for c in ("identifiant", "mot_de_passe", "totp"))
+    v = navigateur.ouvrir(s["url"])
+    faits = []
+    for _ in range(5):   # identifiant -> mot de passe -> code -> choix… : une page à la fois
+        champs = [e for e in v.get("elements", []) if e["type"].startswith("champ") and not e.get("desactive")]
+        mdp_champ = next((e for e in champs if e["type"] == "champ password"), None)
+        texte = [e for e in champs if e["type"] in ("champ text", "champ email", "champ tel", "champ number", "champ texte")]
+        code_champ = next((e for e in texte if _RX_CODE.search(e["libelle"])), None)
+        ident_champ = next((e for e in texte if e is not code_champ and _RX_IDENT.search(e["libelle"])), None) or \
+            (texte[0] if texte and mdp_champ and not code_champ else None)
+        action = False
+        if ident_champ and ident and not ident_champ.get("valeur"):
+            navigateur.remplir(str(ident_champ["ref"]), ident)
+            faits.append("identifiant")
+            action = True
+        if mdp_champ and mdp:
+            navigateur.remplir(str(mdp_champ["ref"]), mdp)
+            faits.append("mot de passe")
+            action = True
+        elif mdp_champ and not mdp:
+            return "Il me faut le mot de passe de ce site : ajoute-le dans l'écran Sites (connexion automatique)."
+        if code_champ and not action:
+            c = totp.code_frais(cle) if cle else (demander(f"Code de sécurité pour {s['nom']} ?") if demander else "")
+            if not c:
+                return "Code de sécurité requis : l'utilisateur ne l'a pas donné."
+            navigateur.remplir(str(code_champ["ref"]), c.strip())
+            faits.append("code de sécurité" + (" (calculé)" if cle else " (donné par l'utilisateur)"))
+            action = True
+        if not action:
+            break
+        avant = v.get("url")
+        v = navigateur.touche("entree")
+        if v.get("url") == avant and any(e["type"] == "champ password" for e in v.get("elements", [])) and "mot de passe" in faits[-1:]:
+            break   # toujours sur la page du mot de passe : refusé ?
+    reste = [e for e in v.get("elements", []) if e["type"] == "champ password"]
+    etat = "Toujours sur une page de connexion (identifiants refusés ? étape non prévue ?)" if reste else "Connecté"
+    return f"{etat}. Fait : {', '.join(faits) or 'rien (déjà connecté ?)'}.\n\n" + navigateur.decrire(v, 60)

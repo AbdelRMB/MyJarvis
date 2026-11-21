@@ -132,3 +132,46 @@ def site_noter(site: str, astuce: str):
         return "Site inconnu : précise son adresse."
     sites.noter(s["id"], astuce)
     return f"Astuce retenue pour {s['nom']}."
+
+
+@outil
+def site_se_connecter(site: str):
+    """Se connecte tout seul à un site appris : identifiant, mot de passe, puis code de double authentification (calculé si la clé de l'appli d'authentification est enregistrée, sinon demandé à l'utilisateur), même quand la connexion se fait en plusieurs pages. Utilise-le aussi quand tu tombes sur une page de connexion pendant une tâche. Tu ne vois jamais les mots de passe.
+    site: nom ou adresse du site"""
+    from .. import sites, web
+    s = sites.trouver(site)
+    if not s:
+        return "Site inconnu : il doit d'abord être ajouté dans l'écran Sites (avec ses identifiants)."
+    try:
+        return sites.se_connecter(s["id"], lambda q: web.demander_texte(q, "Saisis le code affiché par ton appli ou reçu par SMS."))
+    except Exception as e:
+        return f"Erreur de connexion : {e}"
+
+
+@outil
+def navigateur_capture_enregistrer(nom: str = "", element: str = "", pleine_page: bool = False):
+    """Prend une capture d'écran de la page du navigateur et l'enregistre (dossier Images › Jarvis › Captures) : toute la partie visible, un élément précis (le tableau des interventions, un bloc…) ou toute la page déroulée. Renvoie le chemin du fichier (pour l'envoyer ensuite, par WhatsApp par exemple).
+    nom: (optionnel) nom court ajouté au fichier (ex : interventions_karim)
+    element: (optionnel) numéro ou texte d'un élément : capture seulement le tableau / bloc qui le contient
+    pleine_page: true pour capturer toute la page, y compris ce qui dépasse en bas"""
+    from .. import navigateur
+    try:
+        f = navigateur.enregistrer_capture(nom, element, pleine_page)
+    except Exception as e:
+        return f"Erreur navigateur : {e}"
+    return f"Capture enregistrée : {f}"
+
+
+@outil
+def whatsapp_envoyer(contact: str, message: str = "", fichiers: list = None):
+    """Envoie un message WhatsApp et/ou des fichiers (captures d'écran, photos) à un contact, par WhatsApp Web dans le navigateur de Jarvis (la 1re fois, l'utilisateur scanne un QR code avec son téléphone). Envoie seulement ce que l'utilisateur t'a demandé d'envoyer, à la personne qu'il a nommée.
+    contact: nom du contact tel qu'enregistré dans son téléphone (ex : Karim Technicien)
+    message: (optionnel) texte du message, ou légende de l'image
+    fichiers: (optionnel) chemins des images à joindre (ex : ceux renvoyés par navigateur_capture_enregistrer)"""
+    from .. import whatsapp
+    if not message and not fichiers:
+        return "Rien à envoyer : donne un message ou des fichiers."
+    try:
+        return whatsapp.envoyer(contact, message, fichiers or [])
+    except Exception as e:
+        return f"Erreur WhatsApp : {e}"

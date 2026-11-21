@@ -1,4 +1,4 @@
-import { BookOpen, Circle, Compass, Download, ExternalLink, Globe, Lightbulb, LogIn, Plus, Square, Trash2, Video } from "lucide-react";
+import { BookOpen, Circle, Compass, Download, ExternalLink, Globe, KeyRound, Lightbulb, LogIn, Plus, Square, Trash2, Video } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -19,7 +19,90 @@ type Etat = { sites: Resume[]; navigateur: Nav; exploration: Exploration };
 type Page = { url: string; titre: string; chemin: string[]; boutons: string[]; champs: string[] };
 type Procedure = { id: string; nom: string; texte: string[]; date: string };
 type Astuce = { id: string; texte: string; date: string };
-type Detail = Omit<Resume, "pages" | "procedures" | "astuces" | "guide"> & { pages: Page[]; procedures: Procedure[]; astuces: Astuce[]; guide: string };
+type Detail = Omit<Resume, "pages" | "procedures" | "astuces" | "guide"> & {
+  pages: Page[];
+  procedures: Procedure[];
+  astuces: Astuce[];
+  guide: string;
+  connexion?: { identifiant: boolean; mot_de_passe: boolean; totp: boolean };
+};
+
+/** Identifiants du site (envoyés une fois, jamais réaffichés) et code 2FA du moment pour vérifier la clé. */
+function ConnexionAuto({ id, connexion, onMaj }: { id: string; connexion?: Detail["connexion"]; onMaj: () => void }) {
+  const [f, setF] = useState({ identifiant: "", mot_de_passe: "", totp: "" });
+  const [code, setCode] = useState<{ code: string; reste: number } | null>(null);
+  const [enCours, setEnCours] = useState(false);
+  useEffect(() => {
+    if (!connexion?.totp) return setCode(null);
+    const lire = () => api<{ code: string; reste: number }>(`/api/sites/${id}/code`, { method: "POST", json: {} }).then(setCode).catch(() => {});
+    lire();
+    const i = setInterval(lire, 1000);
+    return () => clearInterval(i);
+  }, [id, connexion?.totp]);
+  const enregistrer = async () => {
+    const json = Object.fromEntries(Object.entries(f).filter(([, v]) => v.trim()));
+    if (!Object.keys(json).length) return;
+    try {
+      await api(`/api/sites/${id}/identifiants`, { method: "POST", json });
+      setF({ identifiant: "", mot_de_passe: "", totp: "" });
+      toast(t("Enregistré dans ton coffre chiffré."), "succes");
+      onMaj();
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  const connecter = async () => {
+    setEnCours(true);
+    try {
+      const r = await api<{ resultat: string }>(`/api/sites/${id}/connecter`, { method: "POST", json: {} });
+      toast(r.resultat, r.resultat.startsWith("Connecté") ? "succes" : "info");
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setEnCours(false);
+    }
+  };
+  const ok = (b?: boolean) => (b ? <span className="text-vert">✓</span> : <span className="text-tres-doux">—</span>);
+  return (
+    <details className="mb-4 rounded-md border border-ligne px-3 py-2">
+      <summary className="flex cursor-pointer items-center gap-2 text-[13px]">
+        <KeyRound className="size-4 text-hud" /> {t("Connexion automatique")}
+        <span className="ml-auto text-[12px] text-doux">
+          {t("identifiant")} {ok(connexion?.identifiant)} · {t("mot de passe")} {ok(connexion?.mot_de_passe)} · {t("code 2FA")} {ok(connexion?.totp)}
+        </span>
+      </summary>
+      <p className="mt-2 text-[12px] text-doux">
+        {t("Jarvis se connecte tout seul, même avec double authentification. Tes identifiants vont dans ton coffre chiffré : ils ne sont jamais réaffichés ni montrés à l'IA.")}
+      </p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <Champ placeholder={connexion?.identifiant ? t("Identifiant (déjà enregistré)") : t("Identifiant")} value={f.identifiant} onChange={(x) => setF({ ...f, identifiant: x.target.value })} />
+        <Champ type="password" placeholder={connexion?.mot_de_passe ? t("Mot de passe (déjà enregistré)") : t("Mot de passe")} value={f.mot_de_passe} onChange={(x) => setF({ ...f, mot_de_passe: x.target.value })} />
+        <Champ
+          className="sm:col-span-2"
+          type="password"
+          placeholder={connexion?.totp ? t("Clé de double authentification (déjà enregistrée)") : t("Clé secrète de l'appli d'authentification (ou adresse otpauth://)")}
+          value={f.totp}
+          onChange={(x) => setF({ ...f, totp: x.target.value })}
+        />
+      </div>
+      <p className="mt-1 text-[11px] text-tres-doux">
+        {t("La clé secrète s'obtient en ajoutant une appli d'authentification sur le portail : sous le QR code, « Impossible de scanner ? » affiche la clé. Ajoute-la aussi dans ton appli habituelle pour garder les deux.")}
+      </p>
+      {code && (
+        <p className="mt-2 text-[13px]">
+          {t("Code du moment : ")}<span className="font-mono text-lg tracking-widest text-hud">{code.code}</span>{" "}
+          <span className="text-[11px] text-tres-doux">({code.reste} s) — {t("il doit être identique à celui de ton appli.")}</span>
+        </p>
+      )}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Bouton taille="sm" onClick={enregistrer}>{t("Enregistrer")}</Bouton>
+        <Bouton taille="sm" variante="primaire" icone={<LogIn className="size-3.5" />} chargement={enCours} disabled={!connexion?.identifiant && !connexion?.mot_de_passe} onClick={connecter}>
+          {t("Me connecter automatiquement")}
+        </Bouton>
+      </div>
+    </details>
+  );
+}
 
 function DetailSite({ id, etat, recharger }: { id: string; etat: Etat; recharger: () => void }) {
   const [d, setD] = useState<Detail | null>(null);
@@ -52,6 +135,7 @@ function DetailSite({ id, etat, recharger }: { id: string; etat: Etat; recharger
 
   return (
     <Panneau titre={d.nom} icone={<Globe />} actions={<a href={d.url} target="_blank" rel="noreferrer" className="text-doux hover:text-hud"><ExternalLink className="size-4" /></a>}>
+      <ConnexionAuto id={id} connexion={d.connexion} onMaj={charger} />
       <ol className="mb-4 space-y-3 text-[13px]">
         <li className="flex flex-wrap items-center gap-3">
           <span className="w-5 text-hud">1.</span>

@@ -331,11 +331,46 @@ def _element(cible: str) -> dict:
     return r
 
 
+def _pages() -> list:
+    try:
+        return [t for t in _api("/json/list") if t.get("type") == "page"]
+    except Exception:
+        return []
+
+
+def _suivre_nouvel_onglet(avant: set):
+    """Le clic a ouvert un nouvel onglet (bouton d'un portail vers un service…) : Jarvis passe dessus."""
+    for _ in range(10):
+        nouveaux = [t for t in _pages() if t["id"] not in avant]
+        if nouveaux:
+            t = nouveaux[0]
+            ancien = _etat.get("cdp")
+            if ancien is not None:
+                try:
+                    ancien.ws.close()
+                except Exception:
+                    pass
+            c = _Cdp(t["webSocketDebuggerUrl"])
+            for dom in ("Page.enable", "Runtime.enable"):
+                c.envoyer(dom)
+            try:
+                c.envoyer("Emulation.setFocusEmulationEnabled", {"enabled": True})
+            except Exception:
+                pass
+            _etat.update(cdp=c, cible=t["id"])
+            _rebrancher_enregistrement(c)
+            return True
+        time.sleep(0.3)
+    return False
+
+
 def cliquer(cible: str) -> dict:
     e = _element(cible)
     c = _onglet()
+    avant = {t["id"] for t in _pages()}
     for t in ("mousePressed", "mouseReleased"):   # vrais clics (les applis web ignorent souvent el.click())
         c.envoyer("Input.dispatchMouseEvent", {"type": t, "x": e["x"], "y": e["y"], "button": "left", "clickCount": 1})
+    _suivre_nouvel_onglet(avant)
     _attendre_chargement(8)
     return instantane()
 
@@ -384,9 +419,56 @@ def touche(nom: str) -> dict:
     return instantane()
 
 
-def capture() -> bytes:
+def capture(element: str = "", pleine_page: bool = False) -> bytes:
+    """Capture de la page visible, d'un élément (un tableau, un bloc…) ou de toute la page déroulée."""
     import base64
-    return base64.b64decode(_onglet().envoyer("Page.captureScreenshot", {"format": "png"})["data"])
+    params = {"format": "png"}
+    if element:
+        cible = str(element).strip().strip("[]")
+        # un numéro (élément interactif) ou n'importe quel texte de la page (une cellule de tableau, un titre…)
+        trouver = (f"document.querySelector('[data-jarvis-ref=\"{cible}\"]')" if cible.isdigit() else
+                   f"""(() => {{ const cle = {json.dumps(cible.lower())}; let meilleur = null;
+                   const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                   while (w.nextNode()) {{ if (w.currentNode.textContent.toLowerCase().includes(cle)) {{ meilleur = w.currentNode.parentElement; break; }} }}
+                   return meilleur; }})()""")
+        r = _js(f"""(() => {{ const e = {trouver}; if (!e) return null;
+            const t = (e.closest('table, section, article, [role=grid], [role=table], form, .card, .panel') || e);
+            t.scrollIntoView({{block: 'start'}}); const r = t.getBoundingClientRect();
+            return {{x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height}}; }})()""")
+        if not r:
+            raise RuntimeError(f"« {element} » introuvable sur la page.")
+        params.update(clip={"x": r["x"], "y": r["y"], "width": max(1, r["w"]), "height": max(1, r["h"]), "scale": 1},
+                      captureBeyondViewport=True)
+    elif pleine_page:
+        m = _onglet().envoyer("Page.getLayoutMetrics")
+        taille = m.get("cssContentSize") or m.get("contentSize")
+        params.update(clip={"x": 0, "y": 0, "width": taille["width"], "height": min(taille["height"], 16000), "scale": 1},
+                      captureBeyondViewport=True)
+    return base64.b64decode(_onglet().envoyer("Page.captureScreenshot", params, 60)["data"])
+
+
+def dossier_captures() -> Path:
+    d = Path.home() / ("Pictures" if (Path.home() / "Pictures").exists() else "") / "Jarvis" / "Captures"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def enregistrer_capture(nom: str = "", element: str = "", pleine_page: bool = False) -> Path:
+    import re as _re
+    propre = _re.sub(r"[^\w -]", "", nom).strip().replace(" ", "_")[:60]
+    f = dossier_captures() / f"{time.strftime('%Y-%m-%d_%H-%M-%S')}{'_' + propre if propre else ''}.png"
+    f.write_bytes(capture(element, pleine_page))
+    return f
+
+
+def joindre_fichiers(selecteur: str, chemins: list):
+    """Remplit un champ « fichier » (pièce jointe) sans passer par la fenêtre de choix du système."""
+    c = _onglet()
+    racine = c.envoyer("DOM.getDocument", {"depth": 0})["root"]["nodeId"]
+    noeud = c.envoyer("DOM.querySelector", {"nodeId": racine, "selector": selecteur})["nodeId"]
+    if not noeud:
+        raise RuntimeError("Champ de pièce jointe introuvable.")
+    c.envoyer("DOM.setFileInputFiles", {"nodeId": noeud, "files": [str(Path(x).expanduser().resolve()) for x in chemins]})
 
 
 def afficher():
