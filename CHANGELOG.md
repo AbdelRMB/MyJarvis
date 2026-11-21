@@ -3,6 +3,9 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 1.11.0
+- **Choisis l'IA que tu veux comme cerveau** : en plus de Claude, OpenAI et Ollama, Jarvis marche maintenant avec **Google Gemini**, **Mistral AI**, **DeepSeek**, **Grok (xAI)**, **OpenRouter** (une seule clé pour des centaines de modèles), **Groq**, **Cerebras**, **Together AI**, **Fireworks AI**, **Kimi (Moonshot)**, **Qwen (Alibaba)**, **Cohere**, **Hugging Face**, et en local **LM Studio**. L'option **Autre (compatible OpenAI)** accepte n'importe quel service qui parle le même langage (vLLM, Jan, llama.cpp, LocalAI…). Dans Réglages › Cerveau, clique sur l'IA, colle ta clé (le lien pour la créer est indiqué), choisis le modèle dans la liste ou écris son nom, puis « Tester ». Plusieurs offrent un essai gratuit (Gemini, Mistral, Groq, Cerebras, OpenRouter). Ta clé est rangée dans ton coffre chiffré et te suit sur tous tes appareils, comme ton choix de modèle. / **Pick any AI as Jarvis's brain**: Gemini, Mistral, DeepSeek, Grok, OpenRouter, Groq, Cerebras, Together, Fireworks, Kimi, Qwen, Cohere, Hugging Face, LM Studio, or any OpenAI-compatible service, in addition to Claude, OpenAI and Ollama.
+
 ## 1.10.0
 - **Jarvis apprend tes sites par cœur** (intranet, logiciels d'entreprise, sites complexes) : nouvel écran **Sites appris**. Ajoute un site, connecte-toi une fois dans le navigateur de Jarvis (la session est gardée), puis :
   - **Explorer** : Jarvis parcourt le site sans rien modifier et retient chaque page avec le chemin pour y arriver (« Menu › Facturation › Nouvelle facture »), ses boutons et ses formulaires, puis rédige un guide du site ;

@@ -327,15 +327,19 @@ def _appliquer_coffre():
             _definir_secret_local(nom, valeur)
     if _coffre.get("ANTHROPIC_API_KEY") and _coffre["ANTHROPIC_API_KEY"] != os.environ.get("ANTHROPIC_API_KEY"):
         claude.definir_cle(_coffre["ANTHROPIC_API_KEY"], synchro=False)
-    if _coffre.get("OPENAI_API_KEY") and _coffre["OPENAI_API_KEY"] != os.environ.get("OPENAI_API_KEY"):
-        from . import openai_cerveau
-        openai_cerveau.definir_cle(_coffre["OPENAI_API_KEY"], synchro=False)
+    from .fournisseurs import FOURNISSEURS
+    for f in FOURNISSEURS:   # clés des autres IA (OpenAI, Gemini, Mistral…)
+        env = f.get("env")
+        if env and _coffre.get(env) and _coffre[env] != os.environ.get(env):
+            from . import openai_cerveau
+            openai_cerveau.definir_cle(_coffre[env], synchro=False, fid=f["id"])
 
 
 def _pousser_coffre_depuis_appareil():
     """Rassemble les secrets déjà présents sur cet appareil (clé API, connecteurs) dans le coffre."""
     from . import connecteurs
-    for nom in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY"):
+    from .fournisseurs import ENV_CLES
+    for nom in ("ANTHROPIC_API_KEY", *ENV_CLES):
         if os.environ.get(nom):
             _coffre[nom] = os.environ[nom]
     trousseau = _coffre.setdefault("trousseau", {})

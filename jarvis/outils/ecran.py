@@ -31,7 +31,8 @@ def _vision(prompt, image):
     if CONFIG.get("cerveau") == "claude":
         from ..claude import vision
         return vision(prompt, image)
-    if CONFIG.get("cerveau") == "openai":
+    from ..fournisseurs import est_compatible
+    if est_compatible(CONFIG.get("cerveau")):
         from ..openai_cerveau import vision
         return vision(prompt, image)
     r = ollama.chat(model=CONFIG["modele_vision"], think=False,

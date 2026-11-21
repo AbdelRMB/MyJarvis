@@ -27,7 +27,8 @@ def _env():
     e["PATH"] = os.pathsep.join([p for p in _PATH_EN_PLUS if p] + [e.get("PATH", "")])
     # Les clés API de Jarvis (cerveau) ne doivent PAS être vues par Claude Code / Codex : sinon ils les utilisent
     # à la place de ton compte connecté (abonnement Claude Pro/Max, ChatGPT) et tout est facturé sur la clé API.
-    for cle in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"):
+    from .fournisseurs import ENV_CLES
+    for cle in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", *ENV_CLES, "CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT"):
         e.pop(cle, None)
     return e
 

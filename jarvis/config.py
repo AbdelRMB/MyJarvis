@@ -57,10 +57,11 @@ DEFAUT = {
     "whisper_modele": "small",
     "nom_utilisateur": "",
     "garder_modele": -1,          # -1 = garder le modèle en VRAM tant que Jarvis tourne (sinon Ollama le décharge après 5 min)
-    "cerveau": "claude",          # "claude" (API Anthropic) ou "ollama" (local)
+    "cerveau": "claude",          # "claude", "ollama" (local) ou une IA compatible OpenAI de fournisseurs.py
     "claude_modele": "claude-sonnet-5-5",
     "claude_effort": "auto",      # auto = bas pour une conversation, élevé pour une vraie tâche, très élevé sur demande
     "openai_modele": "",
+    "perso_url": "",              # cerveau « Autre (compatible OpenAI) » : adresse de l'API (ex. http://localhost:8000/v1)
     "langue": "fr",               # « fr » ou « en » : réponses de Jarvis, reconnaissance vocale, voix, interface        # vide = le meilleur modèle disponible avec ta clé OpenAI       # low = le plus réactif à l'oral ; medium pour les tâches longues avec outils
     "serveur_comptes": "",        # vide = serveur de comptes officiel ; sinon l'adresse HTTPS de ton propre serveur
     "cle_appli": "",              # clé d'appli de ton propre serveur (JARVIS_CLE_APPLI dans serveur/.env)
@@ -101,7 +102,10 @@ def _dossier_compte() -> Path:
 PARTAGE = _dossier_compte()   # remplacé par compte.activer_dossiers() à la connexion
 
 # Réglages communs à tous tes appareils (prénom, cerveau) : rangés dans ton compte
-CLES_PARTAGEES = ["nom_utilisateur", "cerveau", "claude_modele", "claude_effort", "openai_modele", "langue", "silence_fin"]
+from .fournisseurs import CLES_MODELES   # « openai_modele », « gemini_modele »… : modèle choisi pour chaque IA
+for _k in CLES_MODELES:
+    CONFIG.setdefault(_k, "")
+CLES_PARTAGEES = ["nom_utilisateur", "cerveau", "claude_modele", "claude_effort", *CLES_MODELES, "perso_url", "langue", "silence_fin"]
 PROFIL = PARTAGE / "profil.json"
 try:
     CONFIG.update({k: v for k, v in json.loads(PROFIL.read_text(encoding="utf-8")).items() if k in CLES_PARTAGEES and v})

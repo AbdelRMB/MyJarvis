@@ -115,7 +115,7 @@ function OngletCode() {
         </Panneau>
       ))}
       <Panneau titre={t("Jarvis code lui-même")} icone={<Brain />}>
-        <p className="text-[13px] text-doux">{t("Sans agent externe : Jarvis code avec ses propres outils et le cerveau choisi dans l'onglet Cerveau (Claude, OpenAI ou Ollama). Rien à connecter.")}</p>
+        <p className="text-[13px] text-doux">{t("Sans agent externe : Jarvis code avec ses propres outils et le cerveau choisi dans l'onglet Cerveau (Claude, OpenAI, Gemini, Mistral, Ollama…). Rien à connecter.")}</p>
       </Panneau>
     </div>
   );
@@ -781,58 +781,118 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
   );
 }
 
-/** Cerveau OpenAI : clé API (gardée dans .env + coffre chiffré du compte) et modèle choisi parmi ceux de la clé. */
-function ReglagesOpenAI({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer: (p: Partial<ConfigServeur>) => void }) {
-  type Etat = { cle: boolean; cle_masquee: string; modeles: string[]; modele: string; erreur: string };
+/** IA proposée comme cerveau (catalogue de jarvis/fournisseurs.py). */
+export type IA = { id: string; nom: string; detail: string; cle_ou: string; cle: boolean; local: boolean; perso: boolean };
+
+/** Réglages d'une IA compatible OpenAI : clé API (gardée dans .env + coffre chiffré du compte), adresse (« Autre »),
+ *  modèle choisi dans la liste du fournisseur ou écrit à la main. */
+function ReglagesIA({ ia, cfg, enregistrer }: { ia: IA; cfg: ConfigServeur; enregistrer: (p: Partial<ConfigServeur>) => void }) {
+  type Etat = { cle: boolean; cle_masquee: string; modeles: string[]; modele: string; conseille: string; url: string; erreur: string };
+  const cleModele = `${ia.id}_modele` as const;
   const [e, setE] = useState<Etat | null>(null);
   const [cle, setCle] = useState("");
+  const [url, setUrl] = useState(cfg.perso_url || "");
+  const [modele, setModele] = useState("");
   const [test, setTest] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
+  const charger = () =>
+    api<Etat>(`/api/ia/${ia.id}`)
+      .then((x) => {
+        setE(x);
+        setModele(cfg[cleModele] || x.modele || "");
+      })
+      .catch((x) => toast((x as Error).message, "erreur"));
   useEffect(() => {
-    api<Etat>("/api/openai").then(setE).catch(() => {});
-  }, []);
+    setE(null);
+    setTest(null);
+    setCle("");
+    charger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ia.id]);
   const sauverCle = async () => {
     try {
-      setE(await api<Etat>("/api/openai/cle", { method: "POST", json: { cle } }));
+      setE(await api<Etat>(`/api/ia/${ia.id}/cle`, { method: "POST", json: { cle } }));
       setCle("");
-      toast(t("Clé OpenAI enregistrée."), "succes");
+      toast(t("Clé {nom} enregistrée.", { nom: t(ia.nom) }), "succes");
     } catch (x) {
       toast((x as Error).message, "erreur");
     }
   };
+  const sauverUrl = async () => {
+    await enregistrer({ perso_url: url.trim() });
+    charger();
+  };
+  const choisirModele = (v: string) => {
+    setModele(v);
+    if (v.trim() !== (cfg[cleModele] || "")) enregistrer({ [cleModele]: v.trim() } as Partial<ConfigServeur>);
+  };
   const tester = async () => {
     setEnCours(true);
     try {
-      const r = await api<{ texte: string; secondes: number; modele: string }>("/api/openai/tester", { method: "POST" });
-      setTest(`${r.modele} : « ${r.texte} » en ${r.secondes} s`);
+      const r = await api<{ texte: string; secondes: number; modele: string }>(`/api/ia/${ia.id}/tester`, { method: "POST" });
+      setTest(`${r.modele} : « ${r.texte} » ${t("en {s} s", { s: r.secondes })}`);
     } catch (x) {
       setTest((x as Error).message);
     } finally {
       setEnCours(false);
     }
   };
+  const pret = e?.cle || (ia.local && !ia.cle);
   return (
     <div className="space-y-3">
-      <label className="block text-sm">
-        <span className="mb-1.5 block">Clé API OpenAI {e?.cle && <span className="font-mono text-[12px] text-vert">({e.cle_masquee})</span>}</span>
-        <div className="flex gap-2">
-          <Champ type="password" placeholder={t("sk-…")} value={cle} onChange={(x) => setCle(x.target.value)} className="flex-1" />
-          <Bouton variante="primaire" icone={<KeyRound className="size-4" />} onClick={sauverCle} disabled={!cle.trim()}>
-            {t("Enregistrer")}
-          </Bouton>
-        </div>
-        <span className="mt-1 block text-[12px] text-doux">{t("platform.openai.com › API keys. L'abonnement ChatGPT Plus n'inclut pas de crédit API.")}</span>
-      </label>
-      {e?.erreur && <p className="text-[12px] text-rouge">{e.erreur}</p>}
-      {e && e.modeles.length > 0 && (
-        <Selecteur
-          label={t("Modèle")}
-          valeur={cfg.openai_modele || e.modele || e.modeles[0]}
-          options={e.modeles.map((m) => ({ valeur: m, libelle: m }))}
-          onChange={(v) => enregistrer({ openai_modele: v })}
-        />
+      {ia.perso && (
+        <label className="block text-sm">
+          <span className="mb-1.5 block">{t("Adresse de l'API (compatible OpenAI)")}</span>
+          <div className="flex gap-2">
+            <Champ placeholder="http://localhost:8000/v1" value={url} onChange={(x) => setUrl(x.target.value)} className="flex-1 font-mono" />
+            <Bouton variante="primaire" onClick={sauverUrl} disabled={url.trim() === (cfg.perso_url || "")}>
+              {t("Enregistrer")}
+            </Bouton>
+          </div>
+        </label>
       )}
-      {e?.cle && (
+      {ia.cle && (
+        <label className="block text-sm">
+          <span className="mb-1.5 block">
+            {t("Clé API {nom}", { nom: t(ia.nom) })}
+            {ia.perso && <span className="text-doux">{t(" (facultative)")}</span>}{" "}
+            {e?.cle_masquee && <span className="font-mono text-[12px] text-vert">({e.cle_masquee})</span>}
+          </span>
+          <div className="flex gap-2">
+            <Champ type="password" placeholder={t("Colle ta clé ici")} value={cle} onChange={(x) => setCle(x.target.value)} className="flex-1" />
+            <Bouton variante="primaire" icone={<KeyRound className="size-4" />} onClick={sauverCle} disabled={!cle.trim()}>
+              {t("Enregistrer")}
+            </Bouton>
+          </div>
+        </label>
+      )}
+      <p className="text-[12px] text-doux">{t(ia.cle_ou)}</p>
+      {e?.erreur && <p className="text-[12px] text-ambre">{e.erreur}</p>}
+      {e && (pret || e.modeles.length > 0) && (
+        <label className="block text-sm">
+          <span className="mb-1.5 block">{t("Modèle")}</span>
+          <Champ
+            list={`modeles-${ia.id}`}
+            value={modele}
+            placeholder={e.conseille || t("Nom du modèle")}
+            onChange={(x) => setModele(x.target.value)}
+            onBlur={(x) => choisirModele(x.target.value)}
+            onKeyDown={(x) => x.key === "Enter" && choisirModele((x.target as HTMLInputElement).value)}
+            className="font-mono"
+          />
+          <datalist id={`modeles-${ia.id}`}>
+            {e.modeles.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+          <span className="mt-1 block text-[12px] text-doux">
+            {e.modeles.length
+              ? t("{n} modèles disponibles : choisis dans la liste ou écris un nom. Vide = le meilleur automatiquement.", { n: e.modeles.length })
+              : t("Écris le nom du modèle. Vide = le modèle conseillé.")}
+          </span>
+        </label>
+      )}
+      {pret && (
         <Bouton icone={<Zap className="size-4" />} chargement={enCours} onClick={tester}>
           {t("Tester")}
         </Bouton>
@@ -842,44 +902,64 @@ function ReglagesOpenAI({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
   );
 }
 
+function CarteCerveau({ actif, titre, detail, onClick }: { actif: boolean; titre: string; detail: string; onClick: () => void }) {
+  return (
+    <button
+      role="radio"
+      aria-checked={actif}
+      onClick={onClick}
+      className={cx("rounded-md border px-3 py-2.5 text-left transition-colors", actif ? "border-hud bg-hud/10" : "border-ligne hover:border-ligne-forte")}
+    >
+      <div className={cx("text-sm font-semibold", actif ? "text-hud" : "text-texte")}>{titre}</div>
+      <div className="mt-0.5 line-clamp-2 text-[12px] leading-snug text-doux" title={detail}>{detail}</div>
+    </button>
+  );
+}
+
 function PanneauCerveau({
   cfg,
   maj,
   modeles,
+  ias,
   enregistrer,
 }: {
   cfg: ConfigServeur;
   maj: (p: Partial<ConfigServeur>) => void;
   modeles: string[];
+  ias: IA[];
   enregistrer: (p: Partial<ConfigServeur>) => void;
 }) {
+  const choisir = (id: string) => cfg.cerveau !== id && enregistrer({ cerveau: id });
+  const iaActive = ias.find((i) => i.id === cfg.cerveau);
+  const carte = (i: IA) => <CarteCerveau key={i.id} actif={cfg.cerveau === i.id} titre={t(i.nom)} detail={t(i.detail)} onClick={() => choisir(i.id)} />;
   return (
     <Panneau titre={t("Cerveau")} icone={<Brain />}>
-      <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t("Cerveau de Jarvis")}>
-        {[
-          { id: "claude", titre: t("Claude (API)"), detail: t("Plus intelligent, ne touche pas ta carte graphique. Payant, données envoyées à Anthropic.") },
-          { id: "openai", titre: t("OpenAI (API)"), detail: t("Avec ta clé API OpenAI (GPT). Payant, données envoyées à OpenAI.") },
-          { id: "ollama", titre: t("Ollama (local)"), detail: t("Gratuit, 100 % privé. Utilise ta carte graphique.") },
-        ].map((o) => (
-          <button
-            key={o.id}
-            role="radio"
-            aria-checked={cfg.cerveau === o.id}
-            onClick={() => cfg.cerveau !== o.id && enregistrer({ cerveau: o.id as ConfigServeur["cerveau"] })}
-            className={cx(
-              "rounded-md border p-3 text-left transition-colors",
-              cfg.cerveau === o.id ? "border-hud bg-hud/10" : "border-ligne hover:border-ligne-forte",
-            )}
-          >
-            <div className={cx("text-sm font-semibold", cfg.cerveau === o.id ? "text-hud" : "text-texte")}>{o.titre}</div>
-            <div className="mt-1 text-[12px] leading-snug text-doux">{o.detail}</div>
-          </button>
-        ))}
+      <div role="radiogroup" aria-label={t("Cerveau de Jarvis")} className="mb-4 space-y-3">
+        <p className="titre-hud text-[10px] text-tres-doux">{t("Dans le cloud (avec une clé API)")}</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <CarteCerveau
+            actif={cfg.cerveau === "claude"}
+            titre={t("Claude (API)")}
+            detail={t("Le plus intelligent, conseillé. Payant, données envoyées à Anthropic.")}
+            onClick={() => choisir("claude")}
+          />
+          {ias.filter((i) => !i.local && !i.perso).map(carte)}
+        </div>
+        <p className="titre-hud pt-1 text-[10px] text-tres-doux">{t("Sur ton ordinateur (gratuit, privé)")}</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <CarteCerveau
+            actif={cfg.cerveau === "ollama"}
+            titre={t("Ollama (local)")}
+            detail={t("Gratuit, 100 % privé. Utilise ta carte graphique.")}
+            onClick={() => choisir("ollama")}
+          />
+          {ias.filter((i) => i.local || i.perso).map(carte)}
+        </div>
       </div>
       {cfg.cerveau === "claude" ? (
         <ReglagesClaude cfg={cfg} enregistrer={enregistrer} />
-      ) : cfg.cerveau === "openai" ? (
-        <ReglagesOpenAI cfg={cfg} enregistrer={enregistrer} />
+      ) : iaActive ? (
+        <ReglagesIA ia={iaActive} cfg={cfg} enregistrer={enregistrer} />
       ) : (
         <>
           <Selecteur label={t("Modèle Ollama")} valeur={cfg.modele} options={modeles.map((m) => ({ valeur: m, libelle: m }))} onChange={(v) => maj({ modele: v })} />
@@ -901,6 +981,7 @@ function PanneauCerveau({
 function OngletCerveau() {
   const [cfg, setCfg] = useState<ConfigServeur | null>(null);
   const [modeles, setModeles] = useState<string[]>([]);
+  const [ias, setIas] = useState<IA[]>([]);
   const [sauve, setSauve] = useState(false);
   const [prechargement, setPrechargement] = useState(false);
 
@@ -911,6 +992,9 @@ function OngletCerveau() {
         setModeles(d.modeles);
       })
       .catch((e) => toast(e.message, "erreur"));
+    api<{ fournisseurs: IA[] }>("/api/ia")
+      .then((d) => setIas(d.fournisseurs))
+      .catch(() => {});
   }, []);
 
   if (!cfg) return <p className="text-doux">{t("Chargement…")}</p>;
@@ -922,7 +1006,9 @@ function OngletCerveau() {
       await api("/api/config", { method: "POST", json: p });
       if (p.cerveau)
         toast(
-          p.cerveau === "claude" ? "Cerveau : Claude. VRAM libérée." : p.cerveau === "openai" ? "Cerveau : OpenAI. VRAM libérée." : "Cerveau : Ollama local. Chargement du modèle…",
+          p.cerveau === "ollama"
+            ? t("Cerveau : Ollama local. Chargement du modèle…")
+            : t("Cerveau : {nom}. VRAM libérée.", { nom: p.cerveau === "claude" ? "Claude" : ias.find((i) => i.id === p.cerveau)?.nom ?? p.cerveau }),
           "succes",
         );
       rafraichirSysteme();
@@ -957,7 +1043,7 @@ function OngletCerveau() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <PanneauCerveau cfg={cfg} maj={maj} modeles={modeles} enregistrer={enregistrer} />
+      <PanneauCerveau cfg={cfg} maj={maj} modeles={modeles} ias={ias} enregistrer={enregistrer} />
       <div className="space-y-4">
         <Panneau titre={t("Reconnaissance vocale")}>
           <Selecteur

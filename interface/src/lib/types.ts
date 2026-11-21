@@ -31,7 +31,7 @@ export type Systeme = {
   ollama: boolean;
   charges: { nom: string; vram: number; taille: number }[];
   modele: string;
-  cerveau?: "ollama" | "claude" | "openai";
+  cerveau?: string;   // "claude", "ollama" ou l'id d'une IA compatible OpenAI (voir /api/ia)
   cle_claude_manquante?: boolean;
   occupe: boolean;
   uptime: number;
@@ -46,8 +46,10 @@ export type ConfigServeur = {
   max_etapes_outils: number;
   whisper_modele: string;
   nom_utilisateur: string;
-  cerveau: "ollama" | "claude" | "openai";
+  cerveau: string;   // "claude", "ollama" ou l'id d'une IA compatible OpenAI (voir /api/ia)
   openai_modele?: string;
+  perso_url?: string;
+  [modeleIA: `${string}_modele`]: string | undefined;   // modèle choisi pour chaque IA (« gemini_modele »…)
   claude_modele: string;
   claude_effort: string;
   conseiller?: boolean;

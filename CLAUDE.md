@@ -49,8 +49,11 @@ Jarvis vit près de l'horloge (zone de notification).
 **Premier lancement (les deux systèmes)**
 - L'écran de connexion s'affiche : l'utilisateur **crée son compte** (prénom, e-mail, mot de passe) ou se connecte.
   Sa mémoire, son historique, ses connecteurs et ses réglages sont liés à ce compte et le suivent partout.
-- Réglages › Cerveau : coller sa **clé API Claude** (platform.claude.com › API keys ; l'abonnement Claude Pro n'en
-  inclut pas), ou choisir **Ollama** (gratuit, local : installer Ollama puis `ollama pull qwen3.5:9b`).
+- Réglages › Cerveau : choisir l'IA et coller sa clé API. **Claude** (platform.claude.com › API keys ; l'abonnement
+  Claude Pro n'en inclut pas), OpenAI, Gemini, Mistral, DeepSeek, Grok, OpenRouter, Groq… (l'écran indique où créer
+  chaque clé ; Gemini, Mistral, Groq et Cerebras ont une offre gratuite), ou **Ollama** (gratuit, local : installer
+  Ollama puis `ollama pull qwen3.5:9b`) / **LM Studio**. Ajouter une IA compatible OpenAI = une entrée dans
+  `jarvis/fournisseurs.py` (plus sa traduction dans `interface/src/lib/en.ts`).
 - L'appeler : dire « Jarvis, … » ou `Ctrl+Alt+J` (Windows) / `⌃⌥J` (Mac). Le faire taire : « Jarvis, stop » ou `Ctrl+Alt+S`.
 
 Vérifie que ça tourne : `curl -s http://127.0.0.1:7777/api/session` doit répondre (serveur local de l'appli).

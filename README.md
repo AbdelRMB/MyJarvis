@@ -8,7 +8,8 @@
   <strong>A voice assistant that actually drives your computer.</strong><br>
   Say <em>"Jarvis, …"</em>: it opens your apps, clicks, types, reads your screen, codes in VS Code,
   uses your websites (even with 2FA) and manages your servers.<br>
-  Powered by Claude, OpenAI or <strong>Ollama (100% local, free)</strong>. macOS and Windows.
+  Powered by <strong>the AI of your choice</strong>: Claude, GPT, Gemini, Mistral, DeepSeek, Grok, OpenRouter…
+  or <strong>Ollama / LM Studio (100% local, free)</strong>. macOS and Windows.
 </p>
 
 <p align="center">
@@ -43,7 +44,9 @@ files, browser and servers, and tells you out loud what it did.
 
 - 🎙️ **Hands-free.** Wake word ("Jarvis") detected **on your machine** (openWakeWord + Whisper). Nothing is sent
   until it hears its name. Interrupt it just by talking.
-- 🧠 **Your choice of brain.** Claude (smartest), OpenAI, or **Ollama: free, offline, nothing leaves your computer.**
+- 🧠 **Any AI as its brain.** Claude (smartest), OpenAI, Google Gemini, Mistral, DeepSeek, Grok, OpenRouter, Groq,
+  Cerebras, Together, Fireworks, Kimi, Qwen, Cohere, Hugging Face, any OpenAI-compatible API, or
+  **Ollama / LM Studio: free, offline, nothing leaves your computer.** Several have a free tier.
 - 🖥️ **Real computer control.** Apps, files, windows, mouse and keyboard, screen vision, terminal, VS Code, git.
 - 🌐 **Learns your websites.** Explores your intranet or business tools read-only, records your demonstrations,
   then does the task for you. Signs in on its own, **including 2FA codes** (TOTP computed locally).
@@ -82,8 +85,9 @@ files, browser and servers, and tells you out loud what it did.
 
 2. **Install**: drag Jarvis into Applications (Mac) or run the installer (Windows, no admin rights needed).
 3. **Create your account** (or use it locally without one), then pick a brain in **Settings › Brain**:
-   paste a [Claude API key](https://platform.claude.com), or install [Ollama](https://ollama.com) and run
-   `ollama pull qwen3.5:9b` for a free local brain.
+   click the AI you want and paste its API key (the screen tells you where to create it): Claude, OpenAI, Gemini,
+   Mistral, DeepSeek, Grok, OpenRouter… Or install [Ollama](https://ollama.com) and run `ollama pull qwen3.5:9b`
+   (or use [LM Studio](https://lmstudio.ai)) for a free local brain.
 
 Then say **"Jarvis, …"** or press `Ctrl+Alt+J` (Windows) / `⌃⌥J` (Mac).
 
@@ -155,7 +159,7 @@ Jarvis can also update itself automatically at the next start.
 
 ## 🔐 Privacy & security
 
-- **Ollama brain = nothing leaves your computer.** With Claude or OpenAI, your messages, memories and tool results
+- **Ollama or LM Studio brain = nothing leaves your computer.** With a cloud AI (Claude, OpenAI, Gemini…), your messages, memories and tool results
   are sent to that provider.
 - **Wake word is 100% local.** Audio is only processed after "Jarvis".
 - **Your password never leaves the device.** It derives a sign-in key and a vault key that encrypts your API key and

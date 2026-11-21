@@ -218,11 +218,10 @@ def _llm(consigne: str) -> str:
                                             messages=[{"role": "user", "content": consigne}])
         claude.enregistrer_cout(r.usage, CONFIG["claude_modele"])
         return "".join(b.text for b in r.content if b.type == "text")
-    if cerveau == "openai":
+    from .fournisseurs import est_compatible
+    if est_compatible(cerveau):
         from . import openai_cerveau
-        r = openai_cerveau.client().chat.completions.create(model=openai_cerveau.modele(),
-                                                            messages=[{"role": "user", "content": consigne}])
-        return r.choices[0].message.content or ""
+        return openai_cerveau.completer(consigne)
     import ollama
     r = ollama.chat(model=CONFIG["modele"], think=False, messages=[{"role": "user", "content": consigne}],
                     options={"num_ctx": CONFIG.get("num_ctx", 16384)})

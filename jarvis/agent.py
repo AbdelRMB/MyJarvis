@@ -134,7 +134,7 @@ class Jarvis:
         self.messages = [{"role": "system", "content": prompt_systeme()}]
         self.histo_claude = []   # historique au format Anthropic (cerveau Claude), jamais modifié après coup
         self.effort_claude = None   # effort en vigueur dans la conversation (réglé demande par demande)
-        self.histo_openai = []   # historique au format OpenAI (cerveau OpenAI)
+        self.histo_openai = []   # historique au format OpenAI (OpenAI, Gemini, Mistral… : voir fournisseurs.py)
 
     @property
     def avec_claude(self):
@@ -142,7 +142,9 @@ class Jarvis:
 
     @property
     def avec_openai(self):
-        return CONFIG.get("cerveau") == "openai"
+        """Cerveau compatible OpenAI : OpenAI, Gemini, Mistral, DeepSeek, Grok, OpenRouter, LM Studio…"""
+        from .fournisseurs import est_compatible
+        return est_compatible(CONFIG.get("cerveau"))
 
     def prechauffer(self):
         """Charge le modèle et lui fait lire le prompt système + les outils à l'avance.
@@ -291,10 +293,10 @@ def completer(prompt: str) -> str:
                                             messages=[{"role": "user", "content": prompt}])
         claude.enregistrer_cout(r.usage, CONFIG["claude_modele"])
         return "".join(b.text for b in r.content if b.type == "text")
-    if cerveau == "openai":
-        from . import openai_cerveau as o
-        r = o.client().chat.completions.create(model=o.modele(), messages=[{"role": "user", "content": prompt}])
-        return r.choices[0].message.content or ""
+    from .fournisseurs import est_compatible
+    if est_compatible(cerveau):
+        from . import openai_cerveau
+        return openai_cerveau.completer(prompt)
     r = ollama.chat(model=CONFIG["modele"], think=False, options={"num_ctx": CONFIG["num_ctx"], "temperature": 0.2},
                     messages=[{"role": "user", "content": prompt}])
     return r.message.content or ""

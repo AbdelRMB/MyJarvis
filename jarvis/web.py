@@ -28,6 +28,7 @@ from .modeles import charger_whisper
 from .plateforme import CACHE_FENETRE, MAC, WIN
 from .agent import Jarvis
 from .config import CONFIG, MACHINE, PARTAGE, RACINE, sauver_config, sauver_profil
+from .fournisseurs import CLES_MODELES, PAR_ID as IA, est_compatible
 
 HOTE, PORT = "127.0.0.1", int(os.environ.get("JARVIS_PORT", 7777))
 STATIC = Path(__file__).parent / "static"
@@ -35,8 +36,9 @@ JETON = secrets.token_urlsafe(24)
 HOTES_OK = {"127.0.0.1", "localhost"}
 CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
                "max_etapes_outils", "whisper_modele", "nom_utilisateur",
-               "cerveau", "claude_modele", "claude_effort", "openai_modele", "langue",
-               "briefing_matin", "conversation_suivie", "maj_auto", "conseiller", "recherche_web_native"]
+               "cerveau", "claude_modele", "claude_effort", "langue",
+               "briefing_matin", "conversation_suivie", "maj_auto", "conseiller", "recherche_web_native",
+               *CLES_MODELES, "perso_url"]
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 jarvis: Jarvis | None = None
@@ -109,10 +111,9 @@ def systeme(req: Request):
     return {"cpu": psutil.cpu_percent(interval=None), "ram": ram.percent, "ram_used": ram.used / 2**30,
             "ram_total": ram.total / 2**30, "disque": disque.percent, "disque_libre": disque.free / 2**30,
             "gpu": _gpu(), "ollama": ollama_ok, "charges": charges, "cerveau": CONFIG.get("cerveau", "ollama"),
-            "modele": {"claude": CONFIG["claude_modele"], "openai": CONFIG.get("openai_modele") or "OpenAI"}.get(
-                CONFIG.get("cerveau"), CONFIG["modele"]),
+            "modele": _nom_modele(),
             "cle_claude_manquante": (CONFIG.get("cerveau") == "claude" and not __import__("os").environ.get("ANTHROPIC_API_KEY"))
-            or (CONFIG.get("cerveau") == "openai" and not __import__("os").environ.get("OPENAI_API_KEY")),
+            or (est_compatible(CONFIG.get("cerveau")) and not _ia().cle_configuree()),
             "occupe": verrou_tache.locked(), "uptime": int(time.time() - psutil.boot_time())}
 
 
@@ -140,9 +141,8 @@ async def ecrire_config(req: Request):
         jarvis.arreter = True
         jarvis.reset()
         diffuser(type="reset")
-        diffuser(type="info", texte="Cerveau : " + ("OpenAI " + (CONFIG.get("openai_modele") or "") if CONFIG["cerveau"] == "openai" else "Claude " + CONFIG["claude_modele"] if CONFIG["cerveau"] == "claude"
-                                                     else "Ollama local " + CONFIG["modele"]))
-        if CONFIG["cerveau"] in ("claude", "openai"):
+        diffuser(type="info", texte="Cerveau : " + _nom_cerveau())
+        if CONFIG["cerveau"] != "ollama":
             threading.Thread(target=Jarvis.liberer, daemon=True).start()   # rend la VRAM
         else:
             threading.Thread(target=jarvis.prechauffer, daemon=True).start()
@@ -366,41 +366,82 @@ async def precharger(req: Request):
     return {"ok": True, "secondes": round(time.time() - t0, 1)}
 
 
-# ---------- cerveau OpenAI ----------
-@app.get("/api/openai")
-async def etat_openai(req: Request):
+# ---------- cerveaux compatibles OpenAI (OpenAI, Gemini, Mistral, DeepSeek, Grok, OpenRouter, LM Studio…) ----------
+def _ia():
+    from . import openai_cerveau
+    return openai_cerveau
+
+
+def _nom_modele() -> str:
+    c = CONFIG.get("cerveau")
+    if c == "claude":
+        return CONFIG["claude_modele"]
+    if est_compatible(c):
+        return CONFIG.get(f"{c}_modele") or IA[c]["nom"]
+    return CONFIG["modele"]
+
+
+def _nom_cerveau() -> str:
+    c = CONFIG.get("cerveau")
+    if c == "claude":
+        return "Claude " + CONFIG["claude_modele"]
+    if est_compatible(c):
+        return IA[c]["nom"] + (" " + CONFIG.get(f"{c}_modele") if CONFIG.get(f"{c}_modele") else "")
+    return "Ollama local " + CONFIG["modele"]
+
+
+def _fid(fid: str) -> str:
+    if fid not in IA:
+        raise HTTPException(404, "IA inconnue.")
+    return fid
+
+
+@app.get("/api/ia")
+def liste_ia(req: Request):
     _verifier(req)
-    from . import openai_cerveau as o
+    from .fournisseurs import pour_interface
+    return {"fournisseurs": pour_interface()}
+
+
+@app.get("/api/ia/{fid}")
+async def etat_ia(fid: str, req: Request):
+    _verifier(req)
+    o = _ia()
+    fid = _fid(fid)
     modeles, erreur = [], ""
-    if o.cle_configuree():
+    if o.cle_configuree(fid):
         try:
-            modeles = await asyncio.to_thread(o.modeles)
+            modeles = await asyncio.to_thread(o.modeles, fid)
         except Exception as e:
-            erreur = f"Liste des modèles indisponible : {e}"
-    return {"cle": o.cle_configuree(), "cle_masquee": o.cle_masquee(), "modeles": modeles,
-            "modele": CONFIG.get("openai_modele") or "", "erreur": erreur}
+            erreur = f"Liste des modèles indisponible ({type(e).__name__}) : tu peux écrire le nom du modèle à la main."
+    return {"cle": o.cle_configuree(fid), "cle_masquee": o.cle_masquee(fid), "modeles": modeles,
+            "modele": CONFIG.get(f"{fid}_modele") or "", "conseille": IA[fid].get("defaut", ""),
+            "url": o.url(fid) or "", "erreur": erreur}
 
 
-@app.post("/api/openai/cle")
-async def cle_openai(req: Request):
+@app.post("/api/ia/{fid}/cle")
+async def cle_ia(fid: str, req: Request):
     _verifier(req)
-    from . import openai_cerveau as o
+    o = _ia()
+    fid = _fid(fid)
     cle = str((await req.json()).get("cle", "")).strip()
-    if cle and not cle.startswith("sk-"):
-        raise HTTPException(400, "Ce n'est pas une clé API OpenAI (elle commence par sk-).")
-    o.definir_cle(cle)
-    return await etat_openai(req)
+    prefixe = IA[fid].get("prefixe")
+    if cle and prefixe and not cle.startswith(prefixe):
+        raise HTTPException(400, f"Ce n'est pas une clé {IA[fid]['nom']} (elle commence par {prefixe}).")
+    o.definir_cle(cle, fid=fid)
+    return await etat_ia(fid, req)
 
 
-@app.post("/api/openai/tester")
-async def tester_openai(req: Request):
+@app.post("/api/ia/{fid}/tester")
+async def tester_ia(fid: str, req: Request):
     _verifier(req)
-    from . import openai_cerveau as o
+    o = _ia()
+    fid = _fid(fid)
     try:
-        texte, s = await asyncio.to_thread(o.tester)
+        texte, s = await asyncio.to_thread(o.tester, fid)
     except Exception as e:
         raise HTTPException(502, f"Échec : {e}")
-    return {"texte": texte, "secondes": round(s, 1), "modele": o.modele()}
+    return {"texte": texte, "secondes": round(s, 1), "modele": o.modele(fid)}
 
 
 # ---------- cerveau Claude ----------
@@ -1610,7 +1651,7 @@ def preparer():
     taches.au_demarrage()        # tâches de fond coupées par la fermeture : « interrompues » (bouton Reprendre)
     from . import agents_code
     agents_code.surveiller()     # prévient si Claude Code / Codex ne sont plus connectés
-    if CONFIG.get("cerveau") not in ("claude", "openai"):
+    if CONFIG.get("cerveau") == "ollama":
         _demarrer_ollama()
     if not memoire.SYSTEME.exists():
         print("  Premier lancement : scan du PC...")
