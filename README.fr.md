@@ -31,7 +31,7 @@
 
 <p align="center">
   <a href="docs/demo.mp4"><img src="docs/demo.webp" alt="Démo de Jarvis : commande vocale, VS Code et tests, analyse de l'écran, formulaire intranet avec 2FA et accord, message WhatsApp" width="800"></a>
-  <br><sub>▶ <a href="docs/demo.mp4">Voir en HD (MP4)</a></sub>
+  <br><sub>▶ <a href="docs/demo.mp4">Voir en HD (MP4)</a> · <a href="docs/demo-en.mp4">version anglaise</a></sub>
 </p>
 
 ---

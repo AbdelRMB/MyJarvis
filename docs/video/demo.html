@@ -237,6 +237,31 @@ header{height:64px;flex:none;border-bottom:1px solid var(--ligne);display:flex;a
 </div>
 
 <script>
+const EN=new URLSearchParams(location.search).get("lang")==="en";
+const tr=(fr,en)=>EN?en:fr;
+if(EN){document.documentElement.lang="en";const PAIRES=[
+ ["ASSISTANT PERSONNEL","PERSONAL ASSISTANT"],[">Liaison serveur<",">Server link<"],[">Micro<",">Microphone<"],["Connecté en tant que","Signed in as"],
+ ["<span>Appui</span>","<span>Push</span>"],["« Jarvis »","“Jarvis”"],["LUNDI 23 NOVEMBRE","MONDAY, NOVEMBER 23"],[">Conversation en cours<",">Current conversation<"],
+ ["Bonjour Abdelrahim.","Hello Abdelrahim."],["Que puis-je faire pour vous ?","What can I do for you?"],
+ ["Ouvre mon dernier projet dans VS Code","Open my latest project in VS Code"],["Quelle météo aujourd'hui ?","What's the weather today?"],
+ ["Qu'est-ce qui consomme le plus de mémoire ?","What's using the most memory?"],["Fais une capture et dis-moi ce que tu vois","Take a screenshot and tell me what you see"],
+ ["Résume les actus tech du jour","Summarize today's tech news"],["Crée un projet Vite React dans Documents","Create a Vite React project in Documents"],
+ ["Demande-moi n'importe quoi…","Ask me anything…"],["Entrée pour envoyer · Maj+Entrée nouvelle ligne · Espace maintenu pour parler · Échap pour stopper","Enter to send · Shift+Enter new line · Hold Space to talk · Esc to stop"],
+ [">En attente<",">Waiting<"],["Dis « Jarvis, … »","Say “Jarvis, …”"],["ACTIONS DE LA SESSION","SESSION ACTIONS"],["Aucune action pour l'instant.","No actions yet."],
+ ["localhost:5173/boutique","localhost:5173/shop"],["Ma Boutique","My Shop"],["<span>Produits</span>","<span>Products</span>"],["Panier (0)","Cart (0)"],
+ ["ListeProduits.tsx","ProductList.tsx"],["&lt;ListeProduits&gt;","&lt;ProductList&gt;"],["at ListeProduits (","at ProductList ("],
+ ["intranet.entreprise.fr/rh/conges/nouvelle","intranet.company.com/hr/time-off/new"],["▣ Espace RH","▣ HR Portal"],["Service informatique","IT department"],
+ ["Nouvelle demande d'absence","New time-off request"],["Solde : 18,5 jours de congés payés","Balance: 18.5 days of paid leave"],["Type d'absence","Leave type"],
+ ["<label>Du</label>","<label>From</label>"],["<label>Au</label>","<label>To</label>"],[">Choisir…<",">Choose…<"],[">jj/mm/aaaa<",">mm/dd/yyyy<"],
+ ["Envoyer la demande</div>","Submit request</div>"],["<b>Connexion automatique</b> · code 2FA 482 913 calculé","<b>Automatic sign-in</b> · 2FA code 482 913 generated"],
+ ["✓ Demande envoyée · en attente de validation par ton responsable","✓ Request submitted · awaiting your manager's approval"],
+ [">en ligne<",">online<"],[">AUJOURD'HUI<",">TODAY<"],["Tu es où ? On commence sans toi 😄","Where are you? We're starting without you 😄"],["J'arrive dans 10 minutes 👍","Be there in 10 minutes 👍"],
+ ["<em>ANALYSE</em>","<em>ANALYZING</em>"],["Cliquer sur « Envoyer la demande » sur intranet.entreprise.fr","Click “Submit request” on intranet.company.com"],
+ ["Congés payés · du mer. 23/12/2026 au dim. 27/12/2026","Paid leave · Wed 12/23/2026 to Sun 12/27/2026"],[">Refuser<",">Deny<"],[">Autoriser<",">Allow<"],
+ ["The voice assistant that actually drives your computer</div>","Just talk. It does the work.</div>"],
+ ["L'assistant vocal qui pilote vraiment ton ordinateur","The voice assistant that actually drives your computer"],
+ ["Ollama 100 % local","Ollama 100% local"],["Gratuit · Free — installe-le en 2 minutes","Free — install it in 2 minutes"]];
+ const st=document.getElementById("stage");let h=st.innerHTML;for(const [a,b] of PAIRES)h=h.split(a).join(b);st.innerHTML=h;}
 const IC=(n,s=18,st=2)=>`<svg class="i" viewBox="0 0 24 24" style="width:${s}px;height:${s}px;stroke-width:${st}">${ICONES[n]||""}</svg>`;
 const $=id=>document.getElementById(id);
 const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
@@ -247,15 +272,15 @@ const DUREE=54.5;
 
 /* ---------- barre latérale ---------- */
 (function(){
- const G=[["",[["message-square","Assistant",1],["list-checks","À faire"]]],["Ma mémoire",[["rotate-ccw-clock","Historique"],["brain","Mémoire"]]],
- ["Automatiser",[["list-todo","Tâches"],["zap","Automatisations"],["globe","Sites appris"],["plug","Connecteurs"]]],
- ["Mes machines",[["laptop","Mes appareils"],["cpu","Système"],["activity","Activité"],["wrench","Arsenal"]]],
- ["Jarvis",[["settings","Réglages"],["download","Mises à jour"],["life-buoy","Tickets"]]]];
+ const G=[["",[["message-square","Assistant",1],["list-checks",tr("À faire","To do")]]],[tr("Ma mémoire","My memory"),[["rotate-ccw-clock",tr("Historique","History")],["brain",tr("Mémoire","Memory")]]],
+ [tr("Automatiser","Automate"),[["list-todo",tr("Tâches","Tasks")],["zap",tr("Automatisations","Automations")],["globe",tr("Sites appris","Learned sites")],["plug",tr("Connecteurs","Connectors")]]],
+ [tr("Mes machines","My machines"),[["laptop",tr("Mes appareils","My devices")],["cpu",tr("Système","System")],["activity",tr("Activité","Activity")],["wrench","Arsenal"]]],
+ ["Jarvis",[["settings",tr("Réglages","Settings")],["download",tr("Mises à jour","Updates")],["life-buoy","Tickets"]]]];
  let h="";for(const [g,items] of G){if(g)h+=`<div class="grp">${g}${IC("chevron-down",13)}</div>`;for(const [i,l,on] of items)h+=`<div class="ni${on?" on":""}">${IC(i,18)}${l}</div>`;}
  $("nav").innerHTML=h;
  $("bmic").innerHTML=IC("mic",17);$("bvol").innerHTML=IC("volume-2",17);$("bcl").innerHTML=IC("bell",17);
  $("modele").innerHTML=IC("brain",14)+"claude-sonnet-5-5";$("smic").innerHTML=IC("mic",19);$("senv").innerHTML=IC("arrow-up",19);
- $("capMic").innerHTML=IC("mic",22);$("dlgI").innerHTML=IC("shield-exclamation-point",19)+"Jarvis demande ton accord";
+ $("capMic").innerHTML=IC("mic",22);$("dlgI").innerHTML=IC("shield-exclamation-point",19)+tr("Jarvis demande ton accord","Jarvis asks for your approval");
  $("vu").innerHTML="<i></i>".repeat(44);
 })();
 
@@ -282,6 +307,12 @@ const SC=[
   outils:[["whatsapp_envoyer",44.1,45.0,"Karim"],["rappel",45.0,45.4,"18:00 · acheter du pain"]],
   pa:[45.6,48.4],rep:"C'est fait : message envoyé à **Karim**, et je te rappelle d'acheter du pain à **18 h**."},
 ];
+if(EN){const E=[
+ {chF:"Drives your computer",fr:"Jarvis, open my project in VS Code and run the tests.",rep:"Done: **MyJarvis** is open in VS Code and all **42 tests pass**. ✅",args:["MyJarvis","npm test"]},
+ {chF:"Sees your screen",fr:"Jarvis, look at my screen: why is my page blank?",rep:"The error comes from **ProductList.tsx, line 42**: `products` is still undefined on the first render, so `.map` crashes. Use `products ?? []` and the page will show up. Want me to fix it?",args:["main screen"]},
+ {chF:"Uses your websites, 2FA included",fr:"Jarvis, book my time off from December 23 to 27 on the intranet.",rep:"Submitted ✅ Your time-off request for **December 23–27** is waiting for your manager's approval.",args:["intranet","intranet.company.com/hr/time-off","intranet.company.com","Type, From, To","Submit request"]},
+ {chF:"Gets things done for you",fr:"Jarvis, tell Karim on WhatsApp I'll be there in 10 minutes, and remind me to buy bread at 6 pm.",rep:"Done: message sent to **Karim**, and I'll remind you to buy bread at **6 pm**.",args:["Karim","6:00 PM · buy bread"]}];
+ SC.forEach((s,k)=>{const e=E[k];s.chF=e.chF;s.chE="";s.fr=e.fr;s.en="";s.rep=e.rep;s.outils.forEach((o,i)=>o[3]=e.args[i]);});}
 const T0=10*3600+46*60+12;
 const hms=s=>{s=Math.floor(s);return [s/3600|0,(s%3600)/60|0,s%60].map(x=>String(x).padStart(2,"0")).join(":")};
 const hm=s=>hms(s).slice(0,5);
@@ -398,7 +429,7 @@ window.render=function(t){
 
  /* horloge, statut */
  $("heure").textContent=hms(T0+t);
- const S={attente:["En attente","Dis « Jarvis, … »","var(--hud)"],ecoute:["Écoute","Je t'écoute…","var(--vert)"],trans:["Transcription","J'analyse ta voix…","var(--hud)"],ana:["Analyse","Je réfléchis…","var(--hud)"],exec:["Exécution",(st.outil||"").replace(/_/g," "),"var(--ambre)"],parle:["Transmission","Dis « Jarvis, stop » ou Échap pour couper","var(--hud)"]}[st.e];
+ const S=(EN?{attente:["Waiting","Say “Jarvis, …”","var(--hud)"],ecoute:["Listening","I'm listening…","var(--vert)"],trans:["Transcription","Analyzing your voice…","var(--hud)"],ana:["Thinking","Thinking…","var(--hud)"],exec:["Running",(st.outil||"").replace(/_/g," "),"var(--ambre)"],parle:["Sending","Say “Jarvis, stop” or press Esc to cut","var(--hud)"]}:{attente:["En attente","Dis « Jarvis, … »","var(--hud)"],ecoute:["Écoute","Je t'écoute…","var(--vert)"],trans:["Transcription","J'analyse ta voix…","var(--hud)"],ana:["Analyse","Je réfléchis…","var(--hud)"],exec:["Exécution",(st.outil||"").replace(/_/g," "),"var(--ambre)"],parle:["Transmission","Dis « Jarvis, stop » ou Échap pour couper","var(--hud)"]})[st.e];
  $("stL").textContent=S[0];$("stL").style.color=S[2];$("stL").style.textShadow=`0 0 14px ${S[2]}`;$("stD").textContent=S[1];
  $("bmic").className="btn"+(st.e==="ecoute"?" actif":"");
  rApp(t,dt,st.e,lvl);
@@ -420,7 +451,7 @@ window.render=function(t){
   }
  });
  $("accueil").style.display=premier?"none":"flex";$("topchat").style.visibility=premier?"visible":"hidden";
- if(entendu){$("entendu").style.display="block";$("entendu").innerHTML=`<span style="color:var(--td)">Entendu : </span>« ${entendu} »`;}
+ if(entendu){$("entendu").style.display="block";$("entendu").innerHTML=(EN?`<span style="color:var(--td)">Heard: </span>“${entendu}”`:`<span style="color:var(--td)">Entendu : </span>« ${entendu} »`);}
  const cible=Math.max(0,$("filIn").scrollHeight-$("fil").clientHeight);defil+=(cible-defil)*Math.min(1,dt*7);if(t<.05)defil=cible;
  $("filIn").style.transform=`translateY(${-defil}px)`;
  /* actions */
@@ -430,11 +461,11 @@ window.render=function(t){
  /* chapitre */
  let chV=0,chS=null;for(const s of SC){const v=env(t,s.ch[0],s.ch[0]+3.4,.4);if(v>chV){chV=v;chS=s;}}
  $("chap").style.opacity=chV;$("chap").style.transform=`translateX(${(1-chV)*-24}px)`;
- if(chS){$("chN").textContent=chS.num;$("chF").textContent=chS.chF;$("chE").textContent=chS.chE;}
+ if(chS){$("chN").textContent=chS.num;$("chF").textContent=chS.chF;$("chE").textContent=chS.chE;$("chE").style.display=chS.chE?"block":"none";}
  /* sous-titres */
  let cV=0;for(const s of SC){const v=env(t,s.ec[0]-.25,s.tr[1]+.7,.3);if(v>0){cV=v;
   const mots=s.fr.split(" "),n=mots.length*P(t,s.ec[0]+.1,s.ec[1]-.35);
-  $("capF").innerHTML=mots.map((m,i)=>`<span class="w" style="opacity:${.18+.82*clamp(n-i)}">${m}</span>`).join(" ");$("capE").textContent=s.en;
+  $("capF").innerHTML=mots.map((m,i)=>`<span class="w" style="opacity:${.18+.82*clamp(n-i)}">${m}</span>`).join(" ");$("capE").textContent=s.en;$("capE").style.display=s.en?"block":"none";
   const ecoute=t<s.ec[1];$("capMic").style.transform=`scale(${1+(ecoute?.12*voix(t):0)})`;$("capMic").style.opacity=ecoute?1:.45;}}
  $("cap").style.opacity=cV;$("cap").style.transform=`translateY(${(1-cV)*16}px)`;
 
@@ -452,7 +483,7 @@ window.render=function(t){
  fenetre($("wRh"),t,31.35,37.2);
  $("toast").style.opacity=env(t,31.9,33.2,.25);
  const typer=(id,txt,a,b,ph)=>{const n=Math.floor(txt.length*P(t,a,b));const el=$(id);if(n>0){el.textContent=txt.slice(0,n);el.style.color="#1d2433";}else{el.textContent=ph;el.style.color="#9aa3b2";}};
- typer("vType","Congés payés",32.75,33.0,"Choisir…");typer("vDu","23/12/2026",33.25,33.7,"jj/mm/aaaa");typer("vAu","27/12/2026",33.85,34.3,"jj/mm/aaaa");
+ typer("vType",tr("Congés payés","Paid leave"),32.75,33.0,tr("Choisir…","Choose…"));typer("vDu",tr("23/12/2026","12/23/2026"),33.25,33.7,tr("jj/mm/aaaa","mm/dd/yyyy"));typer("vAu",tr("27/12/2026","12/27/2026"),33.85,34.3,tr("jj/mm/aaaa","mm/dd/yyyy"));
  const cibles=[["cType",32.6,33.15],["cDu",33.15,33.8],["cAu",33.8,34.4],["bEnv",34.4,36.75]];let hv=0,hr=null;
  for(const [id,a,b] of cibles)if(t>=a&&t<b){hv=1;const el=$(id),k=el.querySelector("div")||el;hr=rectDans(k);const rr=rectDans($("wRh").querySelector(".rh"));hr={x:hr.x-rr.x-5,y:hr.y-rr.y-5,w:hr.w+10,h:hr.h+10};}
  if(hr)Object.assign($("hl").style,{left:hr.x+"px",top:hr.y+"px",width:hr.w+"px",height:hr.h+"px"});$("hl").style.opacity=hv;

@@ -1,5 +1,6 @@
 // node rendu.mjs apercu 5 9.5 ...   → apercu-<t>.png
 // node rendu.mjs video out.mp4      → vidéo 1920x1080 30 i/s
+// LANGUE=en node rendu.mjs …         → version anglaise
 import puppeteer from "puppeteer-core";
 import { spawn } from "child_process";
 import path from "path";
@@ -17,7 +18,7 @@ const nav = await puppeteer.launch({
 });
 const page = await nav.newPage();
 await page.setViewport({ width: 1600, height: 900, deviceScaleFactor: 1.2 });
-await page.goto(pathToFileURL(path.join(ici, "demo.html")).href, { waitUntil: "networkidle0" });
+await page.goto(pathToFileURL(path.join(ici, "demo.html")).href + "?lang=" + (process.env.LANGUE || "fr"), { waitUntil: "networkidle0" });
 await page.evaluate(async () => { await document.fonts.ready; });
 const DUREE = await page.evaluate(() => window.DUREE);
 
@@ -29,7 +30,7 @@ if (mode === "apercu") {
     const t = i / FPS;
     await page.evaluate((t) => window.render(t), t);
     if (t >= cibles[k] - 1e-6) {
-      await page.screenshot({ path: path.join(ici, `apercu-${cibles[k]}.png`) });
+      await page.screenshot({ path: path.join(ici, `apercu-${process.env.LANGUE || "fr"}-${cibles[k]}.png`) });
       k++;
     }
   }
