@@ -1,0 +1,15 @@
+{
+  "name": "jarvis-video-demo",
+  "private": true,
+  "type": "module",
+  "description": "Vidéo de démo de Jarvis : animation qui reproduit l'interface, rendue image par image dans Chrome puis encodée par ffmpeg",
+  "scripts": {
+    "icones": "node icones.mjs ../../interface/node_modules/lucide-react/dist/esm/icons icones.js",
+    "apercu": "node rendu.mjs apercu",
+    "video": "node rendu.mjs video jarvis-demo.mp4"
+  },
+  "dependencies": {
+    "ffmpeg-static": "5.2.0",
+    "puppeteer-core": "23.11.1"
+  }
+}

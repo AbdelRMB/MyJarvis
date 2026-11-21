@@ -29,12 +29,10 @@
   <a href="README.fr.md">🇫🇷 Français</a>
 </p>
 
-<!--
-  DEMO: record a 20–40 s screen capture ("Jarvis, open Discord", "Jarvis, look at my screen…"),
-  save it as docs/demo.gif (or upload an .mp4 by dragging it into a GitHub issue and paste the link here),
-  then replace this comment with:
-  <p align="center"><img src="docs/demo.gif" alt="Jarvis demo" width="800"></p>
--->
+<p align="center">
+  <a href="docs/demo.mp4"><img src="docs/demo.webp" alt="Jarvis demo: voice command, VS Code and tests, screen analysis, intranet form with 2FA and approval, WhatsApp message" width="800"></a>
+  <br><sub>▶ <a href="docs/demo.mp4">Watch in HD (MP4)</a> · the interface is in French, subtitles in English</sub>
+</p>
 
 ---
 

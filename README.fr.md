@@ -29,12 +29,10 @@
   <a href="README.md">🇬🇧 English</a>
 </p>
 
-<!--
-  DÉMO : enregistre une capture d'écran de 20 à 40 s (« Jarvis, ouvre Discord », « Jarvis, regarde mon écran… »),
-  enregistre-la en docs/demo.gif (ou glisse un .mp4 dans une issue GitHub et colle le lien ici),
-  puis remplace ce commentaire par :
-  <p align="center"><img src="docs/demo.gif" alt="Démo de Jarvis" width="800"></p>
--->
+<p align="center">
+  <a href="docs/demo.mp4"><img src="docs/demo.webp" alt="Démo de Jarvis : commande vocale, VS Code et tests, analyse de l'écran, formulaire intranet avec 2FA et accord, message WhatsApp" width="800"></a>
+  <br><sub>▶ <a href="docs/demo.mp4">Voir en HD (MP4)</a></sub>
+</p>
 
 ---
 
