@@ -1167,6 +1167,22 @@ async def regler_appli(req: Request):
     return etat_appli(req)
 
 
+VOCAL = {"ts": 0.0}   # dernière demande faite à la voix (conversation suivie)
+
+
+def _ecouter_suite_bientot():
+    """La voix de Jarvis s'est tue : si la réponse est finie et que la demande était orale, on écoute la suite
+    8 s sans redire « Jarvis »."""
+    def verifier():
+        time.sleep(0.8)   # entre deux phrases, la voix s'arrête un instant : on attend d'être sûr
+        ecoute = APPLI.get("ecoute")
+        if (CONFIG.get("conversation_suivie", True) and ecoute is not None and ecoute.actif and not PAROLE["actif"]
+                and not verrou_tache.locked() and time.time() - VOCAL["ts"] < 180):
+            ecoute.ecouter_suite(8.0)
+            diffuser(type="vocal", etat="suite")
+    threading.Thread(target=verifier, daemon=True).start()
+
+
 def commande_vocale(audio: np.ndarray):
     """Phrase dite après « Hey Jarvis » (fenêtre éventuellement cachée) : transcription puis exécution."""
     if audio is None:   # rien dit après le mot d'activation
@@ -1187,6 +1203,8 @@ def commande_vocale(audio: np.ndarray):
         if RX_STOP_SEUL.match(texte) or re.match(r"^(stop|arr[êe]te|annule|tais[- ]toi|chut|silence)\b", texte, re.I):
             stop_vocal()
             return
+        VOCAL["ts"] = time.time()
+
         def lancer():
             for _ in range(80):   # jusqu'à 8 s : fenêtre réveillée à l'instant, pas encore branchée
                 if _clients:
@@ -1347,7 +1365,10 @@ async def ws(sock: WebSocket):
                 jarvis.arreter = True
                 outils.arreter_tout()
             elif t == "parle":
+                avant = PAROLE["actif"]
                 PAROLE.update(actif=bool(m.get("actif")), depuis=time.time())
+                if avant and not PAROLE["actif"]:
+                    _ecouter_suite_bientot()
             elif t == "reset":
                 jarvis.arreter = True
                 jarvis.reset()

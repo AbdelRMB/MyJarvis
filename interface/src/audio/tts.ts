@@ -16,6 +16,9 @@ let file: Morceau[] = [];
 let tampon = "";
 let generation = 0;
 let enLecture = false;
+let enCours = "";
+/** Ce que Jarvis est en train de dire (et va dire) : sert à reconnaître l'écho de sa propre voix dans le micro. */
+export const texteEnCours = () => [enCours, ...file.map((m) => m.texte)].join(" ");
 let lecteur: HTMLAudioElement | null = null;
 let analyseur: AnalyserNode | null = null;
 const donnees = new Uint8Array(256);
@@ -121,6 +124,7 @@ async function jouerSuivant(gen: number) {
     return;
   }
   enLecture = true;
+  enCours = m.texte;
   majAudio({ parle: true });
   const blob = await m.audio;
   if (gen !== generation) return;

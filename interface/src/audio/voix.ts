@@ -10,7 +10,18 @@ import { reglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { sons } from "./bips";
 import { micro, versPcm16k } from "./micro";
-import { finirFlux, recevoirFlux, taire } from "./tts";
+import { finirFlux, recevoirFlux, taire, texteEnCours } from "./tts";
+
+let suiviActif = true;    // Réglages › Application › Conversation suivie
+let dernierVocal = 0;     // dernière demande faite à la voix
+
+const mots = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[a-z0-9']+/g) ?? [];
+/** La phrase entendue reprend surtout ce que Jarvis dit : c'est l'écho de sa voix, pas toi. */
+function estEcho(entendu: string) {
+  const dit = new Set(mots(texteEnCours()));
+  const m = mots(entendu);
+  return m.length > 0 && m.filter((x) => dit.has(x)).length / m.length >= 0.5;
+}
 
 // Même règles que l'écoute de fond (jarvis/ecoute.py) : « Jarvis », « Hé/Et/Ok/Dis Jarvis », transcriptions approximatives
 const NOM = String.raw`(?:d[ie]\s?)?(?:j|dj)[ae]r?v[iy](?:s|ce|sse|ss)?`;
@@ -65,6 +76,7 @@ function traiterParole(texte: string, auto: boolean) {
     texte = texte.replace(RX_EVEIL, "").trim() || texte;
   }
   majAudio({ eveilJusqua: 0 });
+  dernierVocal = Date.now();
   envoyer(texte);
 }
 
@@ -88,6 +100,12 @@ export function brancherVoix() {
         majAudio({ derniereTranscription: texte });
         stopTout();
         const suite = await transcrire(morceaux); // transcription précise de la nouvelle demande
+        traiterParole(suite || texte, false);
+      } else if (suiviActif && reglages().echo && mots(texte).length >= 3 && !estEcho(texte)) {
+        // tu lui coupes la parole sans dire « Jarvis » : il se tait et écoute ta nouvelle demande
+        majAudio({ derniereTranscription: texte, eveilJusqua: Date.now() + 3000 });
+        stopTout();
+        const suite = await transcrire(morceaux);
         traiterParole(suite || texte, false);
       }
     } catch {
@@ -132,12 +150,23 @@ export function brancherVoix() {
       taire();
       sons.eveil();
       majAudio({ vocalServeur: "eveil" });
-    } else if (v.etat === "transcription") majAudio({ vocalServeur: "transcription" });
+    } else if (v.etat === "suite") majAudio({ vocalServeur: "eveil" }); // écoute la suite, sans bip
+    else if (v.etat === "transcription") majAudio({ vocalServeur: "transcription" });
     else majAudio({ vocalServeur: null, ...(v.texte ? { derniereTranscription: v.texte } : {}) });
   });
   bus.addEventListener("stop_voix", () => stopTout());
+  api<{ config: { conversation_suivie?: boolean } }>("/api/config")
+    .then((c) => (suiviActif = c.config.conversation_suivie !== false))
+    .catch(() => {});
   useAudio.subscribe((s, avant) => {
     if (s.parle !== avant.parle) signalerParole(s.parle);
+    // conversation suivie (micro de la fenêtre, mode « Jarvis ») : après sa réponse, la suite sans redire son nom
+    if (avant.parle && !s.parle)
+      setTimeout(() => {
+        const a = audio();
+        if (suiviActif && !a.parle && !useJarvis.getState().occupe && reglages().mode === "eveil" && !a.ecouteFond && Date.now() - dernierVocal < 180000)
+          majAudio({ eveilJusqua: Date.now() + 8000 });
+      }, 800);
   });
   bus.addEventListener("fin", () => {
     sons.fin();

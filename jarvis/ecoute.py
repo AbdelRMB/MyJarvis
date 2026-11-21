@@ -110,10 +110,17 @@ class EcouteFond:
         self._apres_phrase = []      # ce qui est entendu pendant l'analyse d'une phrase (pour ne rien perdre)
         self._analyse_en_cours = False
         self._a_reprendre = None     # (phrase int16, parle_encore) posé par l'analyse quand le nom est reconnu
+        self._suite_demandee = 0.0   # conversation suivie : écouter la suite sans « Jarvis » pendant N s
+        self._attente = ATTENTE_DEBUT
 
     @property
     def actif(self):
         return bool(self._fil and self._fil.is_alive() and self._continuer)
+
+    def ecouter_suite(self, duree: float = 8.0):
+        """Jarvis vient de finir de répondre à l'oral : la suite est écoutée sans redire « Jarvis » (appelé depuis
+        un autre fil : la trame audio suivante ouvre l'écoute)."""
+        self._suite_demandee = duree
 
     def demarrer(self):
         if self.actif:
@@ -159,10 +166,11 @@ class EcouteFond:
         else:
             threading.Thread(target=fn, args=args, daemon=True).start()
 
-    def _ouvrir_commande(self, morceaux=None, suite=()):
+    def _ouvrir_commande(self, morceaux=None, suite=(), attente=ATTENTE_DEBUT):
         """Nom reconnu : enregistrement de la demande jusqu'à silence_fin() secondes de silence."""
         self.commande = Segmenteur(silence_fin=silence_fin(), duree_max=DUREE_DEMANDE_MAX, bruit=self.seg.bruit)
         self.attente_debut = self.seg.t
+        self._attente = attente
         self._precedent = None
         demande = self.commande.deja_en_cours(morceaux, suite) if morceaux else self.commande.rejouer(suite)
         if demande is not None:      # tu t'étais déjà tu assez longtemps pendant l'analyse : on envoie
@@ -179,6 +187,11 @@ class EcouteFond:
             # la phrase + tout ce que tu as dit pendant l'analyse : une seule demande continue
             self._ouvrir_commande([phrase] if parle_encore else None, suite)
         self._apres_phrase = (self._apres_phrase + [x])[-APRES_MAX:] if self._analyse_en_cours else []
+        # 1 bis. conversation suivie : Jarvis vient de répondre, on écoute la suite directement
+        if self._suite_demandee and self.commande is None and not self._analyse_en_cours:
+            duree, self._suite_demandee = self._suite_demandee, 0.0
+            self.seg = Segmenteur(bruit=self.seg.bruit)   # avant d'ouvrir : son horloge sert de départ au délai
+            self._ouvrir_commande(attente=duree)
 
         # 2. enregistrement d'une demande en cours
         if self.commande is not None:
@@ -187,7 +200,7 @@ class EcouteFond:
             if demande is not None:
                 self.commande = None
                 self._lancer(self.sur_commande, demande.astype(np.float32) / 32768.0)
-            elif self.commande.morceaux is None and self.seg.t - self.attente_debut > ATTENTE_DEBUT:
+            elif self.commande.morceaux is None and self.seg.t - self.attente_debut > self._attente:
                 self.commande = None                           # « Jarvis » puis rien
                 self._lancer(self.sur_commande, None)
             return
@@ -198,8 +211,8 @@ class EcouteFond:
             self.dernier_eveil = self.seg.t
             oww.reset()
             self._lancer(self.sur_eveil)
+            self.seg = Segmenteur(bruit=self.seg.bruit)   # avant d'ouvrir : son horloge sert de départ au délai
             self._ouvrir_commande()
-            self.seg = Segmenteur(bruit=self.seg.bruit)
             return
 
         # 4. détecteur français : phrase -> petit Whisper -> commence par « Jarvis » ?
