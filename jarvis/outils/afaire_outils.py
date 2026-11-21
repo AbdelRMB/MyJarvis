@@ -13,14 +13,15 @@ def _une(tache: str):
 
 
 @outil
-def ajouter_a_faire(titre: str, note: str = "", echeance: str = "", priorite: str = "normale"):
+def ajouter_a_faire(titre: str, note: str = "", echeance: str = "", priorite: str = "normale", rappel: str = ""):
     """Ajoute une tâche à la liste « À faire » de l'utilisateur. À utiliser dès qu'il dit qu'il doit / veut / a prévu de faire quelque chose (« souviens-toi que je dois appeler le garage », « note que je dois finir le rapport », « ajoute à ma liste… ») : c'est une tâche, PAS un souvenir (n'utilise pas memoriser pour ça). Une demande avec plusieurs choses = un appel par tâche.
     titre: la tâche, courte et à l'infinitif (ex : « Appeler le garage »)
     note: (optionnel) détails utiles
     echeance: (optionnel) date limite au format AAAA-MM-JJ, éventuellement suivie de l'heure HH:MM (calcule-la si l'utilisateur dit « demain », « vendredi »…)
-    priorite: basse | normale | haute"""
+    priorite: basse | normale | haute
+    rappel: (optionnel) moment où Jarvis doit le rappeler à voix haute, AAAA-MM-JJ HH:MM (« rappelle-moi de … à 18 h », « dans 2 heures » : calcule-le avec date_heure). Sans rappel mais avec une échéance qui a une heure, Jarvis prévient 1 h avant et à l'heure."""
     from .. import afaire
-    t = afaire.ajouter(titre, note, echeance, priorite)
+    t = afaire.ajouter(titre, note, echeance, priorite, rappel=rappel)
     return f"Ajouté à la liste : {afaire.decrire(t)}"
 
 
@@ -57,18 +58,20 @@ def changer_etape_a_faire(tache: str, statut: str):
 
 
 @outil
-def modifier_a_faire(tache: str, titre: str = "", note: str = "", echeance: str = "", priorite: str = ""):
+def modifier_a_faire(tache: str, titre: str = "", note: str = "", echeance: str = "", priorite: str = "", rappel: str = ""):
     """Modifie une tâche de la liste « À faire » (titre, note, échéance, priorité).
     tache: identifiant entre crochets ou morceau du titre
     titre: (optionnel) nouveau titre
     note: (optionnel) nouvelle note
     echeance: (optionnel) nouvelle échéance AAAA-MM-JJ [HH:MM]
-    priorite: (optionnel) basse | normale | haute"""
+    priorite: (optionnel) basse | normale | haute
+    rappel: (optionnel) nouveau rappel AAAA-MM-JJ HH:MM (« aucun » pour l'enlever)"""
     from .. import afaire
     t, err = _une(tache)
     if not t:
         return err
-    t = afaire.modifier(t["id"], titre=titre or None, note=note or None, echeance=echeance or None, priorite=priorite or None)
+    t = afaire.modifier(t["id"], titre=titre or None, note=note or None, echeance=echeance or None, priorite=priorite or None,
+                        rappel=("" if rappel.strip().lower() == "aucun" else rappel) or None)
     return f"Modifié : {afaire.decrire(t)}"
 
 
@@ -85,6 +88,27 @@ def supprimer_a_faire(tache: str = "", tout_ce_qui_est_fait: bool = False):
         return err
     afaire.supprimer(t["id"])
     return f"Retiré : {t['titre']}"
+
+
+@outil
+def briefing_du_jour():
+    """Prépare le briefing : à appeler pour « fais-moi le briefing », « qu'est-ce que j'ai aujourd'hui ? », et au premier échange de la journée. Renvoie la liste « À faire » du jour et ce qu'il te reste à vérifier avec tes autres outils."""
+    from datetime import datetime
+    from .. import afaire
+    from .. import taches
+    n = datetime.now()
+    jours = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+    code = [t for t in taches.lister() if t.get("statut") == "en_cours"]
+    parties = [f"Nous sommes {jours[n.weekday()]} {n:%d/%m/%Y}, il est {n:%H:%M}.", "", "# À faire", afaire.resume_du_jour()]
+    if code:
+        parties += ["", "# Tâches de code en cours", "\n".join(f"- {t['titre']}" for t in code)]
+    parties += ["", "# À vérifier maintenant avec tes outils (seulement ceux disponibles, sans demander) :",
+                "- mails importants ou non lus depuis hier (connecteurs mail) ;",
+                "- agenda / rendez-vous du jour (connecteur agenda) ;",
+                "- météo du jour pour la ville de l'utilisateur (mémoire ; recherche web) ;",
+                "- état rapide des serveurs SSH s'il y en a (disque, services en panne) — seulement s'il y a un problème.",
+                "Puis fais un briefing ORAL court (6 à 8 phrases), chaleureux, en commençant par l'essentiel."]
+    return "\n".join(parties)
 
 
 # ---------- tickets ----------

@@ -1,5 +1,5 @@
 import { changerLangue, LANGUE, t, type Langue } from "../lib/i18n";
-import { AppWindow, Brain, Cloud, Code2, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Trash2, Volume2, Zap } from "lucide-react";
+import { AppWindow, Brain, Cloud, Code2, ShieldCheck, Download, KeyRound, Mic, Monitor, Play, RotateCcw, Save, ScanLine, Sunrise, Trash2, Volume2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { crete, micro } from "../audio/micro";
 import { sons } from "../audio/bips";
@@ -121,6 +121,49 @@ function OngletCode() {
   );
 }
 
+type Habitudes = { briefing_matin: boolean; conversation_suivie: boolean; maj_auto: boolean };
+
+/** Réglages de comportement gardés par le serveur local (config.json). */
+function PanneauHabitudes() {
+  const [h, setH] = useState<Habitudes | null>(null);
+  useEffect(() => {
+    api<{ config: Habitudes }>("/api/config").then((c) => setH(c.config)).catch(() => {});
+  }, []);
+  const regler = async (p: Partial<Habitudes>) => {
+    setH((x) => (x ? { ...x, ...p } : x));
+    try {
+      await api("/api/config", { method: "POST", json: p });
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  if (!h) return null;
+  return (
+    <Panneau titre={t("Habitudes")} icone={<Sunrise />}>
+      <div className="divide-y divide-ligne">
+        <Interrupteur
+          label={t("Briefing du matin")}
+          aide={t("Au premier échange de la journée (avant midi), Jarvis te résume ta liste À faire, tes mails importants, ton agenda, la météo et tes serveurs.")}
+          actif={h.briefing_matin}
+          onChange={(v) => regler({ briefing_matin: v })}
+        />
+        <Interrupteur
+          label={t("Conversation suivie")}
+          aide={t("Après une réponse à l'oral, Jarvis écoute ta suite quelques secondes : pas besoin de redire « Jarvis ».")}
+          actif={h.conversation_suivie}
+          onChange={(v) => regler({ conversation_suivie: v })}
+        />
+        <Interrupteur
+          label={t("Mises à jour automatiques")}
+          aide={t("Jarvis télécharge les nouvelles versions en arrière-plan et les installe au prochain démarrage.")}
+          actif={h.maj_auto}
+          onChange={(v) => regler({ maj_auto: v })}
+        />
+      </div>
+    </Panneau>
+  );
+}
+
 function OngletApplication() {
   const os = useOS();
   const [e, setE] = useState<EtatAppli | null>(null);
@@ -166,6 +209,7 @@ function OngletApplication() {
   const raccourci = os.touches(e.raccourci);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      <PanneauHabitudes />
       <Panneau titre={t("Application")} icone={<AppWindow />}>
         {!e.appli && (
           <p className="mb-3 rounded border border-ambre/40 bg-ambre/5 p-3 text-[13px] text-ambre">

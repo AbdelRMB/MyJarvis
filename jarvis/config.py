@@ -68,6 +68,9 @@ DEFAUT = {
     "seuil_eveil": 0.5,           # sensibilité du mot d'activation (0-1, plus bas = plus sensible)
     "silence_fin": 2.5,           # s de silence avant d'envoyer ta demande (il écoute en continu jusque-là)
     "raccourci": "<ctrl>+<alt>+j",
+    "briefing_matin": True,       # au premier échange de la journée (5 h-12 h), Jarvis commence par le briefing
+    "conversation_suivie": True,  # après une réponse à l'oral, il écoute la suite quelques secondes sans « Jarvis »
+    "maj_auto": True,             # télécharge les mises à jour en fond et les installe au prochain démarrage
 }
 
 CONFIG = {**DEFAUT, **(json.loads(FICHIER_CONFIG.read_text(encoding="utf-8")) if FICHIER_CONFIG.exists() else {})}

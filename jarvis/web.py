@@ -35,7 +35,8 @@ JETON = secrets.token_urlsafe(24)
 HOTES_OK = {"127.0.0.1", "localhost"}
 CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
                "max_etapes_outils", "whisper_modele", "nom_utilisateur",
-               "cerveau", "claude_modele", "claude_effort", "openai_modele", "langue"]
+               "cerveau", "claude_modele", "claude_effort", "openai_modele", "langue",
+               "briefing_matin", "conversation_suivie", "maj_auto"]
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 jarvis: Jarvis | None = None
@@ -897,7 +898,8 @@ async def creer_afaire(req: Request):
     d = await req.json()
     if not str(d.get("titre", "")).strip():
         raise HTTPException(400, "Indique la tâche.")
-    afaire.ajouter(d["titre"], d.get("note", ""), d.get("echeance", ""), d.get("priorite", "normale"), d.get("statut", "a_faire"))
+    afaire.ajouter(d["titre"], d.get("note", ""), d.get("echeance", ""), d.get("priorite", "normale"), d.get("statut", "a_faire"),
+                   rappel=d.get("rappel", ""))
     return afaire.lister()
 
 
@@ -906,7 +908,7 @@ async def modifier_afaire(tid: str, req: Request):
     _verifier(req)
     from . import afaire
     d = await req.json()
-    afaire.modifier(tid, **{k: d.get(k) for k in ("titre", "note", "echeance", "priorite", "statut")})
+    afaire.modifier(tid, **{k: d.get(k) for k in ("titre", "note", "echeance", "rappel", "priorite", "statut")})
     return afaire.lister()
 
 
@@ -1210,6 +1212,26 @@ def _conversation():
     return out
 
 
+def _avec_briefing(texte: str) -> str:
+    """Premier échange de la journée (le matin) : Jarvis commence par le briefing, puis répond."""
+    if not CONFIG.get("briefing_matin", True):
+        return texte
+    from datetime import datetime
+    from . import config
+    n = datetime.now()
+    f = config.PARTAGE / "briefing.txt"
+    jour = n.strftime("%Y-%m-%d")
+    try:
+        deja = f.read_text(encoding="utf-8").strip() == jour
+    except OSError:
+        deja = False
+    if deja or not 5 <= n.hour < 12 or len(texte) < 2:
+        return texte
+    f.write_text(jour, encoding="utf-8")
+    return ("[Premier échange de la journée : commence par le briefing du matin (outil briefing_du_jour), court, "
+            f"puis réponds à ce qui suit s'il y a une vraie demande]\n{texte}")
+
+
 def executer(texte: str):
     global _seq
     if not verrou_tache.acquire(blocking=False):
@@ -1231,7 +1253,8 @@ def executer(texte: str):
     try:
         diffuser(type="utilisateur", texte=texte)
         diffuser(type="etat", occupe=True)
-        rep = jarvis.demander(texte, sur_texte=lambda t: diffuser(type="texte", t=t),
+        demande = _avec_briefing(texte)
+        rep = jarvis.demander(demande, sur_texte=lambda t: diffuser(type="texte", t=t),
                               sur_pensee=lambda t: diffuser(type="pensee", t=t), sur_outil=sur_outil)
         diffuser(type="fin", texte=rep)
     except Exception as e:

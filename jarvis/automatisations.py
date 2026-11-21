@@ -284,6 +284,11 @@ def demarrer():
         while True:
             try:
                 verifier_temps()
+                try:
+                    from . import afaire
+                    afaire.verifier_rappels()
+                except Exception:
+                    traceback.print_exc()
                 if time.time() - dernier_mail >= INTERVALLE:
                     dernier_mail = time.time()
                     verifier()

@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Circle, Flag, ListChecks, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bell, CalendarClock, CheckCircle2, Circle, Flag, ListChecks, Loader2, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -9,7 +9,7 @@ import { toast } from "../stores/toasts";
 
 type Statut = "a_faire" | "en_cours" | "fait";
 type Priorite = "basse" | "normale" | "haute";
-type Tache = { id: string; titre: string; note: string; echeance: string; priorite: Priorite; statut: Statut; cree: string; modifie: string; fait_le: string };
+type Tache = { id: string; titre: string; note: string; echeance: string; rappel?: string; priorite: Priorite; statut: Statut; cree: string; modifie: string; fait_le: string };
 
 const COLONNES: { id: Statut; libelle: string; icone: typeof Circle; couleur: string }[] = [
   { id: "a_faire", libelle: "À faire", icone: Circle, couleur: "text-doux" },
@@ -17,7 +17,7 @@ const COLONNES: { id: Statut; libelle: string; icone: typeof Circle; couleur: st
   { id: "fait", libelle: "Fait", icone: CheckCircle2, couleur: "text-vert" },
 ];
 const ORDRE: Statut[] = ["a_faire", "en_cours", "fait"];
-const VIDE = { titre: "", note: "", echeance: "", priorite: "normale" as Priorite };
+const VIDE = { titre: "", note: "", echeance: "", rappel: "", priorite: "normale" as Priorite };
 
 function enRetard(x: Tache) {
   if (!x.echeance || x.statut === "fait") return false;
@@ -41,6 +41,12 @@ function Carte({ x, deplacer, supprimer }: { x: Tache; deplacer: (s: Statut) => 
           <span className={cx("inline-flex items-center gap-1 text-[11px]", enRetard(x) ? "text-rouge" : "text-tres-doux")}>
             <CalendarClock className="size-3" />
             {x.echeance.replace("T", " ")}
+          </span>
+        )}
+        {x.rappel && x.statut !== "fait" && (
+          <span className="inline-flex items-center gap-1 text-[11px] text-hud" title={t("Rappel")}>
+            <Bell className="size-3" />
+            {x.rappel.replace("T", " ")}
           </span>
         )}
         <div className="ml-auto flex gap-1">
@@ -93,7 +99,7 @@ export function VueAFaire() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("À faire")}
-        sousTitre={t("Ce que tu as prévu de faire. Dis simplement à Jarvis : « souviens-toi que je dois appeler le garage », puis « qu'est-ce que j'ai prévu ? » ou « c'est fait ».")}
+        sousTitre={t("Ce que tu as prévu de faire. Dis simplement à Jarvis : « souviens-toi que je dois appeler le garage », « rappelle-moi de sortir les poubelles à 20 h », puis « qu'est-ce que j'ai prévu ? » ou « c'est fait ».")}
         actions={
           nbFaits > 0 && (
             <Bouton variante="fantome" icone={<Trash2 className="size-4" />} onClick={viderFaits}>
@@ -121,7 +127,11 @@ export function VueAFaire() {
           <Bouton variante="primaire" icone={<Plus />} type="submit">
             {t("Ajouter")}
           </Bouton>
-          <Champ className="sm:col-span-4" placeholder={t("Note (optionnel)")} value={f.note} onChange={(x) => setF({ ...f, note: x.target.value })} />
+          <Champ className="sm:col-span-3" placeholder={t("Note (optionnel)")} value={f.note} onChange={(x) => setF({ ...f, note: x.target.value })} />
+          <label className="flex items-center gap-2 text-[12px] text-doux sm:col-span-1" title={t("Rappel")}>
+            <Bell className="size-4 flex-none text-hud" />
+            <Champ type="datetime-local" aria-label={t("Rappel")} value={f.rappel} onChange={(x) => setF({ ...f, rappel: x.target.value })} />
+          </label>
         </form>
       </Panneau>
 
