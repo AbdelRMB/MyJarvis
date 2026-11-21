@@ -28,7 +28,14 @@ const EN = {
   "Que veux-tu que je fasse sur <b>{nom}</b> ?": "What should I do on <b>{nom}</b>?", "Connecté : {email}": "Signed in: {email}",
   "Effacer l'historique de ce téléphone ?": "Clear this phone's history?", "Te déconnecter de Jarvis sur ce téléphone ?": "Sign out of Jarvis on this phone?",
   "La reconnaissance vocale n'est pas disponible dans ce navigateur.": "Speech recognition isn't available in this browser.",
-  "Je t'écoute…": "Listening…", "version {v} — trop ancienne pour la mise à jour à distance": "version {v} — too old for remote update",
+  "Je t'écoute…": "Listening…", "À faire": "To do", "Tickets": "Tickets", "Nouvelle tâche…": "New task…",
+  "Touche une tâche pour la passer à l'étape suivante. Même ordinateur éteint, tu peux écrire « ajoute du pain à ma liste ».":
+    "Tap a task to move it to the next step. Even with your computer off, you can type “add bread to my list”.",
+  "en cours": "in progress", "fait": "done", "à faire": "to do", "Rien de prévu.": "Nothing planned.",
+  "Ajouté à ta liste : {t}": "Added to your list: {t}", "Bug": "Bug", "Amélioration": "Improvement", "Idée": "Idea", "Question": "Question",
+  "Titre": "Title", "Détails…": "Details…", "Envoyer au développeur": "Send to the developer", "Ticket envoyé.": "Ticket sent.",
+  "Aucun ticket.": "No tickets.", "ouvert": "open", "résolu": "resolved", "fermé": "closed", "Réponse : ": "Reply: ",
+  "Supprimer cette tâche ?": "Delete this task?", "version {v} — trop ancienne pour la mise à jour à distance": "version {v} — too old for remote update",
 };
 let langue = lire().langue || ((navigator.language || "fr").startsWith("en") ? "en" : "fr");
 const t = (s, v = {}) => Object.entries(v).reduce((r, [k, x]) => r.replaceAll(`{${k}}`, x), langue === "en" ? EN[s] ?? s : s);
@@ -174,6 +181,14 @@ async function envoyerOrdre(a, contenu) {
   throw new Error(t("{nom} n'a pas répondu.", { nom: a.nom }));
 }
 async function demander(texte) {
+  // « ajoute du pain à ma liste » : directement dans la liste À faire du compte, même ordinateur éteint
+  const m = texte.match(/^(?:ajoute|rajoute|mets|note|add|put)\s+(.+?)\s+(?:à|a|dans|sur|to|on)\s+(?:ma|la|my|the)\s+(?:liste|todo|to-do|list|liste (?:à|a) faire)\s*[.!]?$/i);
+  if (m) {
+    ajouter("moi", texte, "Jarvis");
+    try { await ajouterTache(m[1]); ajouter("jarvis", t("Ajouté à ta liste : {t}", { t: m[1] }), "Jarvis"); }
+    catch (e) { if (e.message !== "401") ajouter("jarvis", e.message, "Jarvis", true); }
+    return;
+  }
   const a = appareilChoisi();
   if (!a) return;
   if (!a.en_ligne) { ajouter("jarvis", t("{nom} est hors ligne (éteint ou Jarvis fermé).", { nom: a.nom }), a.nom, true); return; }
@@ -253,6 +268,76 @@ function micro() {
   reco.start();
 }
 
+// ---------- liste À faire (document « afaire » du compte, le même que sur les ordinateurs) ----------
+const ETAPES = ["a_faire", "en_cours", "fait"];
+const LIB = { a_faire: "à faire", en_cours: "en cours", fait: "fait" };
+let taches = [];
+const maintenant = () => new Date().toISOString().slice(0, 19);
+async function chargerTaches() { taches = (await api("GET", "/documents/afaire")).contenu || []; return taches; }
+async function sauverTaches(modif) {
+  await chargerTaches();   // part de la dernière version (un ordinateur a pu la changer)
+  modif(taches);
+  await api("PUT", "/documents/afaire", { contenu: taches });
+  dessinerTaches();
+}
+function ajouterTache(titre) {
+  return sauverTaches((l) => l.push({ id: crypto.randomUUID().replace(/-/g, "").slice(0, 8), titre: titre.trim(), note: "", echeance: "",
+    rappel: "", priorite: "normale", statut: "a_faire", cree: maintenant(), modifie: maintenant(), fait_le: "" }));
+}
+function dessinerTaches() {
+  const l = $("liste-afaire"); l.innerHTML = "";
+  if (!taches.length) { l.innerHTML = `<p class="petit">${t("Rien de prévu.")}</p>`; return; }
+  for (const s of ETAPES) {
+    const items = taches.filter((x) => x.statut === s);
+    if (!items.length) continue;
+    const h = document.createElement("div"); h.className = "colonne-titre"; h.textContent = `${t(LIB[s])} · ${items.length}`; l.appendChild(h);
+    for (const x of items) {
+      const b = document.createElement("button"); b.className = `tache ${x.statut}`;
+      b.innerHTML = `<span class="rond"></span><span><span class="t"></span><small></small></span><span class="suppr">×</span>`;
+      b.querySelector(".t").textContent = x.titre;
+      b.querySelector("small").textContent = [x.echeance && "⏰ " + x.echeance.replace("T", " "), x.rappel && "🔔 " + x.rappel.replace("T", " ")].filter(Boolean).join(" · ");
+      b.onclick = (ev) => {
+        if (ev.target.classList.contains("suppr")) {
+          if (confirm(t("Supprimer cette tâche ?"))) sauverTaches((li) => li.splice(li.findIndex((y) => y.id === x.id), 1)).catch(() => {});
+          return;
+        }
+        const suivant = ETAPES[(ETAPES.indexOf(x.statut) + 1) % 3];
+        sauverTaches((li) => { const y = li.find((z) => z.id === x.id); if (y) { y.statut = suivant; y.modifie = maintenant(); y.fait_le = suivant === "fait" ? maintenant() : ""; } }).catch(() => {});
+      };
+      l.appendChild(b);
+    }
+  }
+}
+
+// ---------- tickets ----------
+async function dessinerTickets() {
+  const l = $("liste-tickets"); l.innerHTML = "";
+  let liste = [];
+  try { liste = await api("GET", "/tickets"); } catch { return; }
+  if (!liste.length) { l.innerHTML = `<p class="petit">${t("Aucun ticket.")}</p>`; return; }
+  const STATUTS = { ouvert: "ouvert", en_cours: "en cours", resolu: "résolu", ferme: "fermé" };
+  for (const x of liste) {
+    const d = document.createElement("div"); d.className = "ticket";
+    d.innerHTML = `<span class="statut ${x.statut}"></span><b></b><br><small></small>`;
+    d.querySelector(".statut").textContent = t(STATUTS[x.statut] || x.statut);
+    d.querySelector("b").textContent = `#${x.id} ${x.titre}`;
+    d.querySelector("small").textContent = new Date(x.cree * 1000).toLocaleDateString();
+    if (x.reponse) { const r = document.createElement("div"); r.className = "reponse"; r.textContent = t("Réponse : ") + x.reponse; d.appendChild(r); }
+    l.appendChild(d);
+  }
+}
+async function envoyerTicket(ev) {
+  ev.preventDefault();
+  const titre = $("ticket-titre").value.trim();
+  if (titre.length < 3) return;
+  try {
+    await api("POST", "/tickets", { genre: $("ticket-genre").value, titre, description: $("ticket-description").value.trim(),
+      version: "mobile", plateforme: "telephone", appareil: nomAppareil() });
+    $("ticket-titre").value = ""; $("ticket-description").value = "";
+    etat(t("Ticket envoyé.")); dessinerTickets();
+  } catch (e) { if (e.message !== "401") alert(e.message); }
+}
+
 // ---------- feuilles ----------
 function ouvrir(id) { $(id).hidden = false; }
 function fermerFeuilles() { document.querySelectorAll(".feuille").forEach((f) => (f.hidden = true)); }
@@ -276,6 +361,10 @@ function init() {
   $("form-demande").onsubmit = (e) => { e.preventDefault(); const v = $("demande").value.trim(); if (v) { $("demande").value = ""; demander(v); } };
   $("btn-micro").onclick = micro;
   $("choix-appareil").onclick = () => { dessinerListe(); ouvrir("feuille-appareils"); };
+  $("btn-afaire").onclick = () => { ouvrir("feuille-afaire"); dessinerTaches(); chargerTaches().then(dessinerTaches).catch(() => {}); };
+  $("btn-tickets").onclick = () => { ouvrir("feuille-tickets"); dessinerTickets(); };
+  $("form-afaire").onsubmit = (e) => { e.preventDefault(); const v = $("afaire-titre").value.trim(); if (v) { $("afaire-titre").value = ""; ajouterTache(v).catch(() => {}); } };
+  $("form-ticket").onsubmit = envoyerTicket;
   $("btn-reglages").onclick = () => { $("opt-langue").value = langue; ouvrir("feuille-reglages"); };
   $("opt-voix").onchange = (e) => ecrire({ voix: e.target.checked });
   $("opt-langue").onchange = (e) => { langue = e.target.value; ecrire({ langue }); traduire(); dessinerFil(); };

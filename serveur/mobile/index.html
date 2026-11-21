@@ -41,7 +41,11 @@
           <button id="choix-appareil" class="appareil"><span id="appareil-nom">—</span> <span class="fleche">▾</span></button>
         </div>
       </div>
-      <button id="btn-reglages" class="icone" aria-label="Réglages">⚙︎</button>
+      <div class="actions-haut">
+        <button id="btn-afaire" class="icone" aria-label="À faire">☑︎</button>
+        <button id="btn-tickets" class="icone" aria-label="Tickets">✉︎</button>
+        <button id="btn-reglages" class="icone" aria-label="Réglages">⚙︎</button>
+      </div>
     </header>
 
     <main id="fil"></main>
@@ -61,6 +65,38 @@
     <div class="feuille-contenu">
       <div class="feuille-titre" data-t="Sur quel appareil ?">Sur quel appareil ?</div>
       <div id="liste-appareils"></div>
+      <button class="lien" data-ferme data-t="Fermer">Fermer</button>
+    </div>
+  </div>
+
+  <!-- À faire -->
+  <div id="feuille-afaire" class="feuille" hidden>
+    <div class="feuille-contenu">
+      <div class="feuille-titre" data-t="À faire">À faire</div>
+      <form id="form-afaire" class="ajout">
+        <input id="afaire-titre" autocomplete="off" data-ph="Nouvelle tâche…" placeholder="Nouvelle tâche…" />
+        <button type="submit" class="envoyer" aria-label="Ajouter">＋</button>
+      </form>
+      <div id="liste-afaire"></div>
+      <p class="petit" data-t="Touche une tâche pour la passer à l'étape suivante. Même ordinateur éteint, tu peux écrire « ajoute du pain à ma liste ».">Touche une tâche pour la passer à l'étape suivante. Même ordinateur éteint, tu peux écrire « ajoute du pain à ma liste ».</p>
+      <button class="lien" data-ferme data-t="Fermer">Fermer</button>
+    </div>
+  </div>
+
+  <!-- Tickets -->
+  <div id="feuille-tickets" class="feuille" hidden>
+    <div class="feuille-contenu">
+      <div class="feuille-titre" data-t="Tickets">Tickets</div>
+      <form id="form-ticket" class="pile">
+        <select id="ticket-genre">
+          <option value="bug" data-t="Bug">Bug</option><option value="amelioration" data-t="Amélioration">Amélioration</option>
+          <option value="idee" data-t="Idée">Idée</option><option value="question" data-t="Question">Question</option>
+        </select>
+        <input id="ticket-titre" autocomplete="off" data-ph="Titre" placeholder="Titre" />
+        <textarea id="ticket-description" rows="3" data-ph="Détails…" placeholder="Détails…"></textarea>
+        <button type="submit" class="principal" data-t="Envoyer au développeur">Envoyer au développeur</button>
+      </form>
+      <div id="liste-tickets"></div>
       <button class="lien" data-ferme data-t="Fermer">Fermer</button>
     </div>
   </div>

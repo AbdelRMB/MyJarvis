@@ -8,9 +8,9 @@ html, body { margin: 0; height: 100%; background: var(--fond); color: var(--text
   font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overscroll-behavior: none; }
 [hidden] { display: none !important; }
 button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
-input, select { font: inherit; color: var(--texte); background: var(--surface2); border: 1px solid var(--ligne); border-radius: 12px;
+input, select, textarea { font: inherit; color: var(--texte); background: var(--surface2); border: 1px solid var(--ligne); border-radius: 12px;
   padding: 12px 14px; width: 100%; outline: none; }
-input:focus { border-color: var(--hud); }
+input:focus, textarea:focus { border-color: var(--hud); }
 
 .ecran { height: 100%; display: flex; flex-direction: column; }
 #ecran-connexion { align-items: center; justify-content: center; padding: 24px; background:
@@ -78,3 +78,22 @@ footer { padding: 8px 12px calc(var(--bas) + 10px); border-top: 1px solid var(--
 .ligne { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ligne); }
 .ligne input[type=checkbox] { width: 22px; height: 22px; }
 .ligne select { width: auto; }
+
+.actions-haut { display: flex; gap: 2px; }
+.ajout { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.pile { display: grid; gap: 8px; margin-bottom: 16px; }
+textarea { resize: vertical; font: inherit; }
+.colonne-titre { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--doux); margin: 14px 0 6px; }
+.tache { width: 100%; text-align: left; display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px;
+  border: 1px solid var(--ligne); margin-bottom: 6px; background: var(--surface2); }
+.tache .rond { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--doux); flex: none; }
+.tache.en_cours .rond { border-color: var(--hud); background: radial-gradient(var(--hud) 35%, transparent 40%); }
+.tache.fait .rond { border-color: var(--vert); background: var(--vert); }
+.tache.fait .t { text-decoration: line-through; color: var(--doux); }
+.tache small { display: block; color: var(--doux); font-size: 12px; }
+.tache .suppr { margin-left: auto; color: var(--doux); font-size: 18px; padding: 0 4px; }
+.ticket { border: 1px solid var(--ligne); border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; background: var(--surface2); }
+.ticket small { color: var(--doux); font-size: 12px; }
+.ticket .reponse { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: rgba(60, 232, 255, .08); border: 1px solid rgba(60, 232, 255, .3); font-size: 14px; white-space: pre-wrap; }
+.statut { float: right; font-size: 11px; border-radius: 6px; padding: 2px 6px; background: rgba(255, 255, 255, .06); color: var(--doux); }
+.statut.ouvert { color: var(--ambre); } .statut.en_cours { color: var(--hud); } .statut.resolu { color: var(--vert); }
