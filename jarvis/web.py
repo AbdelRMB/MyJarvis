@@ -986,6 +986,35 @@ async def lister_tickets(req: Request):
     return {"connecte": True, "admin": admin, "miens": miens, "tous": tous}
 
 
+@app.get("/api/rapport")
+def lire_rapport(req: Request):
+    _verifier(req)
+    from . import rapport
+    r = rapport.en_attente()
+    return {"rapport": {"titre": r["titre"], "ts": r["ts"], "plantage": r.get("plantage", False), "apercu": rapport.contenu(r)}
+            if r else None}
+
+
+@app.post("/api/rapport")
+async def envoyer_rapport(req: Request):
+    _verifier(req)
+    from . import compte, rapport
+    d = await req.json()
+    try:
+        await asyncio.to_thread(rapport.envoyer, d.get("commentaire", ""))
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
+
+
+@app.delete("/api/rapport")
+def ignorer_rapport(req: Request):
+    _verifier(req)
+    from . import rapport
+    rapport.ignorer()
+    return {"ok": True}
+
+
 @app.post("/api/tickets")
 async def creer_ticket(req: Request):
     _verifier(req)
@@ -1259,6 +1288,9 @@ def executer(texte: str):
         diffuser(type="fin", texte=rep)
     except Exception as e:
         diffuser(type="erreur", texte=f"Erreur : {e}")
+        import traceback as _tb
+        from . import rapport
+        rapport.noter(_tb.format_exc(), contexte=texte[:200])
     finally:
         verrou_tache.release()
         diffuser(type="etat", occupe=False)

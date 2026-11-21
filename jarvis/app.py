@@ -111,6 +111,8 @@ def main():
     if vue_maj:
         cache = False
     _journaux()
+    from . import rapport
+    rapport.installer_crochets()   # une erreur non prévue devient un rapport de bug à envoyer (avec accord)
     from . import web
     from .agent import Jarvis
     from .ecoute import EcouteFond
@@ -134,6 +136,8 @@ def main():
         print(f"  ! Raccourci de mise à jour : {e}")
 
     web.preparer()
+    from . import rapport
+    rapport.au_demarrage()   # plantage lors de la session précédente : propose d'envoyer le rapport
     import uvicorn
     serveur = uvicorn.Server(uvicorn.Config(web.app, host=web.HOTE, port=web.PORT, log_level="warning", log_config=None))
     threading.Thread(target=serveur.run, daemon=True, name="serveur").start()

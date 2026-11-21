@@ -113,12 +113,17 @@ def briefing_du_jour():
 
 # ---------- tickets ----------
 @outil
-def envoyer_ticket(genre: str, titre: str, description: str = ""):
+def envoyer_ticket(genre: str, titre: str, description: str = "", joindre_journal: bool = False):
     """Envoie un ticket au développeur de Jarvis : bug, amélioration, idée ou question (« signale un bug… », « envoie l'idée que… », « dis au développeur que… »). Le développeur répond dans l'écran Tickets.
     genre: bug | amelioration | idee | question | autre
     titre: résumé en une ligne
-    description: détails (ce qui s'est passé, ce qui était attendu, comment le reproduire…)"""
+    description: détails (ce qui s'est passé, ce qui était attendu, comment le reproduire…)
+    joindre_journal: true pour un bug : joint la version, le système et la fin du journal de Jarvis (aide le développeur)"""
     from .. import compte
+    if joindre_journal:
+        from .. import rapport
+        description = (description + "\n\n--- Diagnostic ---\n" + rapport.diagnostic()
+                       + "\n\nFin du journal :\n" + rapport._fin_journal(40))[:9800]
     try:
         r = compte.creer_ticket(genre, titre, description)
     except compte.ErreurCompte as e:

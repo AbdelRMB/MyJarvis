@@ -1,4 +1,4 @@
-import { Bug, HelpCircle, Inbox, Lightbulb, LifeBuoy, MessageSquare, Send, Shield, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, Bug, HelpCircle, Inbox, Lightbulb, LifeBuoy, MessageSquare, Send, Shield, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Onglets, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -40,6 +40,66 @@ const STATUTS: Record<StatutT, [string, "hud" | "ambre" | "vert" | "doux"]> = {
   ferme: ["Fermé", "doux"],
 };
 const date = (ts: number) => new Date(ts * 1000).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" });
+
+type Rapport = { titre: string; ts: number; plantage: boolean; apercu: string };
+
+/** Erreur captée automatiquement : l'utilisateur voit exactement ce qui sera envoyé, puis envoie ou ignore. */
+function BandeauRapport({ onEnvoye }: { onEnvoye: (e: Etat) => void }) {
+  const [r, setR] = useState<Rapport | null>(null);
+  const [voir, setVoir] = useState(false);
+  const [commentaire, setCommentaire] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const charger = () => api<{ rapport: Rapport | null }>("/api/rapport").then((x) => setR(x.rapport)).catch(() => {});
+  useEffect(() => {
+    charger();
+    bus.addEventListener("tickets_maj", charger);
+    return () => bus.removeEventListener("tickets_maj", charger);
+  }, []);
+  if (!r) return null;
+  const envoyer = async () => {
+    setEnvoi(true);
+    try {
+      onEnvoye(await api<Etat>("/api/rapport", { method: "POST", json: { commentaire } }));
+      setR(null);
+      toast(t("Rapport envoyé. Merci, tu seras prévenu de la réponse."), "succes");
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setEnvoi(false);
+    }
+  };
+  const ignorer = async () => {
+    await api("/api/rapport", { method: "DELETE" }).catch(() => {});
+    setR(null);
+  };
+  return (
+    <div className="mb-6 rounded-md border border-ambre/40 bg-ambre/5 p-4">
+      <div className="flex items-start gap-3">
+        <AlertTriangle className="mt-0.5 size-5 flex-none text-ambre" />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">{r.plantage ? t("Jarvis s'est arrêté à cause d'une erreur") : t("Jarvis a rencontré une erreur")}</div>
+          <div className="mt-0.5 truncate font-mono text-[12px] text-doux">{r.titre}</div>
+          <p className="mt-2 text-[13px] text-doux">
+            {t("Envoie le rapport au développeur pour qu'il la corrige. Il contient la version, le système, l'erreur et la fin du journal de Jarvis.")}{" "}
+            <button className="text-hud underline" onClick={() => setVoir(!voir)}>
+              {voir ? t("Masquer") : t("Voir ce qui sera envoyé")}
+            </button>
+          </p>
+          {voir && <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded border border-ligne bg-black/30 p-2 text-[11px] text-doux">{r.apercu}</pre>}
+          <Champ className="mt-3" placeholder={t("Ce que tu faisais à ce moment-là (optionnel)")} value={commentaire} onChange={(x) => setCommentaire(x.target.value)} />
+          <div className="mt-3 flex gap-2">
+            <Bouton variante="primaire" taille="sm" icone={<Send className="size-3.5" />} chargement={envoi} onClick={envoyer}>
+              {t("Envoyer le rapport")}
+            </Bouton>
+            <Bouton variante="fantome" taille="sm" onClick={ignorer}>
+              {t("Ignorer")}
+            </Bouton>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function LigneTicket({ x, admin, onMaj, onSupprimer }: { x: Ticket; admin: boolean; onMaj?: (statut: string, reponse?: string) => void; onSupprimer?: () => void }) {
   const [ouvert, setOuvert] = useState(false);
@@ -184,6 +244,7 @@ export function VueTickets() {
 
       {onglet === "miens" || !e?.admin ? (
         <>
+          <BandeauRapport onEnvoye={setE} />
           <Panneau titre={t("Nouveau ticket")} icone={<Send />} className="mb-6">
             <div className="grid gap-3 sm:grid-cols-[170px_1fr]">
               <select value={f.genre} onChange={(x) => setF({ ...f, genre: x.target.value as Genre })} className={select} aria-label={t("Type")}>
