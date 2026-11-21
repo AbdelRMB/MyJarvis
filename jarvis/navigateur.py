@@ -364,8 +364,20 @@ def _suivre_nouvel_onglet(avant: set):
     return False
 
 
+def _surligner(ref):
+    """Entoure l'élément visé un court instant : on voit ce que Jarvis va faire."""
+    from .navigateur_perso import _SURLIGNER
+    try:
+        _js(f"(() => {{ const e = document.querySelector('[data-jarvis-ref=\"{ref}\"]'); if (e) ({_SURLIGNER})(e); return true; }})()")
+        time.sleep(0.5)
+    except Exception:
+        pass
+
+
 def cliquer(cible: str) -> dict:
     e = _element(cible)
+    _surligner(e["ref"])
+    e = _element(str(e["ref"]))   # position après le défilement
     c = _onglet()
     avant = {t["id"] for t in _pages()}
     for t in ("mousePressed", "mouseReleased"):   # vrais clics (les applis web ignorent souvent el.click())
@@ -378,6 +390,8 @@ def cliquer(cible: str) -> dict:
 def remplir(cible: str, valeur: str) -> dict:
     e = _element(cible)
     cible = str(e["ref"])
+    _surligner(cible)
+    e = _element(cible)
     if e["tag"] == "select":
         _js(f"""(() => {{ const s = document.querySelector('[data-jarvis-ref="{cible}"]');
             const o = [...s.options].find(o => o.text.toLowerCase().includes({json.dumps(valeur.lower())}) || o.value === {json.dumps(valeur)});

@@ -9,6 +9,15 @@ _RISQUE = re.compile(r"supprim|delete|effacer|retirer|remove|payer|paiement|pay 
                      r"signer|r[ée]silier|annuler la|d[ée]sactiver|enregistrer et|approuver|approve|rejeter|reject", re.I)
 
 
+def _nav(dans: str):
+    """« jarvis » : son navigateur à lui ; « mien » : le navigateur de l'utilisateur (Safari, Chrome…), sous ses yeux."""
+    if str(dans).lower().strip() in ("mien", "utilisateur", "safari", "chrome", "le mien", "ton", "user"):
+        from .. import navigateur_perso
+        return navigateur_perso
+    from .. import navigateur
+    return navigateur
+
+
 def _avec_page(fn):
     from .. import navigateur
     try:
@@ -17,61 +26,73 @@ def _avec_page(fn):
         return f"Erreur navigateur : {e}"
 
 
+_DANS = ("dans: « jarvis » (par défaut : ton navigateur à toi, où l'utilisateur s'est connecté à ses sites) ou « mien » "
+         "(le navigateur de l'utilisateur — Safari, Chrome… — dans l'onglet ouvert à son écran : quand il dit « sur ma page », "
+         "« dans Safari », « regarde ce que j'ai ouvert », ou veut te voir faire)")
+
+
+def _doc(fn):
+    fn.__doc__ = fn.__doc__.rstrip() + "\n    " + _DANS
+    return fn
+
+
 @outil
-def navigateur_ouvrir(url: str):
-    """Ouvre une page dans le navigateur de Jarvis (où l'utilisateur est connecté à ses sites) et renvoie ce qu'elle contient : éléments numérotés (liens, boutons, champs). Pour un site appris, cherche d'abord avec site_chercher pour aller directement à la bonne page.
+@_doc
+def navigateur_ouvrir(url: str, dans: str = "jarvis"):
+    """Ouvre une page dans le navigateur et renvoie ce qu'elle contient : éléments numérotés (liens, boutons, champs). Pour un site appris, cherche d'abord avec site_chercher pour aller directement à la bonne page.
     url: adresse de la page"""
-    from .. import navigateur
-    return _avec_page(lambda: navigateur.ouvrir(url))
+    return _avec_page(lambda: _nav(dans).ouvrir(url))
 
 
 @outil
-def navigateur_voir():
-    """Regarde la page actuellement ouverte dans le navigateur de Jarvis : adresse, titres, éléments numérotés, début du texte."""
-    from .. import navigateur
-    return _avec_page(navigateur.instantane)
+@_doc
+def navigateur_voir(dans: str = "jarvis"):
+    """Regarde la page ouverte dans le navigateur : adresse, titres, éléments numérotés, début du texte."""
+    return _avec_page(_nav(dans).instantane)
 
 
 @outil
-def navigateur_cliquer(element: str):
-    """Clique sur un élément de la page (numéro entre crochets donné par navigateur_voir, ou son texte). Les clics qui modifient quelque chose (supprimer, envoyer, payer, valider…) demandent l'accord de l'utilisateur.
+@_doc
+def navigateur_cliquer(element: str, dans: str = "jarvis"):
+    """Clique sur un élément de la page (numéro entre crochets donné par navigateur_voir, ou son texte) ; l'élément est entouré un instant pour que l'utilisateur voie. Les clics qui modifient quelque chose (supprimer, envoyer, payer, valider…) demandent son accord.
     element: numéro de l'élément (ex : 12) ou son texte (ex : « Nouvelle facture »)"""
-    from .. import navigateur, web
+    from .. import web
+    nav = _nav(dans)
     try:
-        e = navigateur._element(element)
+        lib = nav._element(element).get("libelle", "") if hasattr(nav, "_element") else nav.libelle(element)
     except Exception as x:
         return f"Erreur navigateur : {x}"
-    if _RISQUE.search(e.get("libelle", "")):
-        if not web.demander_confirmation(f"Cliquer sur « {e['libelle']} » dans le navigateur ?",
+    if _RISQUE.search(lib or ""):
+        if not web.demander_confirmation(f"Cliquer sur « {lib} » dans le navigateur ?",
                                          "Cette action peut modifier des données sur le site."):
             return "L'utilisateur a refusé ce clic. Ne le refais pas sans son accord."
-    return _avec_page(lambda: navigateur.cliquer(element))
+    return _avec_page(lambda: nav.cliquer(element))
 
 
 @outil
-def navigateur_remplir(element: str, valeur: str):
+@_doc
+def navigateur_remplir(element: str, valeur: str, dans: str = "jarvis"):
     """Remplit un champ (ou choisit une option d'une liste) dans la page.
     element: numéro du champ (navigateur_voir) ou son libellé
     valeur: le texte à saisir, ou l'option à choisir"""
-    from .. import navigateur
-    return _avec_page(lambda: navigateur.remplir(element, valeur))
+    return _avec_page(lambda: _nav(dans).remplir(element, valeur))
 
 
 @outil
-def navigateur_touche(touche: str):
+@_doc
+def navigateur_touche(touche: str, dans: str = "jarvis"):
     """Appuie sur une touche dans la page (après avoir rempli un champ de recherche, par exemple).
     touche: entree | tab | echap | bas | haut | retour"""
-    from .. import navigateur
-    return _avec_page(lambda: navigateur.touche(touche))
+    return _avec_page(lambda: _nav(dans).touche(touche))
 
 
 @outil
-def navigateur_capture(question: str = "Décris précisément ce que montre cette page."):
+@_doc
+def navigateur_capture(question: str = "Décris précisément ce que montre cette page.", dans: str = "jarvis"):
     """Prend une capture de la page du navigateur et l'analyse (graphiques, tableaux, images, mise en page) quand le texte ne suffit pas.
     question: ce que tu veux savoir sur la page"""
-    from .. import navigateur
     try:
-        image = navigateur.capture()
+        image = _nav(dans).capture()
     except Exception as e:
         return f"Erreur navigateur : {e}"
     from ..config import CONFIG
@@ -149,14 +170,22 @@ def site_se_connecter(site: str):
 
 
 @outil
-def navigateur_capture_enregistrer(nom: str = "", element: str = "", pleine_page: bool = False):
+def navigateur_capture_enregistrer(nom: str = "", element: str = "", pleine_page: bool = False, dans: str = "jarvis"):
     """Prend une capture d'écran de la page du navigateur et l'enregistre (dossier Images › Jarvis › Captures) : toute la partie visible, un élément précis (le tableau des interventions, un bloc…) ou toute la page déroulée. Renvoie le chemin du fichier (pour l'envoyer ensuite, par WhatsApp par exemple).
     nom: (optionnel) nom court ajouté au fichier (ex : interventions_karim)
     element: (optionnel) numéro ou texte d'un élément : capture seulement le tableau / bloc qui le contient
-    pleine_page: true pour capturer toute la page, y compris ce qui dépasse en bas"""
+    pleine_page: true pour capturer toute la page, y compris ce qui dépasse en bas
+    dans: « jarvis » (son navigateur : capture précise d'un élément ou de toute la page) ou « mien » (la fenêtre du navigateur de l'utilisateur, telle qu'il la voit)"""
     from .. import navigateur
     try:
-        f = navigateur.enregistrer_capture(nom, element, pleine_page)
+        if _nav(dans) is not navigateur:
+            import re as _re
+            import time as _t
+            propre = _re.sub(r"[^\w -]", "", nom).strip().replace(" ", "_")[:60]
+            f = navigateur.dossier_captures() / f"{_t.strftime('%Y-%m-%d_%H-%M-%S')}{'_' + propre if propre else ''}.png"
+            f.write_bytes(_nav(dans).capture())
+        else:
+            f = navigateur.enregistrer_capture(nom, element, pleine_page)
     except Exception as e:
         return f"Erreur navigateur : {e}"
     return f"Capture enregistrée : {f}"

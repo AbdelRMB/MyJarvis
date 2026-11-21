@@ -263,6 +263,38 @@ function DetailSite({ id, etat, recharger }: { id: string; etat: Etat; recharger
   );
 }
 
+/** Mac : Jarvis peut aussi travailler dans le navigateur de l'utilisateur (Safari, Chrome…), sous ses yeux. */
+function TonNavigateur() {
+  const [r, setR] = useState<{ ok: boolean; message: string } | null>(null);
+  const [enCours, setEnCours] = useState(false);
+  if (!navigator.userAgent.includes("Mac")) return null;
+  const tester = async () => {
+    setEnCours(true);
+    try {
+      setR(await api<{ ok: boolean; message: string }>("/api/navigateur_perso/tester", { method: "POST", json: {} }));
+    } finally {
+      setEnCours(false);
+    }
+  };
+  return (
+    <details className="mb-6 rounded-md border border-ligne px-4 py-3">
+      <summary className="cursor-pointer text-sm">{t("Travailler dans TON navigateur (Safari, Chrome, Edge, Brave, Arc)")}</summary>
+      <p className="mt-2 text-[13px] text-doux">
+        {t("Dis « sur ma page… » ou « dans Safari… » : Jarvis agit dans l'onglet que tu as ouvert, là où tu es connecté, et entoure chaque élément avant de cliquer pour que tu voies ce qu'il fait. À autoriser une fois :")}
+      </p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-[12px] text-doux">
+        <li>{t("Safari : Réglages › Avancées › coche « Afficher les fonctionnalités pour les développeurs web », puis menu Développement › « Autoriser JavaScript depuis les Apple Events ».")}</li>
+        <li>{t("Chrome, Edge, Brave, Arc : menu Affichage › Options pour les développeurs › « Autoriser JavaScript à partir des événements Apple ».")}</li>
+        <li>{t("macOS te demandera ensuite d'autoriser Jarvis à contrôler ce navigateur : accepte.")}</li>
+      </ul>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Bouton taille="sm" chargement={enCours} onClick={tester}>{t("Tester sur l'onglet ouvert")}</Bouton>
+        {r && <span className={cx("text-[13px]", r.ok ? "text-vert" : "text-ambre")}>{r.message}</span>}
+      </div>
+    </details>
+  );
+}
+
 export function VueSites() {
   const [e, setE] = useState<Etat | null>(null);
   const [choisi, setChoisi] = useState<string | null>(null);
@@ -311,6 +343,7 @@ export function VueSites() {
           {nav.installation.erreur && <p className="mt-2 text-rouge">{nav.installation.erreur}</p>}
         </div>
       )}
+      <TonNavigateur />
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
         <div className="space-y-3">
           <Panneau titre={t("Nouveau site")} icone={<Plus />}>

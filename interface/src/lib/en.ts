@@ -719,4 +719,10 @@ export const EN: Record<string, string> = {
   "Code du moment : ": "Current code: ",
   "il doit être identique à celui de ton appli.": "it must match your app.",
   "Me connecter automatiquement": "Sign me in automatically",
+  "Travailler dans TON navigateur (Safari, Chrome, Edge, Brave, Arc)": "Work in YOUR browser (Safari, Chrome, Edge, Brave, Arc)",
+  "Dis « sur ma page… » ou « dans Safari… » : Jarvis agit dans l'onglet que tu as ouvert, là où tu es connecté, et entoure chaque élément avant de cliquer pour que tu voies ce qu'il fait. À autoriser une fois :": "Say “on my page…” or “in Safari…”: Jarvis acts in the tab you have open, where you're signed in, and outlines each element before clicking so you see what it does. Allow it once:",
+  "Safari : Réglages › Avancées › coche « Afficher les fonctionnalités pour les développeurs web », puis menu Développement › « Autoriser JavaScript depuis les Apple Events ».": "Safari: Settings › Advanced › tick “Show features for web developers”, then Develop menu › “Allow JavaScript from Apple Events”.",
+  "Chrome, Edge, Brave, Arc : menu Affichage › Options pour les développeurs › « Autoriser JavaScript à partir des événements Apple ».": "Chrome, Edge, Brave, Arc: View menu › Developer › “Allow JavaScript from Apple Events”.",
+  "macOS te demandera ensuite d'autoriser Jarvis à contrôler ce navigateur : accepte.": "macOS will then ask you to let Jarvis control this browser: accept.",
+  "Tester sur l'onglet ouvert": "Test on the open tab",
 };

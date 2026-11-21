@@ -1300,6 +1300,20 @@ def supprimer_site(sid: str, req: Request):
     return {"ok": True}
 
 
+@app.post("/api/navigateur_perso/tester")
+async def tester_navigateur_perso(req: Request):
+    """Bouton « Tester » : Jarvis lit l'onglet ouvert dans ton navigateur et l'entoure brièvement."""
+    _verifier(req)
+    from . import navigateur_perso as p
+    try:
+        v = await asyncio.to_thread(p.instantane)
+        await asyncio.to_thread(p.js, "(() => { const e = document.querySelector('[data-jarvis-ref]') || document.body; "
+                                      f"({p._SURLIGNER})(e); return true; }})()")
+        return {"ok": True, "message": f"{v.get('navigateur')} : je vois « {v.get('titre') or v.get('url')} » ({len(v.get('elements', []))} éléments)."}
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+
 @app.post("/api/navigateur/installer")
 def installer_navigateur(req: Request):
     _verifier(req)
