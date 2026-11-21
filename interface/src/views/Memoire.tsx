@@ -8,7 +8,7 @@ import type { Fait } from "../lib/types";
 import { bus } from "../stores/jarvis";
 import { toast } from "../stores/toasts";
 
-const CATEGORIES = ["identite", "preference", "projet", "contact", "habitude", "general", "lecon"];
+const CATEGORIES = ["consigne", "identite", "preference", "projet", "contact", "habitude", "general", "lecon"];
 const LIBELLES: Record<string, string> = {
   identite: "Identité",
   preference: "Préférences",
@@ -17,6 +17,7 @@ const LIBELLES: Record<string, string> = {
   habitude: "Habitudes",
   general: "Général",
   lecon: "Leçons apprises",
+  consigne: "Consignes pour Jarvis",
 };
 
 export function VueMemoire() {

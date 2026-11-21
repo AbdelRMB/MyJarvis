@@ -98,8 +98,11 @@ def demander(j, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
 def _demander(j, texte, sur_texte=None, sur_outil=None):
     if not cle_configuree():
         raise RuntimeError("Clé API OpenAI manquante : ajoute-la dans Réglages > Cerveau.")
-    memoire.journaliser("Utilisateur", texte)
+    memoire.journaliser(CONFIG.get("nom_utilisateur") or "Utilisateur", texte)
     j.histo_openai.append({"role": "user", "content": texte})
+    rappel = memoire.rappel_consignes()
+    if rappel:   # ses consignes, juste après sa demande : bien plus respectées qu'en haut des instructions
+        j.histo_openai.append({"role": "system", "content": rappel})
     j.arreter = False
     final = ""
     for _ in range(CONFIG["max_etapes_outils"]):

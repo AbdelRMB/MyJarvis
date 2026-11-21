@@ -6,7 +6,7 @@ from .. import memoire
 def memoriser(fait: str, categorie: str = "general"):
     """Enregistre durablement un fait sur l'utilisateur (identité, goûts, projets, habitudes, contacts, préférences). À utiliser dès que tu apprends quelque chose d'utile.
     fait: le fait, en une phrase
-    categorie: identite | preference | projet | contact | habitude | general"""
+    categorie: identite | preference | projet | contact | habitude | general | consigne (= comment l'utilisateur veut que tu te comportes ou répondes : « réponds en une phrase », « tutoie-moi »…)"""
     return memoire.ajouter(fait, categorie)
 
 

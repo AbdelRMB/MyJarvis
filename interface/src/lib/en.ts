@@ -667,4 +667,5 @@ export const EN: Record<string, string> = {
   "Voix française 7": "French voice 7",
   "Voix française 8": "French voice 8",
   "Voix anglaise expressive (par défaut de Kyutai)": "Expressive English voice (Kyutai default)",
+  "Consignes pour Jarvis": "Instructions for Jarvis",
 };

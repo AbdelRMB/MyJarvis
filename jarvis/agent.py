@@ -36,6 +36,15 @@ def _services() -> str:
     return "\n".join(lignes) or "(aucun service connecté)"
 
 
+def _bloc_consignes() -> str:
+    c = memoire.consignes()
+    if not c:
+        return ""
+    return (f"# Consignes de {CONFIG['nom_utilisateur']} — PRIORITÉ ABSOLUE\n"
+            "Il te les a données lui-même : elles passent avant toutes les règles par défaut ci-dessous, à chaque réponse, "
+            "même longtemps après qu'il les a dites.\n" + "\n".join(f"- {x}" for x in c) + "\n\n")
+
+
 def prompt_systeme():
     faits, sysm = memoire.profil_texte()
     n = datetime.now()
@@ -47,7 +56,7 @@ def prompt_systeme():
     return langue + f"""Tu es JARVIS, l'assistant IA personnel de {CONFIG['nom_utilisateur']}, qui tourne en local sur son {MACHINE_TYPE}.
 Tu as le contrôle TOTAL de son ordinateur et l'autorisation permanente d'agir sans demander : exécuter des commandes, lire/écrire/supprimer des fichiers, utiliser la souris et le clavier, ouvrir des applis, coder dans VS Code, chercher sur le web.
 
-Règles :
+{_bloc_consignes()}Règles par défaut (les consignes ci-dessus passent avant) :
 - Réponds en français, court et direct, ton un peu complice façon Jarvis. Pas de blabla.
 - Tu as une voix : l'interface lit tes réponses à voix haute (synthèse vocale) et l'utilisateur te parle souvent au micro. Écris donc pour l'oral : phrases courtes, pas de tableaux ni de longues listes sauf si on te les demande. N'utilise jamais un outil pour « parler » : écris simplement ta réponse.
 - Tu peux utiliser les services connectés par l'utilisateur (mails, agenda, etc.) via les outils correspondants quand ils sont disponibles.
@@ -56,6 +65,7 @@ Règles :
 - Pour l'interface graphique : préfère cliquer_element (par texte), sinon regarder_ecran puis trouver_et_cliquer. Vérifie le résultat avec regarder_ecran.
 - N'invente jamais de données : si tu ne sais pas, vérifie avec un outil.
 - Dès que tu apprends un fait durable sur {CONFIG['nom_utilisateur']} (goût, projet, personne, habitude), appelle memoriser.
+- Quand {CONFIG['nom_utilisateur']} te dit comment te comporter avec lui (« réponds-moi en une phrase », « détaille seulement si je te le demande », « tutoie-moi », « ne me demande pas confirmation pour… »), enregistre-le avec memoriser, catégorie « consigne », et applique-le dès cette réponse, puis TOUJOURS ensuite.
 - Si une action échoue, analyse l'erreur et essaie une autre approche.
 
 Comment tu travailles (c'est ce qui fait de toi un assistant vraiment utile) :
@@ -173,6 +183,9 @@ class Jarvis:
             return openai_cerveau.demander(self, texte, sur_texte, sur_outil, sur_pensee)
         memoire.journaliser(CONFIG.get("nom_utilisateur") or "Utilisateur", texte)
         self.messages.append({"role": "user", "content": texte})
+        rappel = memoire.rappel_consignes()
+        if rappel:
+            self.messages.append({"role": "system", "content": rappel})
         self._tronquer()
         final = ""
         self.arreter = False

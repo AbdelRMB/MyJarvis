@@ -1,5 +1,6 @@
 """Mémoire long terme : faits sur l'utilisateur + scan du PC + historique des conversations."""
 import json
+import re
 import os
 import platform
 import sqlite3
@@ -157,9 +158,32 @@ def chercher(req):
     return "\n".join(res) or "Rien trouvé."
 
 
+# préférences qui sont en fait des consignes pour Jarvis (enregistrées avant la catégorie « consigne »)
+_RX_CONSIGNE = re.compile(r"\b(r[ée]pon[ds]|r[ée]ponse|r[ée]pondre|parle|parler|dis-moi|phrase|d[ée]tail|tutoi|vouvoi|appelle[- ]moi|"
+                          r"ton |style|r[ée]sum|court|bref|concis|longue|confirm|demande[- ]moi|pr[ée]viens|jamais|toujours|"
+                          r"[ée]vite|n'utilise|utilise|langue|anglais|emoji|blague)", re.I)
+
+
+def consignes() -> list[str]:
+    """Ce que l'utilisateur a demandé à Jarvis sur sa façon de se comporter : passe avant ses règles par défaut."""
+    return [x["fait"] for x in _charger() if x.get("categorie") == "consigne"
+            or (x.get("categorie") == "preference" and _RX_CONSIGNE.search(x["fait"]))]
+
+
+def rappel_consignes() -> str:
+    c = consignes()
+    if not c:
+        return ""
+    from .config import CONFIG
+    return (f"Consignes de {CONFIG.get('nom_utilisateur') or 'l’utilisateur'} pour cette réponse (elles passent avant tes "
+            "règles par défaut ; respecte-les à la lettre) :\n" + "\n".join(f"- {x}" for x in c))
+
+
 def profil_texte():
     par_cat = {}
     for x in _charger():
+        if x.get("categorie") == "consigne":
+            continue   # affichées à part, en tête des instructions
         par_cat.setdefault(x["categorie"], []).append(x["fait"])
     txt = "\n".join(f"## {c}\n" + "\n".join(f"- {f}" for f in fs) for c, fs in par_cat.items())
     sysm = SYSTEME.read_text(encoding="utf-8") if SYSTEME.exists() else ""

@@ -204,7 +204,7 @@ def _effort_de_base() -> str:
 
 def _parametres_requete():
     betas = ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01",
-             "mid-conversation-output-config-2026-07-01"]
+             "mid-conversation-output-config-2026-07-01", "mid-conversation-system-clear-at-2026-08-21"]
     if _avec_conseiller():
         betas.append("advisor-tool-2026-03-01")
     return dict(
@@ -259,6 +259,11 @@ def _demander(j, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
     if effort != (getattr(j, "effort_claude", None) or _effort_de_base()):
         j.histo_claude.append({"role": "system", "content": [], "output_config": {"effort": effort}})
         j.effort_claude = effort
+    # ses consignes (« réponds en une phrase »…) rappelées pour CE tour : visibles maintenant, effacées (gratuites)
+    # dès le message suivant, et jamais retirées de l'historique (cache et réflexion restent valides)
+    rappel = memoire.rappel_consignes()
+    if rappel:
+        j.histo_claude.append({"role": "system", "clear_at": "next_user_message", "content": rappel})
     j.arreter = False
     final = ""
     for _ in range(max(CONFIG["max_etapes_outils"], MAX_ETAPES)):
@@ -320,6 +325,8 @@ def _demander(j, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
                               "is_error": res.startswith("Erreur")})
         # tous les résultats d'un même tour dans UN seul message
         j.histo_claude.append({"role": "user", "content": resultats})
+        if rappel:   # les résultats d'actions effacent le rappel précédent : on le redonne pour la suite du tour
+            j.histo_claude.append({"role": "system", "clear_at": "next_user_message", "content": rappel})
     else:
         final += "\n(J'ai atteint le nombre max d'étapes, dis-moi si je continue.)"
     memoire.journaliser("Jarvis", final)
@@ -367,10 +374,11 @@ def souvenirs(echanges: list[str], faits_actuels: str) -> list[dict]:
                 "properties": {"faits": {"type": "array", "items": {
                     "type": "object", "additionalProperties": False, "required": ["fait", "categorie"],
                     "properties": {"fait": {"type": "string"}, "categorie": {
-                        "type": "string", "enum": ["identite", "preference", "projet", "contact", "habitude", "general"]}}}}}}}},
+                        "type": "string", "enum": ["identite", "preference", "projet", "contact", "habitude", "general", "consigne"]}}}}}}}},
         messages=[{"role": "user", "content":
                    "Voici une conversation entre l'utilisateur et son assistant. Extrais UNIQUEMENT les faits NOUVEAUX et "
-                   "DURABLES sur l'utilisateur (identité, goûts, projets, personnes, habitudes) absents de la mémoire actuelle. "
+                   "DURABLES sur l'utilisateur (identité, goûts, projets, personnes, habitudes) absents de la mémoire actuelle, "
+                   "et les CONSIGNES qu'il a données sur la façon dont l'assistant doit se comporter ou répondre (catégorie consigne). "
                    "Liste vide s'il n'y a rien.\n\nMémoire actuelle :\n" + faits_actuels +
                    "\n\nConversation :\n" + "\n".join(echanges[-40:])}])
     enregistrer_cout(r.usage, CONFIG["claude_modele"])
