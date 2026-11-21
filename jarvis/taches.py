@@ -87,7 +87,7 @@ def _slug(texte):
     return s or "tache"
 
 
-def creer(consigne: str, projet: str, outil: str = "claude_code", titre: str = "") -> dict:
+def creer(consigne: str, projet: str, outil: str = "claude_code", titre: str = "", ticket: int = 0) -> dict:
     chemin = Path(os.path.expanduser(projet.strip())).resolve()
     if not chemin.is_dir():
         raise ValueError(f"Dossier de projet introuvable : {chemin}")
@@ -102,7 +102,7 @@ def creer(consigne: str, projet: str, outil: str = "claude_code", titre: str = "
     t = {"id": tid, "titre": titre.strip() or consigne.strip()[:60], "consigne": consigne.strip(), "projet": str(chemin),
          "outil": outil, "statut": "en_cours",
          "cree": time.time(), "etape": 0, "session": "", "branche": "", "dossier": "", "ajouts": [], "bilan": "",
-         "journal": []}
+         "journal": [], "ticket": int(ticket or 0)}
     _sauver(t)
     _noter(t, "utilisateur", consigne)
     demarrer(tid)
@@ -412,7 +412,12 @@ def _finir(t, statut, raison=""):
     _noter(t, "info", raison or ("Tâche terminée." if statut == "terminee" else "Tâche arrêtée."))
     try:
         from . import annonces
-        if statut == "terminee":
+        if statut == "terminee" and t.get("ticket"):
+            annonces.annoncer(f"Le correctif du ticket {t['ticket']} est prêt sur la branche {t.get('branche') or '?'}.",
+                              titre=f"Ticket n°{t['ticket']}", vue="taches", genre="succes",
+                              detail=(t.get("bilan", "") + "\n\nRelis-le, fusionne-le et publie la version ; puis dis « marque le "
+                                      f"ticket {t['ticket']} résolu » pour prévenir l'utilisateur."))
+        elif statut == "terminee":
             annonces.annoncer(("Task finished: " if CONFIG.get("langue") == "en" else "Tâche terminée : ") + t["titre"],
                               vue="taches", genre="succes", detail=t.get("bilan", ""))
         elif statut == "echec":

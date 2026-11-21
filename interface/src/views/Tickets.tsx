@@ -1,4 +1,4 @@
-import { AlertTriangle, Bug, HelpCircle, Inbox, Lightbulb, LifeBuoy, MessageSquare, Send, Shield, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, Bug, Code2, HelpCircle, Inbox, Lightbulb, LifeBuoy, MessageSquare, Send, Shield, Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Onglets, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -101,7 +101,19 @@ function BandeauRapport({ onEnvoye }: { onEnvoye: (e: Etat) => void }) {
   );
 }
 
-function LigneTicket({ x, admin, onMaj, onSupprimer }: { x: Ticket; admin: boolean; onMaj?: (statut: string, reponse?: string) => void; onSupprimer?: () => void }) {
+function LigneTicket({
+  x,
+  admin,
+  onMaj,
+  onSupprimer,
+  onCorriger,
+}: {
+  x: Ticket;
+  admin: boolean;
+  onMaj?: (statut: string, reponse?: string) => void;
+  onSupprimer?: () => void;
+  onCorriger?: () => void;
+}) {
   const [ouvert, setOuvert] = useState(false);
   const [reponse, setReponse] = useState(x.reponse);
   useEffect(() => setReponse(x.reponse), [x.reponse]);
@@ -152,6 +164,11 @@ function LigneTicket({ x, admin, onMaj, onSupprimer }: { x: Ticket; admin: boole
                     {t(STATUTS[k][0])}
                   </button>
                 ))}
+                {onCorriger && (x.statut === "ouvert" || x.statut === "en_cours") && (
+                  <Bouton taille="sm" icone={<Code2 className="size-3.5" />} onClick={onCorriger} title={t("Lance Claude Code sur le code de Jarvis pour traiter ce ticket (branche à relire)")}>
+                    {t("Corriger avec Claude Code")}
+                  </Bouton>
+                )}
                 <Bouton taille="sm" variante="primaire" icone={<Send className="size-3.5" />} className="ml-auto" disabled={reponse === x.reponse} onClick={() => onMaj("", reponse)}>
                   {t("Envoyer la réponse")}
                 </Bouton>
@@ -202,6 +219,21 @@ export function VueTickets() {
       if (reponse !== undefined) toast(t("Réponse envoyée."), "succes");
     } catch (er) {
       toast((er as Error).message, "erreur");
+    }
+  };
+  const corriger = async (x: Ticket, projet = ""): Promise<void> => {
+    try {
+      const r = await api<Etat & { tache: string }>(`/api/tickets/${x.id}/corriger`, { method: "POST", json: { projet } });
+      setE(r);
+      toast(t("Tâche lancée : suis-la dans l'onglet Tâches."), "succes");
+    } catch (er) {
+      const msg = (er as Error).message;
+      if (!projet && /dossier/i.test(msg)) {
+        const p = prompt(t("Dossier du code de Jarvis sur cet ordinateur (retenu pour la suite) :"), "~/Desktop/jarvis-real");
+        if (p) return corriger(x, p);
+        return;
+      }
+      toast(msg, "erreur");
     }
   };
   const supprimer = async (x: Ticket) => {
@@ -302,7 +334,7 @@ export function VueTickets() {
           ) : (
             <div className="space-y-2">
               {tous.map((x) => (
-                <LigneTicket key={x.id} x={x} admin onMaj={(s, r) => maj(x, s, r)} onSupprimer={() => supprimer(x)} />
+                <LigneTicket key={x.id} x={x} admin onMaj={(s, r) => maj(x, s, r)} onSupprimer={() => supprimer(x)} onCorriger={() => corriger(x)} />
               ))}
             </div>
           )}

@@ -169,3 +169,33 @@ def traiter_ticket(numero: int, statut: str = "", reponse: str = ""):
     except compte.ErreurCompte as e:
         return f"Impossible : {e}"
     return "Ticket mis à jour."
+
+
+@outil
+def corriger_ticket(numero: int, projet: str = "", outil: str = "claude_code"):
+    """(Administrateur) « Corrige le ticket 12 » : lance une tâche de code de fond (Claude Code) sur le dépôt de Jarvis pour traiter ce ticket, et prévient l'auteur que c'est en cours. Le correctif arrive sur une branche à relire.
+    numero: numéro du ticket
+    projet: (optionnel) dossier du code de Jarvis ; retenu après la première fois
+    outil: claude_code (défaut), codex ou jarvis"""
+    from .. import compte
+    try:
+        t = compte.corriger_ticket(numero, projet, outil)
+    except (compte.ErreurCompte, ValueError) as e:
+        return f"Impossible : {e}"
+    return f"Tâche [{t['id']}] lancée pour le ticket n°{numero} (suivi dans l'onglet Tâches). L'auteur est prévenu que c'est en cours."
+
+
+@outil
+def resoudre_ticket(numero: int, version: str = "", message: str = ""):
+    """(Administrateur) Marque un ticket résolu et prévient son auteur (« marque le ticket 12 résolu », après publication du correctif).
+    numero: numéro du ticket
+    version: (optionnel) version qui contient le correctif (ex : 1.9.0)
+    message: (optionnel) mot pour l'auteur"""
+    from .. import compte
+    texte = message.strip() or (f"Corrigé dans la version {version}. Mets Jarvis à jour (écran Mises à jour). Merci pour ton retour !"
+                                if version else "C'est corrigé, merci pour ton retour !")
+    try:
+        compte.traiter_ticket(numero, "resolu", texte)
+    except compte.ErreurCompte as e:
+        return f"Impossible : {e}"
+    return f"Ticket n°{numero} résolu ; l'auteur sera prévenu."

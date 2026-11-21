@@ -1041,6 +1041,18 @@ async def traiter_ticket(tid: int, req: Request):
     return await lister_tickets(req)
 
 
+@app.post("/api/tickets/{tid}/corriger")
+async def corriger_ticket(tid: int, req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json()
+    try:
+        t = await asyncio.to_thread(compte.corriger_ticket, tid, d.get("projet", ""))
+    except (compte.ErreurCompte, ValueError) as e:
+        raise HTTPException(400, str(e))
+    return {"tache": t["id"], **(await lister_tickets(req))}
+
+
 @app.delete("/api/tickets/{tid}")
 async def supprimer_ticket(tid: int, req: Request):
     _verifier(req)

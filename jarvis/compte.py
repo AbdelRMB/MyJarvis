@@ -623,6 +623,33 @@ def statistiques(jours: int = 30) -> dict:
     return _appel("GET", "/v1/admin/stats", params={"jours": int(jours)})
 
 
+def corriger_ticket(tid: int, projet: str = "", outil: str = "claude_code") -> dict:
+    """Administrateur : lance une tâche de code qui corrige le ticket, et prévient son auteur que c'est en cours."""
+    from . import taches
+    from .config import GELE, sauver_config
+    t = next((x for x in tous_les_tickets() if x["id"] == int(tid)), None)
+    if not t:
+        raise ErreurCompte(f"Ticket n°{tid} introuvable.")
+    projet = (projet or CONFIG.get("depot_jarvis") or ("" if GELE else str(RACINE))).strip()
+    if not projet:
+        raise ErreurCompte("Indique le dossier du code de Jarvis (ex : ~/Desktop/jarvis-real) : il sera retenu pour la suite.")
+    if projet != CONFIG.get("depot_jarvis"):
+        CONFIG["depot_jarvis"] = projet
+        sauver_config(["depot_jarvis"])
+    genre = {"bug": "un bug", "amelioration": "une amélioration", "idee": "une idée", "question": "une question"}.get(t["genre"], "une demande")
+    consigne = (f"Traite ce ticket envoyé par un utilisateur de Jarvis ({genre}).\n\nTicket n°{t['id']} : {t['titre']}\n"
+                f"{t.get('description') or '(pas de description)'}\n\nInfos : version {t.get('version') or '?'}, {t.get('plateforme') or '?'}.\n\n"
+                "Trouve la cause dans le code, corrige-la proprement et vérifie (tests, `cd interface && npx tsc -p .` si "
+                "l'interface change). Respecte CLAUDE.md : nouvelle version dans jarvis/version.py et section CHANGELOG en "
+                "français écrite pour l'utilisateur. Ne publie pas et ne pousse pas : je relirai.")
+    tache = taches.creer(consigne, projet, outil, f"Ticket n°{t['id']} : {t['titre']}"[:80], ticket=t["id"])
+    try:
+        traiter_ticket(t["id"], "en_cours", t.get("reponse") or "Merci ! Un correctif est en préparation.")
+    except ErreurCompte:
+        pass
+    return tache
+
+
 def supprimer_ticket(tid: int):
     return _appel("DELETE", f"/v1/admin/tickets/{int(tid)}")
 
