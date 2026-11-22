@@ -190,7 +190,7 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
     _definir_secret_local("compte:cle_coffre", base64.b64encode(cle_coffre).decode())
     venait_du_local = etat().get("mode_precedent") == "local"
     e = {"mode": "en_ligne", "id": reponse["id"], "email": reponse["email"], "prenom": reponse.get("prenom", ""),
-         "serveur": serveur(), "cle": "wesley", "politique": reponse.get("politique", ""),
+         "serveur": serveur(), "cle": "wesley", "admin": bool(reponse.get("admin")),   # sans attendre la 1re synchro "politique": reponse.get("politique", ""),
          "politique_actuelle": reponse.get("politique_actuelle", "")}
     importe = [] if venait_du_local else etat().get("importe", [])   # du local vers le compte : tout part
     e["importe"] = importe
