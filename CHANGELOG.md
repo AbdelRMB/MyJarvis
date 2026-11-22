@@ -5,6 +5,7 @@ Chaque section `## x.y.z` devient la description de la mise à jour affichée da
 
 ## 2.0.0
 - **Jarvis s'appelle maintenant Wesley.** Le nom « Jarvis » était déjà pris : ton assistant a un nouveau nom, rien d'autre ne change. Ta mémoire, ton historique, tes connecteurs, tes réglages et ton compte sont gardés tels quels, et la mise à jour se fait toute seule comme d'habitude. / **Jarvis is now called Wesley.** The name was already taken; your memory, history, connectors, settings and account are all kept.
+  - **Reconnecte-toi une fois** : au premier lancement, Wesley te redemande ton mot de passe. Ton compte passe alors aux clés de chiffrement de Wesley (ton coffre est rechiffré, rien n'est perdu). Sur tes autres appareils, il te sera redemandé une fois aussi. / **Sign in once more**: your account switches to Wesley's encryption keys, nothing is lost.
   - **Pour l'appeler, dis « Wesley »** (« Wesley, ouvre Discord », « Hé Wesley », « Ok Wesley »). Il ne répond plus à « Jarvis ». / **Say "Wesley"** to call it.
   - **Nouveau raccourci : Ctrl+Alt+W** (⌃⌥W sur Mac), W comme Wesley, à la place de Ctrl+Alt+J. Si tu avais choisi un autre raccourci, il est gardé. « Ctrl+Alt+S » coupe toujours la parole. / **New shortcut: Ctrl+Alt+W.**
   - **L'appli s'appelle Wesley partout** : menu Démarrer, zone de notification, barre des menus, lancement au démarrage. L'ancienne installation « Jarvis » est retirée automatiquement. / The app is named Wesley everywhere; the old Jarvis install is removed.

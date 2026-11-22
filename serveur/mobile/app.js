@@ -47,8 +47,7 @@ function traduire() {
 }
 
 // ---------- état local ----------
-// « jarvis-mobile » : session enregistrée avant le renommage de l'appli (Jarvis -> Wesley), reprise une fois
-function lire() { try { return JSON.parse(localStorage.getItem(STOCKAGE) ?? localStorage.getItem("jarvis-mobile")) || {}; } catch { return {}; } }
+function lire() { try { return JSON.parse(localStorage.getItem(STOCKAGE)) || {}; } catch { return {}; } }
 function ecrire(p) { const e = { ...lire(), ...p }; localStorage.setItem(STOCKAGE, JSON.stringify(e)); return e; }
 const b64 = (u8) => btoa(String.fromCharCode(...u8));
 const deb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -62,7 +61,7 @@ async function api(methode, chemin, corps) {
   const e = lire();
   const r = await fetch("/v1" + chemin, {
     method: methode,
-    headers: { "Content-Type": "application/json", "X-Jarvis-Appli": CLE_APPLI, ...(e.jeton ? { Authorization: `Bearer ${e.jeton}` } : {}) },
+    headers: { "Content-Type": "application/json", "X-Wesley-Appli": CLE_APPLI, ...(e.jeton ? { Authorization: `Bearer ${e.jeton}` } : {}) },
     body: corps ? JSON.stringify(corps) : undefined,
   });
   if (r.status === 401 && chemin !== "/connexion") { deconnexionLocale(t("Session expirée : reconnecte-toi.")); throw new Error("401"); }
@@ -79,30 +78,66 @@ async function cle() {
 }
 async function chiffrer(obj) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const c = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode("jarvis-ordre") },
+  const c = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: new TextEncoder().encode("wesley-ordre") },
     await cle(), new TextEncoder().encode(JSON.stringify(obj))));
   const tout = new Uint8Array(12 + c.length); tout.set(iv); tout.set(c, 12);
   return b64(tout);
 }
 async function dechiffrer(blob) {
   const brut = deb64(blob);
-  const p = await crypto.subtle.decrypt({ name: "AES-GCM", iv: brut.slice(0, 12), additionalData: new TextEncoder().encode("jarvis-ordre") },
+  const p = await crypto.subtle.decrypt({ name: "AES-GCM", iv: brut.slice(0, 12), additionalData: new TextEncoder().encode("wesley-ordre") },
     await cle(), brut.slice(12));
   return JSON.parse(new TextDecoder().decode(p));
 }
 
 // ---------- connexion ----------
+const enc = new TextEncoder();
+async function deriver(mdp, email, sel) {
+  const maitre = await scrypt.scrypt(enc.encode(mdp), enc.encode(sel + email), 32768, 8, 1, 64);
+  return { auth: Array.from(maitre.slice(0, 32), (x) => x.toString(16).padStart(2, "0")).join(""), cle: maitre.slice(32) };
+}
+async function essayer(email, auth) {
+  const r = await fetch("/v1/connexion", { method: "POST", headers: { "Content-Type": "application/json", "X-Wesley-Appli": CLE_APPLI },
+    body: JSON.stringify({ email, cle_auth: auth, appareil: nomAppareil() }) });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401) return null;
+  if (!r.ok) throw new Error(d.detail || `Erreur ${r.status}`);
+  return d;
+}
+async function coffreAes(cleBrute, contexte, mode, donnees) {
+  const k = await crypto.subtle.importKey("raw", cleBrute, "AES-GCM", false, [mode]);
+  if (mode === "decrypt") {
+    const brut = deb64(donnees);
+    return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: brut.slice(0, 12), additionalData: enc.encode(contexte) }, k, brut.slice(12)));
+  }
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const c = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv, additionalData: enc.encode(contexte) }, k, donnees));
+  const tout = new Uint8Array(12 + c.length); tout.set(iv); tout.set(c, 12);
+  return b64(tout);
+}
+// Compte créé avant le renommage de l'appli (clés Jarvis) : connexion avec les anciennes clés, coffre rechiffré avec
+// les nouvelles, puis le serveur ne connaît plus que les nouvelles. À retirer quand plus aucun compte ne les utilise.
+async function convertirCompte(email, mdp, neuve) {
+  const ancienne = await deriver(mdp, email, "jarvis-compte:");
+  const r = await essayer(email, ancienne.auth);
+  if (!r) return null;
+  const coffre = r.coffre ? await coffreAes(ancienne.cle, "jarvis-coffre", "decrypt", r.coffre) : enc.encode("{}");
+  const nouveau = await coffreAes(neuve.cle, "wesley-coffre", "encrypt", coffre);
+  const m = await fetch("/v1/moi/cle", { method: "POST", body: JSON.stringify({ cle_auth: neuve.auth, coffre: nouveau }),
+    headers: { "Content-Type": "application/json", "X-Wesley-Appli": CLE_APPLI, Authorization: `Bearer ${r.jeton}` } });
+  if (!m.ok) throw new Error(t("Mise à jour du compte impossible, réessaie."));
+  return r;
+}
 async function connexion(ev) {
   ev.preventDefault();
   const email = $("email").value.trim().toLowerCase(), mdp = $("mdp").value;
   $("btn-connexion").disabled = true; $("btn-connexion").textContent = t("Connexion…"); $("erreur-connexion").textContent = "";
   try {
     await new Promise((r) => setTimeout(r, 30));   // laisse l'écran se mettre à jour (le calcul prend ~1 s)
-    const enc = new TextEncoder();
-    const maitre = await scrypt.scrypt(enc.encode(mdp), enc.encode("jarvis-compte:" + email), 32768, 8, 1, 64);
-    const cleAuth = Array.from(maitre.slice(0, 32), (x) => x.toString(16).padStart(2, "0")).join("");
-    const r = await api("POST", "/connexion", { email, cle_auth: cleAuth, appareil: nomAppareil() });
-    ecrire({ jeton: r.jeton, email: r.email, prenom: r.prenom, cle: b64(maitre.slice(32)) });
+    const neuve = await deriver(mdp, email, "wesley-compte:");
+    const r = (await essayer(email, neuve.auth)) || (await convertirCompte(email, mdp, neuve));
+    if (!r) throw new Error("401");
+    ecrire({ jeton: r.jeton, email: r.email, prenom: r.prenom, cle: b64(neuve.cle), cles: "wesley" });
     cleAes = null; $("mdp").value = "";
     demarrer();
   } catch (e) {
@@ -378,6 +413,8 @@ function init() {
   document.querySelectorAll(".feuille").forEach((f) => (f.onclick = (e) => (e.target === f || e.target.dataset.ferme !== undefined) && fermerFeuilles()));
   document.addEventListener("visibilitychange", () => { if (!document.hidden && lire().jeton) chargerAppareils(); });
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
-  if (lire().jeton && lire().cle) demarrer(); else deconnexionLocale();
+  // « cles » : connecté avec les clés Wesley ; une session d'avant (clés Jarvis) redemande le mot de passe une fois
+  if (lire().jeton && lire().cle && lire().cles === "wesley") demarrer();
+  else deconnexionLocale(lire().jeton ? t("Wesley a changé de nom : reconnecte-toi une fois.") : "");
 }
 init();

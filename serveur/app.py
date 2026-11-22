@@ -35,8 +35,9 @@ async def seulement_l_appli(req: Request, suite):
     """Tout ce qui n'est pas l'appli Wesley (navigateur, robots) reçoit un 404 vide (Apache filtre déjà)."""
     if req.url.path.startswith("/mobile/") and req.method == "GET":   # l'appli mobile (pages) est publique
         return await suite(req)
-    if CLE_APPLI and (not req.url.path.startswith("/v1/") or
-                      not hmac.compare_digest(req.headers.get("x-jarvis-appli", ""), CLE_APPLI)):
+    # x-jarvis-appli : en-tête des versions d'avant le renommage (1.x), accepté le temps qu'elles passent en 2.0.0
+    cle = req.headers.get("x-wesley-appli") or req.headers.get("x-jarvis-appli") or ""
+    if CLE_APPLI and (not req.url.path.startswith("/v1/") or not hmac.compare_digest(cle, CLE_APPLI)):
         return JSONResponse({"detail": "Introuvable"}, status_code=404)
     return await suite(req)
 
@@ -335,6 +336,26 @@ class Coffre(BaseModel):
 def sauver_coffre(d: Coffre, uid: int = Depends(utilisateur)):
     with db() as c:
         c.execute("UPDATE utilisateurs SET coffre = ? WHERE id = ?", (d.coffre, uid))
+        _toucher(c, uid)
+    return {"ok": True}
+
+
+class NouvelleCle(BaseModel):
+    cle_auth: str = Field(min_length=32, max_length=200)
+    coffre: str = Field(max_length=200_000)
+
+
+@app.post("/v1/moi/cle")
+def changer_cle(d: NouvelleCle, authorization: str = Header(""), uid: int = Depends(utilisateur)):
+    """Nouvelles clés du compte (conversion des clés Jarvis en clés Wesley) : nouvelle preuve du mot de passe et
+    coffre rechiffré par l'appareil, en une fois. Les sessions des autres appareils sont fermées : ils avaient
+    l'ancienne clé du coffre et doivent se reconnecter."""
+    sel = secrets.token_bytes(16)
+    with db() as c:
+        c.execute("UPDATE utilisateurs SET auth_sel = ?, auth_hash = ?, coffre = ? WHERE id = ?",
+                  (sel, _hacher(d.cle_auth, sel), d.coffre, uid))
+        c.execute("DELETE FROM sessions WHERE utilisateur = ? AND jeton_hash != ?",
+                  (uid, _empreinte(authorization.removeprefix("Bearer ").strip())))
         _toucher(c, uid)
     return {"ok": True}
 

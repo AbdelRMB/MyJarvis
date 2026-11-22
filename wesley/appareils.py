@@ -94,13 +94,13 @@ def trouver(nom_ou_id: str) -> dict:
 def _chiffrer(d: dict) -> str:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     n = os.urandom(12)
-    return base64.b64encode(n + AESGCM(_compte()._cle_coffre()).encrypt(n, json.dumps(d).encode(), b"jarvis-ordre")).decode()
+    return base64.b64encode(n + AESGCM(_compte()._cle_coffre()).encrypt(n, json.dumps(d).encode(), b"wesley-ordre")).decode()
 
 
 def _dechiffrer(blob: str) -> dict:
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     brut = base64.b64decode(blob)
-    return json.loads(AESGCM(_compte()._cle_coffre()).decrypt(brut[:12], brut[12:], b"jarvis-ordre"))
+    return json.loads(AESGCM(_compte()._cle_coffre()).decrypt(brut[:12], brut[12:], b"wesley-ordre"))
 
 
 # ---------- journal ----------
