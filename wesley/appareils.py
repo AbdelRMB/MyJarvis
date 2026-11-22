@@ -77,7 +77,9 @@ def trouver(nom_ou_id: str) -> dict:
     autres = [a for a in lister() if not a["moi"]]
     for test in (lambda a: a["id"] == cle, lambda a: a["nom"].lower() == cle, lambda a: cle in a["nom"].lower(),
                  lambda a: cle in a["plateforme"].lower() or (cle in ("pc", "windows") and a["plateforme"] == "windows")
-                 or (cle in ("mac", "macbook") and a["plateforme"] == "mac")):
+                 or (cle in ("mac", "macbook") and a["plateforme"] == "mac")
+                 or (cle in ("téléphone", "telephone", "tel", "tél", "mobile", "portable", "smartphone", "phone", "iphone", "android")
+                     and a["plateforme"] == "telephone")):
         trouves = [a for a in autres if test(a)]
         if len(trouves) == 1:
             return trouves[0]

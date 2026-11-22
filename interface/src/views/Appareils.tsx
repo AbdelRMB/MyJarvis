@@ -143,7 +143,8 @@ export function VueAppareils() {
                 )}
               </div>
             )}
-            {!a.moi && a.en_ligne && a.accepte && a.plateforme !== "telephone" && (
+            {/* l'ancienne télécommande mobile refusait les ordres (accepte = false) ; Wesley mobile les accepte */}
+            {!a.moi && a.en_ligne && a.accepte && (
               <div className="mt-3 flex gap-2">
                 <Champ
                   className="flex-1"
