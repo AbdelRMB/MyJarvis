@@ -4,7 +4,7 @@ from . import outil
 
 @outil
 def lancer_tache_code(consigne: str, projet: str, outil: str = "claude_code", titre: str = ""):
-    """Lance une tâche de code EN ARRIÈRE-PLAN : une branche est créée, Claude Code (ou Wesley) code et tu le pilotes jusqu'au bout pendant que l'utilisateur continue à te parler. Utilise-le dès qu'on te demande de coder / développer / corriger quelque chose dans un projet.
+    """Lance une tâche de code EN ARRIÈRE-PLAN : une branche est créée, Claude Code (ou Wesley) code et tu le pilotes jusqu'au bout pendant que l'utilisateur continue à te parler. Utilise-le dès qu'on te demande de coder / développer / corriger quelque chose dans un projet. Le WESLEY.md du projet (instructions du projet) est transmis à l'agent, qui doit le tenir à jour.
     consigne: la demande complète et précise de l'utilisateur
     projet: chemin du dossier du projet (voir « Projets détectés » dans ta mémoire ; demande-le s'il est ambigu)
     outil: « claude_code » (par défaut), « codex » (agent de code d'OpenAI) ou « wesley » si l'utilisateur veut que tu codes toi-même

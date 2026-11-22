@@ -63,7 +63,7 @@ def lister() -> list:
 
 def resume(t: dict) -> dict:
     return {k: t.get(k) for k in ("id", "titre", "statut", "outil", "projet", "branche", "dossier", "cree", "maj",
-                                  "etape", "bilan")} | {"nb_journal": len(t.get("journal", []))}
+                                  "etape", "bilan", "wesley_md")} | {"nb_journal": len(t.get("journal", []))}
 
 
 def _diffuser(tid):
@@ -192,13 +192,82 @@ def _preparer(t: dict):
         t["dossier"], t["branche"] = str(projet), ""
         _noter(t, "info", "Ce dossier n'est pas un dépôt git : travail directement dedans, sans branche.")
         return
-    racine = Path(_git(projet, "rev-parse", "--show-toplevel"))
+    racine = Path(_git(projet, "rev-parse", "--show-toplevel")).resolve()
     branche = f"wesley/{_slug(t['titre'])}-{t['id'][:4]}"
     dossier = racine.parent / f"{racine.name}-wesley-{t['id'][:6]}"
     t["base"] = _git(racine, "rev-parse", "HEAD")
     _git(racine, "worktree", "add", "-b", branche, str(dossier), "HEAD")
     t["dossier"], t["branche"] = str(dossier), branche
+    try:
+        t["sous_dossier"] = projet.relative_to(racine).as_posix().strip(".")
+    except ValueError:
+        t["sous_dossier"] = ""
     _noter(t, "info", f"Branche « {branche} » créée, copie de travail : {dossier}")
+    _copier_wesley_md(t, racine, dossier)
+
+
+def _copier_wesley_md(t: dict, racine: Path, dossier: Path):
+    """Un WESLEY.md pas encore committé n'est pas dans la copie de travail : on l'y recopie pour que l'agent le suive."""
+    from . import wesley_md
+    for f in wesley_md.fichiers(racine, racine / t.get("sous_dossier", "")):
+        cible = dossier / f.relative_to(racine)
+        if not cible.exists():
+            cible.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, cible)
+            t.setdefault("wesley_md_copies", {})[f.relative_to(racine).as_posix()] = f.read_text(encoding="utf-8", errors="replace")
+            _noter(t, "info", f"{f.relative_to(racine).as_posix()} (pas encore committé) recopié dans la copie de travail.")
+
+
+# ---------- WESLEY.md (instructions du projet) ----------
+def _cible(t) -> Path:
+    return Path(t["dossier"]) / t.get("sous_dossier", "")
+
+
+def _bloc_projet(t) -> str:
+    """Instructions du WESLEY.md (racine + sous-dossiers concernés) et obligation de le tenir à jour."""
+    from . import wesley_md
+    try:
+        lus = [f.relative_to(wesley_md.racine_projet(t["dossier"])).as_posix() for f in wesley_md.fichiers(t["dossier"], _cible(t))]
+        if lus != t.get("wesley_md"):
+            t["wesley_md"] = lus
+            _sauver(t)
+        return wesley_md.bloc_consigne(t["dossier"], _cible(t))
+    except Exception:
+        traceback.print_exc()
+        return ""
+
+
+def _wesley_md_a_jour(t) -> bool:
+    """Le WESLEY.md a-t-il été créé ou modifié par la tâche ?"""
+    if t.get("branche"):
+        base = t.get("base") or "HEAD~1"
+        suivis = _git(t["dossier"], "diff", "--name-only", base, verifier=False).splitlines()
+        if any(n.strip().split("/")[-1] == "WESLEY.md" for n in suivis):
+            return True
+        # pas encore suivi par git : compte s'il a été créé, ou modifié depuis sa copie au début de la tâche
+        copies = t.get("wesley_md_copies") or {}
+        for n in _git(t["dossier"], "ls-files", "--others", "--exclude-standard", verifier=False).splitlines():
+            n = n.strip()
+            if n.split("/")[-1] == "WESLEY.md":
+                texte = (Path(t["dossier"]) / n).read_text(encoding="utf-8", errors="replace")
+                if copies.get(n) != texte:
+                    return True
+        return False
+    from . import wesley_md
+    f = wesley_md.racine_projet(t["dossier"]) / wesley_md.NOM
+    return f.is_file() and f.stat().st_mtime >= t.get("cree", 0)
+
+
+def _assurer_wesley_md(t):
+    """Fin de tâche : si l'agent n'a pas tenu le WESLEY.md à jour, Wesley y consigne lui-même le changement."""
+    try:
+        if t.get("dossier") and not _wesley_md_a_jour(t):
+            from . import wesley_md
+            f = wesley_md.noter(t["dossier"], f"{t['titre']}" + (f" — {t['bilan']}" if t.get("bilan") else "")
+                                + (f" (branche {t['branche']})" if t.get("branche") else ""))
+            _noter(t, "info", f"WESLEY.md mis à jour par Wesley : {f}")
+    except Exception as e:
+        _noter(t, "erreur", f"WESLEY.md non mis à jour : {e}")
 
 
 # ---------- pilotage ----------
@@ -208,7 +277,10 @@ def _consignes(t):
 
 
 def _premier_message(t):
-    return (f"{_consignes(t)}\n\n"
+    from . import wesley_md
+    projet = _bloc_projet(t)
+    return ((f"{projet}\n\n# DEMANDE DE L'UTILISATEUR\n" if projet else "") + f"{_consignes(t)}\n\n"
+            + wesley_md.obligation(t["dossier"]) + "\n\n"
             "Travaille en autonomie complète dans ce dossier"
             + (f" (branche git « {t['branche']} »)" if t["branche"] else "") + ". "
             "Ne pose pas de question bloquante : prends des décisions raisonnables et indique-les. "
@@ -300,7 +372,8 @@ def _codex(t, a, message) -> dict:
             break
         # reprise impossible : nouvelle session avec tout le contexte
         t["session"] = ""
-        cmd = base + [f"{_consignes(t)}\n\nOù en est le travail (bilan) : {t.get('bilan') or '—'}\n\n{message}"]
+        projet = _bloc_projet(t)
+        cmd = base + [(f"{projet}\n\n" if projet else "") + f"{_consignes(t)}\n\nOù en est le travail (bilan) : {t.get('bilan') or '—'}\n\n{message}"]
     sortie.unlink(missing_ok=True)
     res["interrompu"] = a.get("interrompu", False)
     if res["erreur"] and ("login" in res["texte"].lower() or "auth" in res["texte"].lower()):
@@ -329,7 +402,8 @@ def _decider(t, res, changements: str) -> dict:
         + (f"OUTILS REFUSÉS À L'AGENT : {', '.join(res['refus'])}\n\n" if res["refus"] else "")
         + f"FICHIERS MODIFIÉS DANS LA BRANCHE (git) :\n{changements[-3000:] or '(aucun)'}\n\n"
         "Réponds UNIQUEMENT en JSON : {\"termine\": true|false, \"message\": \"...\", \"bilan\": \"...\"}\n"
-        "- termine = true seulement si TOUTE la demande est réalisée (et testée si possible).\n"
+        "- termine = true seulement si TOUTE la demande est réalisée (et testée si possible) ET que le WESLEY.md "
+        "du projet est créé ou mis à jour (changements, décisions, commandes, conventions).\n"
         "- message = ce que tu envoies à l'agent pour continuer : réponds à ses questions (décide à la place de "
         "l'utilisateur, de façon raisonnable et cohérente avec la demande), accorde-lui ce dont il a besoin, "
         "demande de corriger les erreurs, de tester, de finir, de committer.\n"
@@ -388,6 +462,12 @@ def _piloter(tid: str):
             t["bilan"] = d["bilan"] or t.get("bilan", "")
             if d["bilan"]:
                 _noter(t, "info", "Bilan : " + d["bilan"])
+            if d["termine"] and not t.get("rappel_wesley_md") and not _wesley_md_a_jour(t):
+                t["rappel_wesley_md"] = True   # une seule relance ; sinon Wesley le complète lui-même à la fin
+                _sauver(t)
+                message = ("Avant de finir : le WESLEY.md du projet n'a pas été mis à jour. " + _obligation(t)
+                           + " Puis fais le commit final.")
+                continue
             if d["termine"]:
                 _finir(t, "terminee")
                 return
@@ -402,7 +482,14 @@ def _piloter(tid: str):
         _actives.pop(tid, None)
 
 
+def _obligation(t) -> str:
+    from . import wesley_md
+    return wesley_md.obligation(t["dossier"])
+
+
 def _finir(t, statut, raison=""):
+    if statut == "terminee":
+        _assurer_wesley_md(t)
     if t.get("branche"):
         if _git(t["dossier"], "status", "--porcelain", verifier=False):
             _git(t["dossier"], "add", "-A", "--", ".", ":!**/__pycache__/**", ":!**/*.pyc", ":!**/node_modules/**",
