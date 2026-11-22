@@ -97,6 +97,20 @@ En mode développement, les données (config, `.env`, journaux, cache du compte)
 Interface en direct : `cd interface && npm run dev` (http://localhost:5173, branchée sur le serveur Python lancé à côté).
 Vérification avant commit : `cd interface && npx tsc -p .`
 
+### Wesley mobile (téléphone)
+
+Appli web réservée aux téléphones (iPhone, Android), servie par le serveur de comptes sur `/mobile/`. Wesley y
+tourne vraiment (cerveau, outils, mémoire, À faire, automatisations, tickets, voix du téléphone) ; ce qu'un
+téléphone ne peut pas faire passe par un ordinateur du compte (ordres chiffrés, `wesley/appareils.py`).
+- Code : `interface/mobile/src` (`moteur/` = compte, chiffrement, synchro, cerveau, outils ; `vues/` = écrans).
+  Il réutilise `interface/src` (composants, thème, Markdown, `t()`) ; traductions propres dans `en-mobile.ts`.
+- Compiler (à committer avec le code) : `cd interface && npm run build:mobile` → `serveur/mobile/index.html` + `app/`.
+  En direct : `npm run dev:mobile` (http://localhost:5174/mobile/, ouvrir avec l'émulation téléphone du navigateur).
+- Téléphones seulement : `serveur/app.py` (`est_telephone`) sert une page de refus aux ordinateurs et refuse l'API
+  aux navigateurs d'ordinateur ; `interface/mobile/src/garde.ts` vérifie aussi côté page. L'appli de bureau
+  (User-Agent « Wesley ») n'est pas concernée.
+- Tests : `serveur/tests/test_telephone.py` (pytest) et `serveur/tests/e2e_mobile.py` (Playwright, iPhone émulé).
+
 ## 3. Construire les installateurs
 
 - **Mac** (sur un Mac) : `bash construire-mac.sh` → `installateur/Wesley-<version>-mac-<arm64|x86_64>.dmg`.

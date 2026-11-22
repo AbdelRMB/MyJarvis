@@ -56,7 +56,8 @@ haute ce qu'il a fait.
 - 🔌 **Connecteurs + n'importe quel serveur MCP.** Gmail/IMAP, agenda, GitHub, Notion, serveurs SSH (avec assistant
   de configuration), WhatsApp, Spotify, Slack, Home Assistant…
 - 📱 **Te suit partout.** Un compte : mémoire, historique et liste À faire synchronisés entre ton Mac, ton PC et ton
-  téléphone. « Sur mon PC, lance Discord » marche depuis ton téléphone.
+  téléphone. Sur le téléphone, Wesley tourne en vrai (voix, IA, mémoire, À faire, automatisations) : ouvre
+  https://wesley.abdelrahimriche.com/mobile/ sur ton iPhone ou Android. « Sur mon PC, lance Discord » marche aussi.
 - 🔐 **Prudent.** Demande ton accord avant toute action destructrice, coffre chiffré pour les clés et mots de passe,
   journal de toutes les actions, arrêt d'urgence.
 - 📦 **Une vraie appli, pas un script.** Appli Mac signée et notarisée par Apple, installateur Windows, mises à jour
@@ -230,7 +231,8 @@ cd interface; npm ci; npm run build; cd ..
 |---|---|
 | `wesley/` | Cœur en Python : agent, outils (`outils/`), voix, écoute, serveur local (`web.py`), compte (`compte.py`), mises à jour |
 | `interface/` | Interface React + TypeScript + Tailwind, compilée dans `wesley/static/` |
-| `serveur/` | Serveur des comptes (FastAPI + SQLite), appli mobile et pages légales (`mobile/`) |
+| `serveur/` | Serveur des comptes (FastAPI + SQLite), appli mobile compilée et pages légales (`mobile/`) |
+| `interface/mobile/` | Wesley mobile (téléphones seulement) : moteur de l'assistant et écrans tactiles, réutilise `interface/src` |
 | `wesley.spec` / `wesley-mac.spec` | Recettes PyInstaller (Windows / Mac) |
 | `installateur.iss` | Installateur Windows (Inno Setup) |
 | `construire.bat` / `construire-mac.sh` | Construire les installateurs |

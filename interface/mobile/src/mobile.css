@@ -1,0 +1,23 @@
+/* Réglages propres au téléphone (le thème vient de src/index.css, le même que l'appli de bureau). */
+html,
+body {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+body {
+  font-size: 15px;
+}
+/* iOS zoome sur les champs de moins de 16 px : on l'évite */
+input,
+textarea,
+select {
+  font-size: 16px !important;
+}
+.zone-sure {
+  padding-top: env(safe-area-inset-top);
+}
+.bas-sur {
+  padding-bottom: max(6px, env(safe-area-inset-bottom));
+}

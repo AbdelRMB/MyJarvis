@@ -21,8 +21,8 @@ def lister_appareils():
 
 @outil
 def demander_a_appareil(appareil: str, demande: str):
-    """Fait exécuter une demande par Wesley sur UN AUTRE de tes appareils (ex : « sur mon PC, lance Discord », « quel est l'espace disque du PC », « éteins le PC »). Le Wesley de l'appareil cible l'exécute avec ses propres outils et renvoie le résultat.
-    appareil: nom de l'appareil (ou « PC », « Mac »… voir lister_appareils)
+    """Fait exécuter une demande par Wesley sur UN AUTRE de tes appareils (ex : « sur mon PC, lance Discord », « quel est l'espace disque du PC », « éteins le PC », « sur mon téléphone, ajoute du pain à ma liste »). Le Wesley de l'appareil cible l'exécute avec ses propres outils et renvoie le résultat. Le téléphone (Wesley mobile) n'a ni souris, ni clavier, ni applis de bureau : il sait gérer la mémoire, la liste À faire, les rappels, ouvrir un lien ou un appel, et recevoir des fichiers.
+    appareil: nom de l'appareil (ou « PC », « Mac », « téléphone »… voir lister_appareils)
     demande: ce qu'il doit faire, en une phrase claire et complète"""
     from .. import appareils
     r = appareils.envoyer(appareil, {"type": "demande", "texte": demande})
