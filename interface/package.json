@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p . && vite build",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "build:mobile": "tsc -p . && vite build --config vite.mobile.config.ts",
+    "dev:mobile": "vite --config vite.mobile.config.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -15,6 +17,7 @@
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
+    "scrypt-js": "^3.0.1",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
