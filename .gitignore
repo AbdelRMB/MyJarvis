@@ -36,3 +36,4 @@ serveur/deployer.sh
 serveur/deploiement-vps.sh
 serveur/Jenkinsfile.serveur
 serveur/COMMIT
+.pytest_cache/

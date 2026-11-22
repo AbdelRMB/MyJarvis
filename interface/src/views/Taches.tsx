@@ -8,7 +8,7 @@ import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Statut = "en_cours" | "terminee" | "echec" | "arretee" | "interrompue";
-type Resume = { id: string; titre: string; statut: Statut; outil: string; projet: string; branche: string; dossier: string; cree: number; maj: number; etape: number; bilan: string };
+type Resume = { id: string; titre: string; statut: Statut; outil: string; projet: string; branche: string; dossier: string; cree: number; maj: number; etape: number; bilan: string; wesley_md?: string[] | null };
 type Entree = { ts: number; genre: "utilisateur" | "wesley" | "claude" | "outil" | "info" | "erreur"; texte: string };
 type Tache = Resume & { consigne: string; ajouts: string[]; journal: Entree[] };
 
@@ -167,6 +167,11 @@ export function VueTaches() {
                   {detail.branche ? `${detail.branche} · ` : ""}
                   {detail.dossier || detail.projet}
                 </p>
+                {!!detail.wesley_md?.length && (
+                  <p className="mt-1 text-[11px] text-tres-doux" title={t("Instructions du projet transmises à l'agent, qui les tient à jour")}>
+                    {t("Suit")} <span className="font-mono">{detail.wesley_md.join(", ")}</span>
+                  </p>
+                )}
                 {detail.bilan && <p className="mt-2 text-[13px] text-doux">{detail.bilan}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {detail.statut === "en_cours" ? (

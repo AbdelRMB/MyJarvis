@@ -412,7 +412,7 @@ export const OUTILS: Outil[] = [
   {
     nom: "lancer_tache_code",
     description:
-      "Lance une tâche de code EN ARRIÈRE-PLAN sur un ordinateur (Claude Code ou Codex crée une branche et code) : à utiliser dès qu'on te demande de coder / développer / corriger quelque chose dans un projet.",
+      "Lance une tâche de code EN ARRIÈRE-PLAN sur un ordinateur (Claude Code ou Codex crée une branche et code) : à utiliser dès qu'on te demande de coder / développer / corriger quelque chose dans un projet. Le WESLEY.md du projet est transmis à l'agent, qui le tient à jour.",
     params: {
       consigne: s("la demande complète et précise"),
       projet: s("chemin du dossier du projet sur l'ordinateur (vide = le demander à l'ordinateur)"),

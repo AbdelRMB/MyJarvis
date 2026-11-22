@@ -27,6 +27,15 @@ def lire_fichier(chemin: str, debut: int = 1, fin: int = 400):
     return out + (f"\n[... {len(lignes)} lignes au total]" if len(lignes) > fin else "")
 
 
+def _rappel_projet(p) -> str:
+    """Fichier écrit dans un projet : rappel de lire / tenir à jour son WESLEY.md (une fois par projet)."""
+    try:
+        from ..wesley_md import rappel_apres_ecriture
+        return rappel_apres_ecriture(p)
+    except Exception:
+        return ""
+
+
 @outil
 def ecrire_fichier(chemin: str, contenu: str):
     """Crée ou remplace entièrement un fichier (crée les dossiers parents). Pour coder un fichier complet.
@@ -35,7 +44,7 @@ def ecrire_fichier(chemin: str, contenu: str):
     p = _p(chemin)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(contenu, encoding="utf-8")
-    return f"Écrit : {p} ({len(contenu)} caractères)"
+    return f"Écrit : {p} ({len(contenu)} caractères)" + _rappel_projet(p)
 
 
 @outil
@@ -52,7 +61,7 @@ def modifier_fichier(chemin: str, ancien: str, nouveau: str):
     if n > 1:
         return f"Erreur : texte trouvé {n} fois, ajoute plus de contexte."
     p.write_text(t.replace(ancien, nouveau), encoding="utf-8")
-    return f"Modifié : {p}"
+    return f"Modifié : {p}" + _rappel_projet(p)
 
 
 @outil

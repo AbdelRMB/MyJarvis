@@ -75,6 +75,8 @@ haute ce qu'il a fait.
 >
 > « Pourquoi mon serveur est lent ? » *(en SSH, il demande avant chaque commande sudo)*
 >
+> « Crée le WESLEY.md de ce projet. » *(ses instructions pour ce projet, qu'il tient à jour)*
+>
 > « Rappelle-moi de sortir les poubelles à 20 h. » · « Fais-moi le briefing. »
 >
 > « À partir de maintenant, réponds-moi en une phrase. » *(il retient tes consignes)*
@@ -142,7 +144,7 @@ Wesley peut aussi se mettre à jour tout seul au prochain démarrage.
 | **Vision** | Regarder l'écran, trouver un élément et cliquer dessus, analyser une image |
 | **Navigateur** | Son propre navigateur ou **le tien** (Safari, Chrome, Edge, Brave, Arc sur Mac), en entourant chaque élément avant d'agir |
 | **Sites appris** | Exploration en lecture seule, démonstrations, astuces, connexion automatique avec 2FA |
-| **Code** | Ouvrir dans VS Code (fichier:ligne), git, créer un projet (Vite / Next / Node / Python) |
+| **Code** | Ouvrir dans VS Code (fichier:ligne), git, créer un projet (Vite / Next / Node / Python), tâches de code en arrière-plan (Claude Code / Codex), un **WESLEY.md** par projet |
 | **Web** | Recherche avec sources, actualités, lire une page, météo, télécharger |
 | **Mémoire** | Retient ce qu'il apprend sur toi, tes consignes, et les leçons de ses propres erreurs |
 | **Organisation** | Liste À faire, rappels dits à voix haute à l'heure, briefing du matin, routines, automatisations |
@@ -159,6 +161,25 @@ Wesley peut aussi se mettre à jour tout seul au prochain démarrage.
 | Le faire taire | **« Wesley, stop »** (même pendant qu'il parle), ou `Ctrl+Alt+S` / `⌃⌥S`, même fenêtre cachée. |
 | Fermer la fenêtre | Elle se cache seulement. Pour quitter : icône Wesley › Quitter. |
 | Dans la fenêtre | `Échap` = stop · `Ctrl+K` = écrire · `Alt+1…9` = écrans |
+
+</details>
+
+<details>
+<summary><strong>WESLEY.md : les instructions de chaque projet</strong></summary>
+
+Comme le `CLAUDE.md` de Claude Code, un fichier **`WESLEY.md`** à la racine d'un projet (et, si besoin, dans un
+sous-dossier) contient ce que Wesley doit savoir pour y travailler : présentation, commandes utiles, conventions,
+décisions, journal des changements.
+
+- **Lu en premier.** Avant de coder, d'ouvrir ou de modifier un projet, Wesley lit son WESLEY.md (racine puis
+  sous-dossier concerné) et le suit avant sa mémoire et ses règles par défaut. Seules ta demande et tes consignes
+  personnelles passent avant.
+- **Transmis aux agents de code.** Les tâches de fond le donnent à Claude Code / Codex en tête de leur consigne.
+- **Tenu à jour, partout.** À chaque fois que Wesley code dans un projet, il le crée s'il n'existe pas et y note les
+  changements, décisions, commandes et conventions. Une tâche qui l'oublie est relancée une fois ; sinon Wesley
+  l'y consigne lui-même avant le commit final.
+- **À la demande.** « Crée le WESLEY.md de ce projet » : Wesley le remplit d'après le projet (README, `package.json`,
+  `pyproject.toml`…), puis le complète.
 
 </details>
 
