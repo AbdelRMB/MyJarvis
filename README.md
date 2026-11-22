@@ -169,7 +169,7 @@ Wesley can also update itself automatically at the next start.
 - The local interface only listens on `127.0.0.1` (checked Host, per-session token, checked Origin).
 - **Emergency stop**: move the mouse to the top-left corner. Every action is logged (`logs/actions.log`).
 - **Your data is yours**: Settings › My account › **Download my data** / **Delete my account**.
-  [Privacy policy](https://jarvis.abdelrahimriche.com/mobile/confidentialite.html) (in French).
+  [Privacy policy](https://wesley.abdelrahimriche.com/mobile/confidentialite.html) (in French).
 
 ## 🏗️ How it works
 

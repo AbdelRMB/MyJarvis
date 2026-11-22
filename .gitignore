@@ -27,6 +27,7 @@ compte.json
 
 # Déploiement du serveur de comptes (Apache, Docker, scripts du VPS) : gardé en local, jamais publié
 serveur/apache-jarvis.conf
+serveur/apache-wesley.conf
 serveur/installer-apache.sh
 serveur/mettre-a-jour-apache.sh
 serveur/Dockerfile

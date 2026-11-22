@@ -174,7 +174,7 @@ Wesley peut aussi se mettre à jour tout seul au prochain démarrage.
 - **Arrêt d'urgence** : souris dans le coin haut-gauche de l'écran. Toutes les actions sont journalisées
   (`logs/actions.log`).
 - **Tes données t'appartiennent** : Réglages › Mon compte › **Télécharger mes données** / **Supprimer mon compte**.
-  [Politique de confidentialité](https://jarvis.abdelrahimriche.com/mobile/confidentialite.html).
+  [Politique de confidentialité](https://wesley.abdelrahimriche.com/mobile/confidentialite.html).
 
 ## 🏗️ Comment ça marche
 
