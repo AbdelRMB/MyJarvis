@@ -36,7 +36,7 @@ export type Automatisation = {
 };
 
 /** connecteurs.json : { cid: { type, nom?, ...champs non secrets } } ; les secrets sont dans le coffre (« cid:champ »). */
-export type Connecteurs = Record<string, { type: string; nom?: string; actif?: boolean; [k: string]: unknown }>;
+export type Connecteurs = Record<string, { type: string; actif?: boolean; conf?: Record<string, unknown>; [k: string]: unknown }>;
 
 export type Profil = Record<string, string | number | boolean | undefined> & {
   nom_utilisateur?: string;

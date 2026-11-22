@@ -1,122 +1,24 @@
 <!doctype html>
 <html lang="fr">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
-  <meta name="theme-color" content="#04090f" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Wesley" />
-  <title>Wesley</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="apple-touch-icon" href="icone-180.png" />
-  <link rel="icon" href="icone-192.png" />
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <!-- Connexion -->
-  <section id="ecran-connexion" class="ecran" hidden>
-    <div class="carte-connexion">
-      <div class="logo">Wesley</div>
-      <p class="sous" data-t="Pilote ton Wesley depuis ton téléphone.">Pilote ton Wesley depuis ton téléphone.</p>
-      <form id="form-connexion">
-        <input id="email" type="email" autocomplete="email" required data-ph="Adresse e-mail" placeholder="Adresse e-mail" />
-        <input id="mdp" type="password" autocomplete="current-password" required data-ph="Mot de passe" placeholder="Mot de passe" />
-        <button type="submit" class="principal" id="btn-connexion" data-t="Se connecter">Se connecter</button>
-      </form>
-      <p class="petit" data-t="Ton mot de passe ne quitte pas ce téléphone : il sert à chiffrer tes demandes, que seuls tes ordinateurs peuvent lire.">Ton mot de passe ne quitte pas ce téléphone : il sert à chiffrer tes demandes, que seuls tes ordinateurs peuvent lire.</p>
-      <p class="erreur" id="erreur-connexion"></p>
-      <button class="lien" id="btn-langue-1">English</button>
-    </div>
-  </section>
-
-  <!-- Application -->
-  <section id="ecran-app" class="ecran" hidden>
-    <header>
-      <div class="titre">
-        <span class="reacteur" id="reacteur"></span>
-        <div>
-          <div class="nom">WESLEY</div>
-          <button id="choix-appareil" class="appareil"><span id="appareil-nom">—</span> <span class="fleche">▾</span></button>
-        </div>
-      </div>
-      <div class="actions-haut">
-        <button id="btn-afaire" class="icone" aria-label="À faire">☑︎</button>
-        <button id="btn-tickets" class="icone" aria-label="Tickets">✉︎</button>
-        <button id="btn-reglages" class="icone" aria-label="Réglages">⚙︎</button>
-      </div>
-    </header>
-
-    <main id="fil"></main>
-
-    <footer>
-      <div id="etat" class="etat"></div>
-      <form id="form-demande">
-        <button type="button" id="btn-micro" class="micro" aria-label="Parler">🎤</button>
-        <input id="demande" autocomplete="off" data-ph="Demande quelque chose…" placeholder="Demande quelque chose…" />
-        <button type="submit" id="btn-envoyer" class="envoyer" aria-label="Envoyer">➤</button>
-      </form>
-    </footer>
-  </section>
-
-  <!-- Choix de l'appareil -->
-  <div id="feuille-appareils" class="feuille" hidden>
-    <div class="feuille-contenu">
-      <div class="feuille-titre" data-t="Sur quel appareil ?">Sur quel appareil ?</div>
-      <div id="liste-appareils"></div>
-      <button class="lien" data-ferme data-t="Fermer">Fermer</button>
-    </div>
-  </div>
-
-  <!-- À faire -->
-  <div id="feuille-afaire" class="feuille" hidden>
-    <div class="feuille-contenu">
-      <div class="feuille-titre" data-t="À faire">À faire</div>
-      <form id="form-afaire" class="ajout">
-        <input id="afaire-titre" autocomplete="off" data-ph="Nouvelle tâche…" placeholder="Nouvelle tâche…" />
-        <button type="submit" class="envoyer" aria-label="Ajouter">＋</button>
-      </form>
-      <div id="liste-afaire"></div>
-      <p class="petit" data-t="Touche une tâche pour la passer à l'étape suivante. Même ordinateur éteint, tu peux écrire « ajoute du pain à ma liste ».">Touche une tâche pour la passer à l'étape suivante. Même ordinateur éteint, tu peux écrire « ajoute du pain à ma liste ».</p>
-      <button class="lien" data-ferme data-t="Fermer">Fermer</button>
-    </div>
-  </div>
-
-  <!-- Tickets -->
-  <div id="feuille-tickets" class="feuille" hidden>
-    <div class="feuille-contenu">
-      <div class="feuille-titre" data-t="Tickets">Tickets</div>
-      <form id="form-ticket" class="pile">
-        <select id="ticket-genre">
-          <option value="bug" data-t="Bug">Bug</option><option value="amelioration" data-t="Amélioration">Amélioration</option>
-          <option value="idee" data-t="Idée">Idée</option><option value="question" data-t="Question">Question</option>
-        </select>
-        <input id="ticket-titre" autocomplete="off" data-ph="Titre" placeholder="Titre" />
-        <textarea id="ticket-description" rows="3" data-ph="Détails…" placeholder="Détails…"></textarea>
-        <button type="submit" class="principal" data-t="Envoyer au développeur">Envoyer au développeur</button>
-      </form>
-      <div id="liste-tickets"></div>
-      <button class="lien" data-ferme data-t="Fermer">Fermer</button>
-    </div>
-  </div>
-
-  <!-- Réglages -->
-  <div id="feuille-reglages" class="feuille" hidden>
-    <div class="feuille-contenu">
-      <div class="feuille-titre" data-t="Réglages">Réglages</div>
-      <p class="petit" id="compte-info"></p>
-      <label class="ligne"><span data-t="Réponses à voix haute">Réponses à voix haute</span><input type="checkbox" id="opt-voix" /></label>
-      <label class="ligne"><span data-t="Langue">Langue</span>
-        <select id="opt-langue"><option value="fr">Français</option><option value="en">English</option></select></label>
-      <button class="secondaire" id="btn-effacer" data-t="Effacer l'historique">Effacer l'historique</button>
-      <button class="danger" id="btn-deconnexion" data-t="Se déconnecter">Se déconnecter</button>
-      <button class="lien" data-ferme data-t="Fermer">Fermer</button>
-    </div>
-  </div>
-
-  <script src="config.js"></script>
-  <script src="scrypt.js"></script>
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#04090f" />
+    <meta name="robots" content="noindex" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Wesley" />
+    <title>Wesley</title>
+    <link rel="manifest" href="/mobile/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/mobile/icone-180.png" />
+    <link rel="icon" href="/mobile/icone-192.png" />
+    <script type="module" crossorigin src="/mobile/app/index-DaocB7xT.js"></script>
+    <link rel="stylesheet" crossorigin href="/mobile/app/index-CL0HLa4J.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- clé d'appli du serveur de comptes (servie seulement aux téléphones) -->
+    <script src="/mobile/config.js"></script>
+  </body>
 </html>

@@ -31,7 +31,7 @@ import {
   JOURS,
 } from "./donnees";
 import { nomTelephone } from "./stockage";
-import type { Automatisation } from "./types";
+import type { Automatisation, Connecteurs } from "./types";
 
 export type Contexte = { surEtat: (s: string) => void; signal?: AbortSignal };
 type Params = Record<string, { type: "string" | "integer" | "boolean" | "number"; description: string; enum?: string[] }>;
@@ -596,10 +596,29 @@ export async function executerOutil(nom: string, args: Record<string, unknown>, 
   }
 }
 
+const NOMS_TYPES: Record<string, string> = {
+  mail: "Messagerie (IMAP)",
+  gmail: "Gmail",
+  agenda: "Agenda",
+  github: "GitHub",
+  notion: "Notion",
+  mcp: "Serveur MCP",
+  ssh: "Serveur SSH",
+  whatsapp: "WhatsApp",
+};
+/** Nom lisible d'un connecteur : « Gmail · moi@gmail.com », « Serveur SSH · vps.exemple.fr ». */
+export function etiquetteConnecteur(c: Connecteurs[string]) {
+  const conf = c.conf || {};
+  const detail = ["nom", "email", "adresse", "utilisateur", "hote", "url"].map((k) => conf[k]).find((v) => typeof v === "string" && v);
+  return `${NOMS_TYPES[c.type] || c.type}${detail ? ` · ${detail}` : ""}`;
+}
+
 /** Les services connectés (connecteurs des ordinateurs), pour le prompt. */
 export function servicesTexte() {
   const d = useDonnees.getState();
-  const lignes = Object.entries(d.connecteurs).map(([cid, c]) => `- ${c.nom || c.type} (${c.type}, ${cid})${c.type === "github" && jetonGitHub() ? " — direct depuis le téléphone (github_*)" : " — via utiliser_service"}`);
+  const lignes = Object.entries(d.connecteurs)
+    .filter(([, c]) => c.actif !== false)
+    .map(([cid, c]) => `- ${etiquetteConnecteur(c)} (${cid})${c.type === "github" && jetonGitHub() ? " — direct depuis le téléphone (github_*)" : " — via utiliser_service"}`);
   const routines = d.automatisations.filter((r) => r.actif && r.declencheur.type === "commande");
   if (routines.length) lignes.push(`- Routines (lancer_routine) : ${routines.map((r) => `« ${r.declencheur.phrase || r.nom} »`).join(", ")}`);
   const autres = d.automatisations.filter((r) => r.actif && r.declencheur.type !== "commande").length;

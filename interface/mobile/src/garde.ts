@@ -8,7 +8,7 @@ export function estTelephone(): boolean {
   const ua = navigator.userAgent;
   const uaTel = /iPhone|iPod|Android.+Mobile|Mobile.+Android|Windows Phone|IEMobile|Opera Mini|Mobile Safari/i.test(ua);
   const indice = (navigator as any).userAgentData?.mobile as boolean | undefined;
-  const tactile = navigator.maxTouchPoints > 0 && matchMedia("(pointer: coarse)").matches;
+  const tactile = (navigator.maxTouchPoints > 0 || "ontouchstart" in window) && matchMedia("(pointer: coarse)").matches;
   const sansSouris = !matchMedia("(any-pointer: fine)").matches || matchMedia("(hover: none)").matches;
   const petit = Math.min(screen.width, screen.height) <= 600;
   if (indice === false && !/iPhone|iPod/.test(ua)) return false;
