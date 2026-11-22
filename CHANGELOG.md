@@ -3,6 +3,13 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 2.1.0
+- **Wesley sur ton téléphone, en vrai** : ouvre https://wesley.abdelrahimriche.com/mobile/ sur ton iPhone ou ton téléphone Android, connecte-toi avec ton compte et ajoute-le à l'écran d'accueil. Ce n'est plus une simple télécommande : Wesley tourne sur le téléphone lui-même, avec la même IA que sur ton ordinateur (Claude, OpenAI, Gemini, Mistral…, la clé de ton compte suffit), ta mémoire, ta liste À faire, tes automatisations, tes tickets et ton historique. Tu lui parles (micro du téléphone) et il te répond à voix haute. / **Wesley really runs on your phone**: same AI, memory, to-dos, automations, tickets and history as on your computer, by voice.
+  - **Ce que le téléphone ne sait pas faire, ton ordinateur le fait** : ouvrir une appli, la souris et le clavier, tes fichiers, tes mails, ton agenda, SSH, les sites appris, les tâches de code avec Claude Code… Wesley passe tout seul par ton ordinateur allumé (demande chiffrée, comme avant). Avec Ollama, c'est ton ordinateur qui réfléchit pour le téléphone. / What the phone can't do, your computer does for it.
+  - **Rappels** sur le téléphone (notification et voix), **liens** (appel, SMS, mail, itinéraire), **partage**, **position**, **fichiers** dans les deux sens entre le téléphone et tes ordinateurs. / Reminders, links, sharing, location and file transfer on the phone.
+  - **Depuis ton ordinateur, « sur mon téléphone, ajoute… »** : ton téléphone reçoit la demande et l'exécute (avec ta confirmation à l'écran, réglable). / Your computer can now send requests to your phone.
+  - **Réservé aux téléphones** : la page refuse de s'ouvrir dans le navigateur d'un ordinateur ou d'une tablette. Sur ordinateur, c'est l'appli de bureau. / **Phones only**: the page won't open in a computer's browser.
+
 ## 2.0.1
 - **Mises à jour sans être connecté** : sur l'écran de connexion, le bouton « Mises à jour » permet d'installer une nouvelle version de Wesley sans te connecter d'abord (utile si une mise à jour corrige justement la connexion). / **Update without signing in**: an "Updates" button on the sign-in screen.
 - **Bouton « Recharger »** : en haut de l'appli (⟳) et sur l'écran de connexion, il recharge l'interface si l'affichage se bloque. / **Reload button** at the top of the app and on the sign-in screen.
