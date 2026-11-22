@@ -3,12 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { parler } from "../audio/tts";
 import { api } from "../lib/api";
 import { t } from "../lib/i18n";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { Bouton } from "./ui";
 
 type Demande = { id: string; titre: string; detail: string; saisie?: boolean };
 
-/** Jarvis demande l'accord avant une action sensible (ex : commande qui modifie un serveur). */
+/** Wesley demande l'accord avant une action sensible (ex : commande qui modifie un serveur). */
 export function Confirmations() {
   const [liste, setListe] = useState<Demande[]>([]);
   const annoncees = useRef(new Set<string>());
@@ -41,7 +41,7 @@ export function Confirmations() {
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
       <div className="w-[min(560px,100%)] rounded-xl border border-ambre/60 bg-surface-2 p-5 shadow-glow">
         <div className="mb-2 flex items-center gap-2 font-semibold text-ambre">
-          <ShieldAlert className="size-5" /> {d.saisie ? t("Jarvis a besoin d'une information") : t("Jarvis demande ton accord")}
+          <ShieldAlert className="size-5" /> {d.saisie ? t("Wesley a besoin d'une information") : t("Wesley demande ton accord")}
         </div>
         <p className="text-sm">{d.titre}</p>
         {d.saisie && (

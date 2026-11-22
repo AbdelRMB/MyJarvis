@@ -6,7 +6,7 @@
 import { EN } from "./en";
 
 export type Langue = "fr" | "en";
-const CLE = "jarvis-langue";
+const CLE = "wesley-langue";
 
 function lire(): Langue {
   try {

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ouvrirLien } from "../lib/liens";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
-import { useJarvis } from "../stores/jarvis";
+import { useWesley } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 import { Bouton, Champ } from "./ui";
 
@@ -41,7 +41,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
       if (r.import && !r.import.erreur && (r.import.faits || r.import.lignes))
         toast(`Mémoire de cet appareil ajoutée à ton compte : ${r.import.faits} souvenir(s), ${r.import.lignes} ligne(s) d'historique.`, "succes");
       else if (r.import?.erreur) toast(`Import de la mémoire de cet appareil : ${r.import.erreur}`, "erreur");
-      useJarvis.setState((s) => ({ session: s.session ? { ...s.session, nom: r.prenom || s.session.nom } : s.session }));
+      useWesley.setState((s) => ({ session: s.session ? { ...s.session, nom: r.prenom || s.session.nom } : s.session }));
       onConnecte(r);
     } catch (x) {
       toast((x as Error).message, "erreur");
@@ -73,7 +73,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
               </button>
             ))}
           </div>
-          <h1 className="mb-2 text-center font-display text-2xl font-black tracking-[0.35em] text-hud">{t("J.A.R.V.I.S.")}</h1>
+          <h1 className="mb-2 text-center font-display text-2xl font-black tracking-[0.35em] text-hud">{t("Wesley")}</h1>
           <p className="mb-6 text-center text-sm text-doux">{t("Où veux-tu garder ta mémoire, tes réglages et tes clés ?")}</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <button
@@ -83,7 +83,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
               <Cloud className="mb-3 size-7 text-hud" />
               <div className="font-semibold">{t("En ligne, avec un compte")}</div>
               <p className="mt-2 text-[13px] leading-relaxed text-doux">
-                {t("Ta mémoire, ton historique, tes connecteurs et tes clés te suivent sur tous tes appareils : connecte-toi sur un autre ordinateur et Jarvis te connaît déjà. Tes clés et mots de passe sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.")}
+                {t("Ta mémoire, ton historique, tes connecteurs et tes clés te suivent sur tous tes appareils : connecte-toi sur un autre ordinateur et Wesley te connaît déjà. Tes clés et mots de passe sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.")}
               </p>
             </button>
             <button
@@ -93,7 +93,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
               <HardDrive className="mb-3 size-7 text-hud" />
               <div className="font-semibold">{t("En local, sur cet appareil")}</div>
               <p className="mt-2 text-[13px] leading-relaxed text-doux">
-                {t("Pas de compte, rien n'est envoyé à un serveur : tout reste sur cet ordinateur. Mais aucune récupération ailleurs : sur un autre appareil, ce sera un nouveau Jarvis qui ne sait rien de toi. Tu pourras passer en ligne plus tard (Réglages › Application) et tout envoyer dans ton compte.")}
+                {t("Pas de compte, rien n'est envoyé à un serveur : tout reste sur cet ordinateur. Mais aucune récupération ailleurs : sur un autre appareil, ce sera un nouveau Wesley qui ne sait rien de toi. Tu pourras passer en ligne plus tard (Réglages › Application) et tout envoyer dans ton compte.")}
               </p>
             </button>
           </div>
@@ -104,7 +104,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
   return (
     <div className="grille-hud fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-fond p-4">
       <form onSubmit={valider} className="w-[min(420px,100%)] rounded-xl border border-ligne bg-surface-2/80 p-6 shadow-glow">
-        <h1 className="mb-1 text-center font-display text-2xl font-black tracking-[0.35em] text-hud">{t("J.A.R.V.I.S.")}</h1>
+        <h1 className="mb-1 text-center font-display text-2xl font-black tracking-[0.35em] text-hud">{t("Wesley")}</h1>
         <p className="mb-6 text-center text-sm text-doux">
           {inscription ? "Crée ton compte : ta mémoire te suit sur tous tes appareils." : "Connecte-toi pour retrouver ta mémoire."}
         </p>
@@ -159,7 +159,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
         {envoi && <p className="mt-3 text-center text-[12px] text-doux">{t("Chiffrement et récupération de ta mémoire…")}</p>}
         {choix && (
           <button type="button" onClick={() => setEtape("choix")} className="mt-4 w-full text-center text-[12px] text-doux hover:text-texte">
-            {t("← Utiliser Jarvis en local plutôt")}
+            {t("← Utiliser Wesley en local plutôt")}
           </button>
         )}
         <div className="mt-4 flex justify-center gap-4 text-[11px] text-tres-doux">

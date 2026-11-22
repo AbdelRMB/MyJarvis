@@ -38,14 +38,14 @@ export function VueArsenal() {
 
   const essayer = (o: Outil) => {
     maj({ vue: "assistant" });
-    setTimeout(() => window.dispatchEvent(new CustomEvent("jarvis:pre-remplir", { detail: `Utilise ${o.nom} pour ` })), 50);
+    setTimeout(() => window.dispatchEvent(new CustomEvent("wesley:pre-remplir", { detail: `Utilise ${o.nom} pour ` })), 50);
   };
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Arsenal")}
-        sousTitre={t("{n} outils que Jarvis peut utiliser sur ton PC, sans demander la permission.", { n: outils.length })}
+        sousTitre={t("{n} outils que Wesley peut utiliser sur ton PC, sans demander la permission.", { n: outils.length })}
         actions={
           <div className="relative w-64">
             <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-doux" />

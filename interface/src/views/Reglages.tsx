@@ -14,7 +14,7 @@ import { cx } from "../lib/format";
 import type { ConfigServeur } from "../lib/types";
 import { useOS } from "../lib/os";
 import { majAudio, useAudio } from "../stores/audio";
-import { bus, rescanner, useJarvis } from "../stores/jarvis";
+import { bus, rescanner, useWesley } from "../stores/wesley";
 import { DEFAUT, reglages, useReglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { rafraichirSysteme } from "../stores/systeme";
@@ -41,7 +41,7 @@ function dans(iso: string) {
   return j >= 1 ? t("expire dans {n} jour(s)", { n: j }) : t("expire dans {n} h", { n: Math.max(1, Math.floor(ms / 3600000)) });
 }
 
-/** Réglages › Code : les agents de code que Jarvis pilote dans les tâches de fond, et leur connexion. */
+/** Réglages › Code : les agents de code que Wesley pilote dans les tâches de fond, et leur connexion. */
 function OngletCode() {
   const [agents, setAgents] = useState<AgentCode[] | null>(null);
   const [action, setAction] = useState("");
@@ -110,12 +110,12 @@ function OngletCode() {
             {a.agent === "claude_code"
               ? t("Utilise ton compte Claude (abonnement Pro / Max) ou un compte de la console Anthropic.")
               : t("Utilise ton compte ChatGPT (Plus / Pro) ou une clé API OpenAI.")}{" "}
-            {t("Jarvis te prévient par une notification si la connexion expire ou ne marche plus.")}
+            {t("Wesley te prévient par une notification si la connexion expire ou ne marche plus.")}
           </p>
         </Panneau>
       ))}
-      <Panneau titre={t("Jarvis code lui-même")} icone={<Brain />}>
-        <p className="text-[13px] text-doux">{t("Sans agent externe : Jarvis code avec ses propres outils et le cerveau choisi dans l'onglet Cerveau (Claude, OpenAI, Gemini, Mistral, Ollama…). Rien à connecter.")}</p>
+      <Panneau titre={t("Wesley code lui-même")} icone={<Brain />}>
+        <p className="text-[13px] text-doux">{t("Sans agent externe : Wesley code avec ses propres outils et le cerveau choisi dans l'onglet Cerveau (Claude, OpenAI, Gemini, Mistral, Ollama…). Rien à connecter.")}</p>
       </Panneau>
     </div>
   );
@@ -143,19 +143,19 @@ function PanneauHabitudes() {
       <div className="divide-y divide-ligne">
         <Interrupteur
           label={t("Briefing du matin")}
-          aide={t("Au premier échange de la journée (avant midi), Jarvis te résume ta liste À faire, tes mails importants, ton agenda, la météo et tes serveurs.")}
+          aide={t("Au premier échange de la journée (avant midi), Wesley te résume ta liste À faire, tes mails importants, ton agenda, la météo et tes serveurs.")}
           actif={h.briefing_matin}
           onChange={(v) => regler({ briefing_matin: v })}
         />
         <Interrupteur
           label={t("Conversation suivie")}
-          aide={t("Après une réponse à l'oral, Jarvis écoute ta suite quelques secondes : pas besoin de redire « Jarvis ».")}
+          aide={t("Après une réponse à l'oral, Wesley écoute ta suite quelques secondes : pas besoin de redire « Wesley ».")}
           actif={h.conversation_suivie}
           onChange={(v) => regler({ conversation_suivie: v })}
         />
         <Interrupteur
           label={t("Mises à jour automatiques")}
-          aide={t("Jarvis télécharge les nouvelles versions en arrière-plan et les installe au prochain démarrage.")}
+          aide={t("Wesley télécharge les nouvelles versions en arrière-plan et les installe au prochain démarrage.")}
           actif={h.maj_auto}
           onChange={(v) => regler({ maj_auto: v })}
         />
@@ -213,19 +213,19 @@ function OngletApplication() {
       <Panneau titre={t("Application")} icone={<AppWindow />}>
         {!e.appli && (
           <p className="mb-3 rounded border border-ambre/40 bg-ambre/5 p-3 text-[13px] text-ambre">
-            {t("Tu utilises Jarvis dans le navigateur. L'écoute de fond et la fenêtre qui s'ouvre toute seule fonctionnent avec l'application (Jarvis installé, ou lanceur.pyw).")}
+            {t("Tu utilises Wesley dans le navigateur. L'écoute de fond et la fenêtre qui s'ouvre toute seule fonctionnent avec l'application (Wesley installé, ou lanceur.pyw).")}
           </p>
         )}
         <div className="divide-y divide-ligne">
           <Interrupteur
-            label={t("Lancer Jarvis {quand}", { quand: os.demarrage })}
+            label={t("Lancer Wesley {quand}", { quand: os.demarrage })}
             aide={t("Il démarre caché (icône {zone}) et attend que tu l'appelles.", { zone: os.zoneIcone })}
             actif={e.demarrage_auto}
             onChange={(v) => regler({ demarrage_auto: v })}
           />
           <Interrupteur
-            label={t("Écoute « Jarvis » en arrière-plan")}
-            aide={t("Même fenêtre fermée : dis « Jarvis, ouvre Discord » d'une traite, ou « Jarvis » puis ta demande. Tout est analysé sur ton PC : rien n'est envoyé tant qu'il n'a pas reconnu son nom.")}
+            label={t("Écoute « Wesley » en arrière-plan")}
+            aide={t("Même fenêtre fermée : dis « Wesley, ouvre Discord » d'une traite, ou « Wesley » puis ta demande. Tout est analysé sur ton PC : rien n'est envoyé tant qu'il n'a pas reconnu son nom.")}
             actif={e.ecoute_fond}
             onChange={(v) => regler({ ecoute_fond: v })}
           />
@@ -243,17 +243,17 @@ function OngletApplication() {
         <div className="mt-2 rounded-md border border-ligne bg-black/20 p-3 text-sm">
           {t("Raccourci pour l'appeler : ")}<kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{raccourci}</kbd>
           <br />
-          {t("Pour le faire taire : dis « Jarvis, stop », ou appuie sur ")}<kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{os.touches("<ctrl>+<alt>+s")}</kbd>{t(" (même fenêtre cachée).")}
-          <p className="mt-1 text-[13px] text-doux">Fermer la fenêtre la cache seulement. Pour quitter : clic sur l'icône Jarvis {os.zoneIcone}, puis « Quitter ».</p>
+          {t("Pour le faire taire : dis « Wesley, stop », ou appuie sur ")}<kbd className="ml-1 rounded border border-ligne-forte bg-surface-3 px-2 py-0.5 font-mono text-xs">{os.touches("<ctrl>+<alt>+s")}</kbd>{t(" (même fenêtre cachée).")}
+          <p className="mt-1 text-[13px] text-doux">Fermer la fenêtre la cache seulement. Pour quitter : clic sur l'icône Wesley {os.zoneIcone}, puis « Quitter ».</p>
         </div>
       </Panneau>
       {compte?.mode === "local" ? (
-        <Panneau titre={t("Jarvis en local")} icone={<Cloud />}>
+        <Panneau titre={t("Wesley en local")} icone={<Cloud />}>
           <p className="text-[13px] leading-relaxed text-doux">
-            {t("Tout reste sur cet ordinateur : mémoire, historique, connecteurs, clés. Rien n'est envoyé à un serveur. Mais il n'y a pas de récupération ailleurs : sur un autre appareil, ce sera un nouveau Jarvis qui ne sait rien de toi.")}
+            {t("Tout reste sur cet ordinateur : mémoire, historique, connecteurs, clés. Rien n'est envoyé à un serveur. Mais il n'y a pas de récupération ailleurs : sur un autre appareil, ce sera un nouveau Wesley qui ne sait rien de toi.")}
           </p>
           <p className="mt-3 text-[13px] leading-relaxed text-doux">
-            {t("En passant en ligne, tu crées ton compte (ou tu te connectes) et Jarvis y envoie toute sa mémoire, ses réglages, tes connecteurs et tes clés (chiffrées avec ton mot de passe).")}
+            {t("En passant en ligne, tu crées ton compte (ou tu te connectes) et Wesley y envoie toute sa mémoire, ses réglages, tes connecteurs et tes clés (chiffrées avec ton mot de passe).")}
           </p>
           <Bouton className="mt-4" variante="primaire" icone={<Cloud />} chargement={action === "changer_mode"} onClick={() => agir("changer_mode")}>
             {t("Passer en ligne")}
@@ -268,7 +268,7 @@ function OngletApplication() {
           {t("Cet appareil : ")}<span className="font-mono text-hud">{e.machine}</span>
         </p>
         <p className="mt-3 text-[13px] leading-relaxed text-doux">
-          {t("Tes souvenirs, l'historique des conversations, tes connecteurs et tes réglages sont rangés dans ton compte : connecte-toi sur n'importe quel appareil et Jarvis se souvient des mêmes choses. Ta clé API et les mots de passe des connecteurs y sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.")}
+          {t("Tes souvenirs, l'historique des conversations, tes connecteurs et tes réglages sont rangés dans ton compte : connecte-toi sur n'importe quel appareil et Wesley se souvient des mêmes choses. Ta clé API et les mots de passe des connecteurs y sont chiffrés avec ton mot de passe : le serveur ne peut pas les lire.")}
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Bouton icone={<Cloud />} chargement={action === "importer"} onClick={() => agir("importer")}>
@@ -450,7 +450,7 @@ function OngletMicro() {
           pas={0.001}
           affichage={r.seuil === 0 ? "0 · auto" : (r.seuil * 100).toFixed(1)}
           onChange={(v) => r.maj({ seuil: v })}
-          aide={t("À 0, pas de seuil fixe : Jarvis s'adapte au bruit de ta pièce et capte même une voix faible.")}
+          aide={t("À 0, pas de seuil fixe : Wesley s'adapte au bruit de ta pièce et capte même une voix faible.")}
         />
         <Curseur
           label={t("Silence avant envoi")}
@@ -463,7 +463,7 @@ function OngletMicro() {
             r.maj({ silence: v });
             api("/api/appli", { method: "POST", json: { silence_fin: v / 1000 } }).catch(() => {});
           }}
-          aide={t("Jarvis t'écoute jusqu'au bout, pauses comprises : il n'envoie ta demande qu'après ce temps de silence. Vaut aussi pour « Jarvis, … » fenêtre fermée.")}
+          aide={t("Wesley t'écoute jusqu'au bout, pauses comprises : il n'envoie ta demande qu'après ce temps de silence. Vaut aussi pour « Wesley, … » fenêtre fermée.")}
         />
       </Panneau>
       <div className="space-y-4">
@@ -472,7 +472,7 @@ function OngletMicro() {
             <Interrupteur label={t("Suppression du bruit")} aide={t("Filtre les bruits de fond (ventilos, clavier)")} actif={r.bruit} onChange={(v) => { r.maj({ bruit: v }); redemarrer(); }} />
             <Interrupteur label={t("Annulation d'écho")} aide={t("Indispensable si tu es sur haut-parleurs")} actif={r.echo} onChange={(v) => { r.maj({ echo: v }); redemarrer(); }} />
             <Interrupteur label={t("Gain automatique")} aide={t("Le navigateur ajuste le volume tout seul")} actif={r.agc} onChange={(v) => { r.maj({ agc: v }); redemarrer(); }} />
-            <Interrupteur label={t("Sourdine pendant que Jarvis parle")} aide={t("Évite qu'il s'écoute lui-même en mode mains libres")} actif={r.sourdine} onChange={(v) => r.maj({ sourdine: v })} />
+            <Interrupteur label={t("Sourdine pendant que Wesley parle")} aide={t("Évite qu'il s'écoute lui-même en mode mains libres")} actif={r.sourdine} onChange={(v) => r.maj({ sourdine: v })} />
           </div>
         </Panneau>
         <Panneau titre={t("Test")}>
@@ -532,7 +532,7 @@ function PanneauKyutai({ voix }: { voix: { id: string; nom: string }[] }) {
         <div className="h-1.5 overflow-hidden rounded bg-surface-3">
           <div className="h-full bg-hud transition-all" style={{ width: `${k.pct}%` }} />
         </div>
-        <p className="mt-2 text-[12px] text-doux">{t("Tu peux continuer à utiliser Jarvis pendant ce temps.")}</p>
+        <p className="mt-2 text-[12px] text-doux">{t("Tu peux continuer à utiliser Wesley pendant ce temps.")}</p>
       </div>
     );
   if (!k.installe)
@@ -566,7 +566,7 @@ function PanneauKyutai({ voix }: { voix: { id: string; nom: string }[] }) {
 function OngletVoix() {
   const r = useReglages();
   const voixNav = useAudio((s) => s.voix);
-  const nom = useJarvis((s) => s.session?.nom ?? "");
+  const nom = useWesley((s) => s.session?.nom ?? "");
   const [voixServeur, setVoixServeur] = useState<VoixServeur>({ edge: [], piper: [] });
   useEffect(() => {
     chargerVoix();
@@ -575,8 +575,8 @@ function OngletVoix() {
   const tester = () => parler(t("Bonjour {nom}. Que puis-je faire pour vous ?", { nom }), true);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panneau titre={t("Voix de Jarvis")} icone={<Volume2 />}>
-        <Interrupteur label={t("Réponses vocales")} aide={t("Jarvis lit ses réponses à voix haute, phrase par phrase, pendant qu'il les écrit")} actif={r.tts} onChange={(v) => r.maj({ tts: v })} />
+      <Panneau titre={t("Voix de Wesley")} icone={<Volume2 />}>
+        <Interrupteur label={t("Réponses vocales")} aide={t("Wesley lit ses réponses à voix haute, phrase par phrase, pendant qu'il les écrit")} actif={r.tts} onChange={(v) => r.maj({ tts: v })} />
         <Selecteur
           label={t("Moteur")}
           valeur={r.ttsMoteur}
@@ -591,7 +591,7 @@ function OngletVoix() {
             r.ttsMoteur === "kyutai"
               ? t("Modèle du labo français Kyutai, sur ton ordinateur : très naturel, rien n'est envoyé. Le débit ne s'applique pas à cette voix.")
               : r.ttsMoteur === "edge"
-              ? "Le plus naturel. Le texte des réponses est envoyé à Microsoft pour être lu. Sans Internet, Jarvis bascule tout seul sur Piper."
+              ? "Le plus naturel. Le texte des réponses est envoyé à Microsoft pour être lu. Sans Internet, Wesley bascule tout seul sur Piper."
               : r.ttsMoteur === "piper"
                 ? "Rien ne sort de ton PC. Un peu moins expressif que Microsoft."
                 : "Voix intégrées à Windows / au navigateur. Dépanne, mais sonne robotique."
@@ -646,7 +646,7 @@ function OngletVoix() {
           }}
         />
         <p className="mt-2 text-[13px] text-doux">
-          {t("La reconnaissance vocale (Whisper) tourne en local sur ton PC et se charge au démarrage de Jarvis. Sa précision se règle dans l'onglet Cerveau.")}
+          {t("La reconnaissance vocale (Whisper) tourne en local sur ton PC et se charge au démarrage de Wesley. Sa précision se règle dans l'onglet Cerveau.")}
         </p>
       </Panneau>
     </div>
@@ -678,7 +678,7 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
     try {
       await api("/api/claude/cle", { method: "POST", json: { cle } });
       setCle("");
-      toast(t("Clé enregistrée dans le fichier .env de Jarvis."), "succes");
+      toast(t("Clé enregistrée dans le fichier .env de Wesley."), "succes");
       charger();
     } catch (e) {
       toast((e as Error).message, "erreur");
@@ -723,7 +723,7 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
             {t("Enregistrer")}
           </Bouton>
         </div>
-        <p className="mt-1 text-[13px] text-doux">{t("Stockée uniquement dans le fichier .env de Jarvis, sur ton PC.")}</p>
+        <p className="mt-1 text-[13px] text-doux">{t("Stockée uniquement dans le fichier .env de Wesley, sur ton PC.")}</p>
       </div>
       <Selecteur
         label={t("Modèle")}
@@ -746,7 +746,7 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
       />
       <Interrupteur
         label={t("Conseiller Opus")}
-        aide={t("Avec Sonnet, Jarvis demande l'avis du modèle Opus (plus puissant) avant une décision difficile ou un plan complexe. Un peu plus cher, seulement quand c'est utile.")}
+        aide={t("Avec Sonnet, Wesley demande l'avis du modèle Opus (plus puissant) avant une décision difficile ou un plan complexe. Un peu plus cher, seulement quand c'est utile.")}
         actif={cfg.conseiller !== false}
         onChange={(v) => enregistrer({ conseiller: v })}
       />
@@ -781,7 +781,7 @@ function ReglagesClaude({ cfg, enregistrer }: { cfg: ConfigServeur; enregistrer:
   );
 }
 
-/** IA proposée comme cerveau (catalogue de jarvis/fournisseurs.py). */
+/** IA proposée comme cerveau (catalogue de wesley/fournisseurs.py). */
 export type IA = { id: string; nom: string; detail: string; cle_ou: string; cle: boolean; local: boolean; perso: boolean };
 
 /** Réglages d'une IA compatible OpenAI : clé API (gardée dans .env + coffre chiffré du compte), adresse (« Autre »),
@@ -934,7 +934,7 @@ function PanneauCerveau({
   const carte = (i: IA) => <CarteCerveau key={i.id} actif={cfg.cerveau === i.id} titre={t(i.nom)} detail={t(i.detail)} onClick={() => choisir(i.id)} />;
   return (
     <Panneau titre={t("Cerveau")} icone={<Brain />}>
-      <div role="radiogroup" aria-label={t("Cerveau de Jarvis")} className="mb-4 space-y-3">
+      <div role="radiogroup" aria-label={t("Cerveau de Wesley")} className="mb-4 space-y-3">
         <p className="titre-hud text-[10px] text-tres-doux">{t("Dans le cloud (avec une clé API)")}</p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
           <CarteCerveau
@@ -1092,7 +1092,7 @@ function OngletCerveau() {
   );
 }
 
-/** Langue de Jarvis : textes de l'interface, réponses, reconnaissance vocale, voix et annonces. */
+/** Langue de Wesley : textes de l'interface, réponses, reconnaissance vocale, voix et annonces. */
 export async function choisirLangue(l: Langue) {
   changerLangue(l);
   const r = reglages();
@@ -1112,14 +1112,14 @@ function OngletInterface() {
     <div className="grid gap-4 lg:grid-cols-2">
       <Panneau titre="Langue / Language" icone={<Monitor />}>
         <Selecteur
-          label="Jarvis"
+          label="Wesley"
           valeur={LANGUE}
           options={[
             { valeur: "fr", libelle: "Français" },
             { valeur: "en", libelle: "English" },
           ]}
           onChange={(v) => choisirLangue(v as Langue)}
-          aide={t("Textes de l'interface, réponses de Jarvis, reconnaissance vocale, voix et annonces.")}
+          aide={t("Textes de l'interface, réponses de Wesley, reconnaissance vocale, voix et annonces.")}
         />
       </Panneau>
       <Panneau titre={t("Interface")} icone={<Monitor />}>
@@ -1136,7 +1136,7 @@ function OngletInterface() {
             { valeur: "aucunes", libelle: t("Désactivées — le plus rapide") },
           ]}
           onChange={(v) => r.maj({ animations: v as typeof r.animations })}
-          aide={t("La carte graphique est partagée avec le modèle d'IA. Les animations complètes peuvent rendre Jarvis beaucoup plus lent quand la VRAM est presque pleine (jeux, LDPlayer, Wallpaper Engine…).")}
+          aide={t("La carte graphique est partagée avec le modèle d'IA. Les animations complètes peuvent rendre Wesley beaucoup plus lent quand la VRAM est presque pleine (jeux, LDPlayer, Wallpaper Engine…).")}
         />
         <Bouton
           variante="danger"
@@ -1178,7 +1178,7 @@ export function VueReglages() {
   const [onglet, setOnglet] = useState<Onglet>("micro");
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
-      <EnTetePage titre={t("Réglages")} sousTitre={t("Micro, voix et cerveau de Jarvis. Les réglages audio sont propres à ce navigateur.")} />
+      <EnTetePage titre={t("Réglages")} sousTitre={t("Micro, voix et cerveau de Wesley. Les réglages audio sont propres à ce navigateur.")} />
       <Onglets<Onglet>
         actif={onglet}
         onChange={setOnglet}

@@ -4,7 +4,7 @@
 # - publié depuis le Mac (./publier-mac.sh)  -> ce workflow fabrique le .exe Windows (~12 min de quota)
 # - publié depuis Windows (publier.bat)      -> ce workflow fabrique le .dmg Mac (~70 min de quota, runner x10)
 # Quota gratuit : 2000 min/mois. Lancement manuel possible : Actions > Run workflow.
-name: Versions de Jarvis
+name: Versions de Wesley
 
 on:
   workflow_dispatch:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v4
       - id: v
         run: |
-          V=$(grep -E '^VERSION = ' jarvis/version.py | cut -d'"' -f2)
+          V=$(grep -E '^VERSION = ' wesley/version.py | cut -d'"' -f2)
           grep -qE "^## $V\b" CHANGELOG.md || { echo "::error::CHANGELOG.md n'a pas de section « ## $V » (description obligatoire)"; exit 1; }
           echo "version=$V" >> "$GITHUB_OUTPUT"
 
@@ -44,7 +44,7 @@ jobs:
         with: { python-version: "3.12", cache: pip, cache-dependency-path: "requirements*.txt" }
       - uses: actions/setup-node@v4
         with: { node-version: "22", cache: npm, cache-dependency-path: interface/package-lock.json }
-      - name: Construire et publier JarvisSetup.exe
+      - name: Construire et publier WesleySetup.exe
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -55,13 +55,17 @@ jobs:
           .venv\Scripts\python -m pip install -q -r requirements.txt -r requirements-voix.txt
           Push-Location interface; npm ci; npm run build; Pop-Location
           if (-not (Test-Path voix\fr_FR-tom-medium.onnx)) { .venv\Scripts\python -m piper.download_voices fr_FR-tom-medium --data-dir voix }
+          # modèles communs d'openWakeWord (servent au détecteur eveil/hey_wesley.onnx s'il existe)
           .venv\Scripts\python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
-          .venv\Scripts\pyinstaller jarvis.spec --noconfirm --log-level WARN
+          .venv\Scripts\pyinstaller wesley.spec --noconfirm --log-level WARN
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
           & $iscc /Q "/DVersion=${{ needs.version.outputs.version }}" installateur.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          .venv\Scripts\python publier.py "installateur\JarvisSetup-${{ needs.version.outputs.version }}.exe"
+          # copie sous l'ancien nom : la mise à jour automatique des PC encore en version Jarvis cherche JarvisSetup-x.y.z.exe
+          $v = "${{ needs.version.outputs.version }}"
+          Copy-Item "installateur\WesleySetup-$v.exe" "installateur\JarvisSetup-$v.exe"
+          .venv\Scripts\python publier.py "installateur\WesleySetup-$v.exe" "installateur\JarvisSetup-$v.exe"
 
   mac:
     needs: version
@@ -82,7 +86,7 @@ jobs:
           CERT_MDP: ${{ secrets.APPLE_CERT_MDP }}
         run: |
           if [ -z "$CERT_P12" ]; then echo "Pas de certificat dans les secrets : signature ad hoc."; exit 0; fi
-          TROUSSEAU="$RUNNER_TEMP/jarvis.keychain-db"
+          TROUSSEAU="$RUNNER_TEMP/wesley.keychain-db"
           MDP=$(openssl rand -hex 16)
           security create-keychain -p "$MDP" "$TROUSSEAU"
           security set-keychain-settings -lut 21600 "$TROUSSEAU"
@@ -102,7 +106,9 @@ jobs:
           APPLE_EQUIPE: ${{ secrets.APPLE_EQUIPE }}
         run: |
           bash construire-mac.sh
-          .venv-mac/bin/python publier.py "installateur/Jarvis-${{ needs.version.outputs.version }}-mac-$(uname -m).dmg"
+          # + la même appli sous l'ancien nom (Jarvis-…dmg, faite par construire-mac.sh) pour les Mac encore en version Jarvis
+          V="${{ needs.version.outputs.version }}"
+          .venv-mac/bin/python publier.py "installateur/Wesley-$V-mac-$(uname -m).dmg" "installateur/Jarvis-$V-mac-$(uname -m).dmg"
       - name: Retirer le certificat
         if: always()
-        run: security delete-keychain "$RUNNER_TEMP/jarvis.keychain-db" 2>/dev/null || true
+        run: security delete-keychain "$RUNNER_TEMP/wesley.keychain-db" 2>/dev/null || true

@@ -5,7 +5,7 @@ import { Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import type { Fait } from "../lib/types";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 const CATEGORIES = ["consigne", "identite", "preference", "projet", "contact", "habitude", "general", "lecon"];
@@ -17,7 +17,7 @@ const LIBELLES: Record<string, string> = {
   habitude: "Habitudes",
   general: "Général",
   lecon: "Leçons apprises",
-  consigne: "Consignes pour Jarvis",
+  consigne: "Consignes pour Wesley",
 };
 
 export function VueMemoire() {
@@ -123,7 +123,7 @@ export function VueMemoire() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Mémoire")}
-        sousTitre={t("{n} souvenirs sur toi — Jarvis les relit à chaque conversation.", { n: faits.length })}
+        sousTitre={t("{n} souvenirs sur toi — Wesley les relit à chaque conversation.", { n: faits.length })}
         actions={
           <div className="flex flex-wrap gap-2">
             <Bouton variante="fantome" icone={<RefreshCw className="size-4" />} chargement={actualisation} onClick={actualiser}>
@@ -146,7 +146,7 @@ export function VueMemoire() {
           value={nouveau}
           onChange={(e) => setNouveau(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && ajouter()}
-          placeholder={t("Apprendre quelque chose à Jarvis… (ex : je bosse surtout le soir)")}
+          placeholder={t("Apprendre quelque chose à Wesley… (ex : je bosse surtout le soir)")}
           className="min-w-[240px] flex-1"
         />
         <select
@@ -186,7 +186,7 @@ export function VueMemoire() {
       </div>
 
       {groupes.length === 0 ? (
-        <Vide icone={<Brain />} titre={faits.length ? "Aucun résultat" : "Mémoire vide"} texte={t("Jarvis mémorise tout seul ce qu'il apprend sur toi au fil des conversations.")} />
+        <Vide icone={<Brain />} titre={faits.length ? "Aucun résultat" : "Mémoire vide"} texte={t("Wesley mémorise tout seul ce qu'il apprend sur toi au fil des conversations.")} />
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
           {groupes.map(([c, fs]) => (

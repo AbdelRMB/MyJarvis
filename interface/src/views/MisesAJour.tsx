@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Markdown } from "../components/Markdown";
 import { Badge, Bouton, Champ, EnTetePage, Panneau } from "../components/ui";
 import { api } from "../lib/api";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Maj = { version: string; titre: string; description: string; date: string; disponible: boolean; taille: number };
@@ -23,7 +23,7 @@ export function VueMisesAJour() {
     try {
       const r = await api<Etat>("/api/majs");
       setE(r);
-      if (!r.erreur && r.majs.length === 0) toast(`Jarvis est à jour (version ${r.version}).`, "succes");
+      if (!r.erreur && r.majs.length === 0) toast(`Wesley est à jour (version ${r.version}).`, "succes");
     } catch (x) {
       toast((x as Error).message, "erreur");
     } finally {
@@ -52,7 +52,7 @@ export function VueMisesAJour() {
   };
 
   const installer = async (version: string) => {
-    setProg({ etape: "telechargement", pct: 0, texte: t("Préparation de Jarvis {version}…", { version }) });
+    setProg({ etape: "telechargement", pct: 0, texte: t("Préparation de Wesley {version}…", { version }) });
     try {
       await api("/api/majs/installer", { method: "POST", json: { version } });
     } catch (x) {
@@ -103,19 +103,19 @@ export function VueMisesAJour() {
 
       {e?.prete && (
         <p className="mb-4 rounded-md border border-hud/40 bg-hud/5 p-3 text-sm text-hud">
-          {t("La version {v} est déjà téléchargée : elle s'installera toute seule au prochain démarrage de Jarvis.", { v: e.prete })}
+          {t("La version {v} est déjà téléchargée : elle s'installera toute seule au prochain démarrage de Wesley.", { v: e.prete })}
         </p>
       )}
       {e?.erreur && <p className="mb-4 rounded-md border border-rouge/40 bg-rouge/5 p-3 text-sm text-rouge">{e.erreur}</p>}
       {e && !e.installee && (
         <p className="mb-4 rounded-md border border-ambre/40 bg-ambre/5 p-3 text-sm text-ambre">
-          {t("Jarvis tourne depuis le code source : tu peux voir les versions ici, mais pour mettre à jour fais « git pull ».")}
+          {t("Wesley tourne depuis le code source : tu peux voir les versions ici, mais pour mettre à jour fais « git pull ».")}
         </p>
       )}
 
       {e && !e.erreur && e.majs.length === 0 && (
         <div className="flex items-center gap-3 rounded-md border border-vert/40 bg-vert/5 p-4 text-sm">
-          <CheckCircle2 className="size-5 text-vert" />{t(" Jarvis est à jour.")}
+          <CheckCircle2 className="size-5 text-vert" />{t(" Wesley est à jour.")}
         </div>
       )}
 
@@ -164,7 +164,7 @@ export function VueMisesAJour() {
             {e.journal.map((v) => (
               <details key={v.version} open={v.installee} className="rounded-md border border-ligne bg-surface/60 px-4 py-3">
                 <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-                  Jarvis {v.version}
+                  Wesley {v.version}
                   {v.date && <Badge ton="doux">{v.date}</Badge>}
                   {v.installee && <Badge ton="vert">{t("installée")}</Badge>}
                   {v.plus_recente && <Badge ton="hud">disponible</Badge>}

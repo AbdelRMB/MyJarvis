@@ -1,18 +1,18 @@
-/* Jarvis mobile : télécommande de tes ordinateurs (même compte).
- * - Connexion : la clé est dérivée du mot de passe SUR le téléphone (scrypt, mêmes réglages que Jarvis) ; le mot de
+/* Wesley mobile : télécommande de tes ordinateurs (même compte).
+ * - Connexion : la clé est dérivée du mot de passe SUR le téléphone (scrypt, mêmes réglages que Wesley) ; le mot de
  *   passe n'est jamais envoyé.
- * - Chaque demande est chiffrée (AES-GCM, clé du compte) puis relayée par le serveur au Jarvis de l'appareil choisi,
+ * - Chaque demande est chiffrée (AES-GCM, clé du compte) puis relayée par le serveur au Wesley de l'appareil choisi,
  *   qui l'exécute et renvoie la réponse chiffrée. Le serveur ne peut ni lire ni fabriquer une demande.
  */
 "use strict";
-const CLE_APPLI = window.JARVIS_CLE_APPLI || "";
-const STOCKAGE = "jarvis-mobile";
-const DEPOT = "AbdelRMB/MyJarvis";
+const CLE_APPLI = window.WESLEY_CLE_APPLI || window.JARVIS_CLE_APPLI || "";
+const STOCKAGE = "wesley-mobile";
+const DEPOT = "AbdelRMB/Wesley";
 const $ = (id) => document.getElementById(id);
 
 // ---------- langue ----------
 const EN = {
-  "Pilote ton Jarvis depuis ton téléphone.": "Control your Jarvis from your phone.",
+  "Pilote ton Wesley depuis ton téléphone.": "Control your Wesley from your phone.",
   "Adresse e-mail": "Email address", "Mot de passe": "Password", "Se connecter": "Sign in",
   "Ton mot de passe ne quitte pas ce téléphone : il sert à chiffrer tes demandes, que seuls tes ordinateurs peuvent lire.":
     "Your password never leaves this phone: it encrypts your requests, which only your computers can read.",
@@ -21,12 +21,12 @@ const EN = {
   "Effacer l'historique": "Clear history", "Se déconnecter": "Sign out", "Connexion…": "Signing in…",
   "E-mail ou mot de passe incorrect.": "Wrong email or password.", "en ligne": "online", "hors ligne": "offline",
   "occupé": "busy", "refuse les ordres": "refuses orders", "Aucun ordinateur connecté à ton compte.": "No computer signed in to your account.",
-  "Choisis un appareil": "Pick a device", "{nom} est hors ligne (éteint ou Jarvis fermé).": "{nom} is offline (off or Jarvis closed).",
+  "Choisis un appareil": "Pick a device", "{nom} est hors ligne (éteint ou Wesley fermé).": "{nom} is offline (off or Wesley closed).",
   "Envoi à {nom}…": "Sending to {nom}…", "{nom} travaille…": "{nom} is working…", "{nom} n'a pas répondu.": "{nom} didn't answer.",
   "Session expirée : reconnecte-toi.": "Session expired: sign in again.", "Mettre à jour vers {v}": "Update to {v}",
   "Mise à jour de {nom} lancée : il redémarre tout seul.": "{nom} update started: it restarts by itself.",
   "Que veux-tu que je fasse sur <b>{nom}</b> ?": "What should I do on <b>{nom}</b>?", "Connecté : {email}": "Signed in: {email}",
-  "Effacer l'historique de ce téléphone ?": "Clear this phone's history?", "Te déconnecter de Jarvis sur ce téléphone ?": "Sign out of Jarvis on this phone?",
+  "Effacer l'historique de ce téléphone ?": "Clear this phone's history?", "Te déconnecter de Wesley sur ce téléphone ?": "Sign out of Wesley on this phone?",
   "La reconnaissance vocale n'est pas disponible dans ce navigateur.": "Speech recognition isn't available in this browser.",
   "Je t'écoute…": "Listening…", "À faire": "To do", "Tickets": "Tickets", "Nouvelle tâche…": "New task…",
   "Touche une tâche pour la passer à l'étape suivante. Même ordinateur éteint, tu peux écrire « ajoute du pain à ma liste ».":
@@ -47,7 +47,8 @@ function traduire() {
 }
 
 // ---------- état local ----------
-function lire() { try { return JSON.parse(localStorage.getItem(STOCKAGE)) || {}; } catch { return {}; } }
+// « jarvis-mobile » : session enregistrée avant le renommage de l'appli (Jarvis -> Wesley), reprise une fois
+function lire() { try { return JSON.parse(localStorage.getItem(STOCKAGE) ?? localStorage.getItem("jarvis-mobile")) || {}; } catch { return {}; } }
 function ecrire(p) { const e = { ...lire(), ...p }; localStorage.setItem(STOCKAGE, JSON.stringify(e)); return e; }
 const b64 = (u8) => btoa(String.fromCharCode(...u8));
 const deb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -184,14 +185,14 @@ async function demander(texte) {
   // « ajoute du pain à ma liste » : directement dans la liste À faire du compte, même ordinateur éteint
   const m = texte.match(/^(?:ajoute|rajoute|mets|note|add|put)\s+(.+?)\s+(?:à|a|dans|sur|to|on)\s+(?:ma|la|my|the)\s+(?:liste|todo|to-do|list|liste (?:à|a) faire)\s*[.!]?$/i);
   if (m) {
-    ajouter("moi", texte, "Jarvis");
-    try { await ajouterTache(m[1]); ajouter("jarvis", t("Ajouté à ta liste : {t}", { t: m[1] }), "Jarvis"); }
-    catch (e) { if (e.message !== "401") ajouter("jarvis", e.message, "Jarvis", true); }
+    ajouter("moi", texte, "Wesley");
+    try { await ajouterTache(m[1]); ajouter("wesley", t("Ajouté à ta liste : {t}", { t: m[1] }), "Wesley"); }
+    catch (e) { if (e.message !== "401") ajouter("wesley", e.message, "Wesley", true); }
     return;
   }
   const a = appareilChoisi();
   if (!a) return;
-  if (!a.en_ligne) { ajouter("jarvis", t("{nom} est hors ligne (éteint ou Jarvis fermé).", { nom: a.nom }), a.nom, true); return; }
+  if (!a.en_ligne) { ajouter("wesley", t("{nom} est hors ligne (éteint ou Wesley fermé).", { nom: a.nom }), a.nom, true); return; }
   ajouter("moi", texte, a.nom);
   $("reacteur").classList.add("actif");
   const att = document.createElement("div"); att.className = "attente"; att.innerHTML = `<span class="points"><span></span><span></span><span></span></span>`;
@@ -199,10 +200,10 @@ async function demander(texte) {
   etat(t("Envoi à {nom}…", { nom: a.nom }));
   try {
     const r = await envoyerOrdre(a, { type: "demande", texte });
-    ajouter("jarvis", r.resultat || "OK", a.nom, !r.ok);
+    ajouter("wesley", r.resultat || "OK", a.nom, !r.ok);
     parler(r.resultat);
   } catch (e) {
-    if (e.message !== "401") ajouter("jarvis", e.message, a.nom, true);
+    if (e.message !== "401") ajouter("wesley", e.message, a.nom, true);
   } finally {
     att.remove(); etat(""); $("reacteur").classList.remove("actif");
   }
@@ -211,8 +212,8 @@ async function mettreAJour(a) {
   fermerFeuilles();
   try {
     const r = await envoyerOrdre(a, { type: "mettre_a_jour" });
-    ajouter("jarvis", r.resultat || t("Mise à jour de {nom} lancée : il redémarre tout seul.", { nom: a.nom }), a.nom, !r.ok);
-  } catch (e) { ajouter("jarvis", e.message, a.nom, true); } finally { etat(""); }
+    ajouter("wesley", r.resultat || t("Mise à jour de {nom} lancée : il redémarre tout seul.", { nom: a.nom }), a.nom, !r.ok);
+  } catch (e) { ajouter("wesley", e.message, a.nom, true); } finally { etat(""); }
 }
 
 // ---------- fil de discussion ----------
@@ -370,7 +371,7 @@ function init() {
   $("opt-langue").onchange = (e) => { langue = e.target.value; ecrire({ langue }); traduire(); dessinerFil(); };
   $("btn-effacer").onclick = () => { if (confirm(t("Effacer l'historique de ce téléphone ?"))) { ecrire({ historique: [] }); dessinerFil(); fermerFeuilles(); } };
   $("btn-deconnexion").onclick = async () => {
-    if (!confirm(t("Te déconnecter de Jarvis sur ce téléphone ?"))) return;
+    if (!confirm(t("Te déconnecter de Wesley sur ce téléphone ?"))) return;
     await api("POST", "/deconnexion").catch(() => {});
     deconnexionLocale();
   };

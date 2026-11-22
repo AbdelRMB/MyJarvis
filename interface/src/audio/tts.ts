@@ -1,5 +1,5 @@
 /**
- * Voix de Jarvis.
+ * Voix de Wesley.
  * La réponse est lue phrase par phrase PENDANT qu'elle s'écrit : dès qu'une phrase est complète,
  * elle part en synthèse (serveur : Microsoft neuronal ou Piper local) et joue dès qu'elle arrive,
  * pendant que les suivantes se préparent. Le navigateur sert de secours.
@@ -17,7 +17,7 @@ let tampon = "";
 let generation = 0;
 let enLecture = false;
 let enCours = "";
-/** Ce que Jarvis est en train de dire (et va dire) : sert à reconnaître l'écho de sa propre voix dans le micro. */
+/** Ce que Wesley est en train de dire (et va dire) : sert à reconnaître l'écho de sa propre voix dans le micro. */
 export const texteEnCours = () => [enCours, ...file.map((m) => m.texte)].join(" ");
 let lecteur: HTMLAudioElement | null = null;
 let analyseur: AnalyserNode | null = null;

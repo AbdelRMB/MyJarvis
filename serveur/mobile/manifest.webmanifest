@@ -1,7 +1,7 @@
 {
-  "name": "Jarvis",
-  "short_name": "Jarvis",
-  "description": "Pilote ton Jarvis depuis ton téléphone",
+  "name": "Wesley",
+  "short_name": "Wesley",
+  "description": "Pilote ton Wesley depuis ton téléphone",
   "start_url": "/mobile/",
   "scope": "/mobile/",
   "display": "standalone",

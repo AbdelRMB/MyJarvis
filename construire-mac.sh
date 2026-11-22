@@ -1,11 +1,11 @@
 #!/bin/bash
-# Construit Jarvis pour macOS : installateur/Jarvis-<version>-mac-<puce>.dmg
+# Construit Wesley pour macOS : installateur/Wesley-<version>-mac-<puce>.dmg
 # À lancer SUR UN MAC (Apple Silicon ou Intel), dans le dossier du projet :  ./construire-mac.sh
 # Prérequis : Python 3.12 (python.org ou « brew install python@3.12 ») et Node.js (« brew install node »).
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION=$(grep -E '^VERSION = ' jarvis/version.py | cut -d'"' -f2)
+VERSION=$(grep -E '^VERSION = ' wesley/version.py | cut -d'"' -f2)
 PUCE=$(uname -m)   # arm64 (Apple Silicon) ou x86_64 (Intel)
 PY=${PYTHON:-python3.12}
 command -v "$PY" >/dev/null || PY=python3
@@ -22,28 +22,32 @@ echo "[2/5] Interface..."
 echo "[3/5] Voix et détecteur (téléchargés une fois)..."
 mkdir -p voix
 [ -f voix/fr_FR-tom-medium.onnx ] || python -m piper.download_voices fr_FR-tom-medium --data-dir voix
+# modèles communs d'openWakeWord (spectrogramme, empreintes) : servent au détecteur eveil/hey_wesley.onnx s'il existe
 python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
 
 echo "[4/5] Application (PyInstaller, quelques minutes)..."
 # Construction HORS du Bureau : s'il est synchronisé par iCloud, iCloud ajoute des attributs aux fichiers pendant
-# la construction (signature refusée) et crée des copies « Jarvis 2.app ». Dossier non synchronisé :
-SORTIE="${JARVIS_BUILD:-$HOME/Library/Caches/jarvis-build}"
+# la construction (signature refusée) et crée des copies « Wesley 2.app ». Dossier non synchronisé :
+SORTIE="${WESLEY_BUILD:-$HOME/Library/Caches/wesley-build}"
 mkdir -p "$SORTIE"
-rm -rf "$SORTIE/build" "$SORTIE/dist" dist/Jarvis dist/Jarvis.app
-pyinstaller jarvis-mac.spec --noconfirm --log-level WARN --distpath "$SORTIE/dist" --workpath "$SORTIE/build"
-mkdir -p dist && ln -sfn "$SORTIE/dist/Jarvis.app" dist/Jarvis.app   # dist/Jarvis.app reste utilisable
-xattr -cr "$SORTIE/dist/Jarvis.app"   # retire les attributs Finder (sinon codesign refuse)
+rm -rf "$SORTIE/build" "$SORTIE/dist" dist/Wesley dist/Wesley.app
+pyinstaller wesley-mac.spec --noconfirm --log-level WARN --distpath "$SORTIE/dist" --workpath "$SORTIE/build"
+mkdir -p dist && ln -sfn "$SORTIE/dist/Wesley.app" dist/Wesley.app   # dist/Wesley.app reste utilisable
+xattr -cr "$SORTIE/dist/Wesley.app"   # retire les attributs Finder (sinon codesign refuse)
+# Pont pour les Mac où l'appli s'appelle encore Jarvis (avant la 2.0.0) : leur outil de mise à jour vérifie
+# Contents/MacOS/Jarvis. Ce lien (signé avec le reste) le satisfait ; l'exécutable réel reste Wesley.
+ln -sfn Wesley "$SORTIE/dist/Wesley.app/Contents/MacOS/Jarvis"
 # Signature STABLE : macOS rattache les autorisations (micro, écran, accessibilité…) à la signature.
 # Avec une signature « ad hoc », elle change à chaque version et macOS oublie tout ; avec un certificat
 # Apple (Developer ID ou Apple Development), les autorisations restent acquises après chaque mise à jour.
-# Choix : $JARVIS_SIGNATURE, sinon Developer ID Application, sinon Apple Development, sinon ad hoc.
-IDENTITE=${JARVIS_SIGNATURE:-$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application[^"]*"' | head -1 | tr -d '"' || true)}
+# Choix : $WESLEY_SIGNATURE, sinon Developer ID Application, sinon Apple Development, sinon ad hoc.
+IDENTITE=${WESLEY_SIGNATURE:-$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Developer ID Application[^"]*"' | head -1 | tr -d '"' || true)}
 [ -n "$IDENTITE" ] || IDENTITE=$(security find-identity -v -p codesigning 2>/dev/null | grep -o '"Apple Development[^"]*"' | head -1 | tr -d '"' || true)
 if [[ "$IDENTITE" == "Developer ID Application"* ]]; then
   # Distribution : runtime renforcé + horodatage (exigés par la notarisation Apple). On signe d'abord chaque
   # binaire intérieur (.so, .dylib, exécutables), puis les frameworks, puis l'appli elle-même.
   echo "    signature : $IDENTITE (runtime renforcé)"
-  APP="$SORTIE/dist/Jarvis.app"
+  APP="$SORTIE/dist/Wesley.app"
   SIGNER=(codesign --force --timestamp --options runtime --entitlements entitlements.plist --sign "$IDENTITE")
   find "$APP/Contents" -type f \( -perm -u+x -o -name "*.so" -o -name "*.dylib" \) -print0 |
     while IFS= read -r -d '' f; do
@@ -53,23 +57,30 @@ if [[ "$IDENTITE" == "Developer ID Application"* ]]; then
   "${SIGNER[@]}" "$APP"
 elif [ -n "$IDENTITE" ]; then
   echo "    signature : $IDENTITE"
-  codesign --force --deep --sign "$IDENTITE" --entitlements entitlements.plist "$SORTIE/dist/Jarvis.app"
+  codesign --force --deep --sign "$IDENTITE" --entitlements entitlements.plist "$SORTIE/dist/Wesley.app"
 else
   echo "    ! aucun certificat Apple : signature ad hoc (les autorisations seront redemandées à chaque version)"
-  codesign --force --deep --sign - --entitlements entitlements.plist "$SORTIE/dist/Jarvis.app"
+  codesign --force --deep --sign - --entitlements entitlements.plist "$SORTIE/dist/Wesley.app"
 fi
 
 echo "[5/5] Image disque..."
 mkdir -p installateur
-DMG="installateur/Jarvis-${VERSION}-mac-${PUCE}.dmg"
+DMG="installateur/Wesley-${VERSION}-mac-${PUCE}.dmg"
 TMP=$(mktemp -d)
 # copie SANS les attributs Finder (le Bureau synchronisé en ajoute, ce qui invaliderait la signature)
-ditto --norsrc --noextattr --noacl "$SORTIE/dist/Jarvis.app" "$TMP/Jarvis.app"
-xattr -cr "$TMP/Jarvis.app"
-codesign --verify --deep --strict "$TMP/Jarvis.app"
+ditto --norsrc --noextattr --noacl "$SORTIE/dist/Wesley.app" "$TMP/Wesley.app"
+xattr -cr "$TMP/Wesley.app"
+codesign --verify --deep --strict "$TMP/Wesley.app"
 ln -s /Applications "$TMP/Applications"
 rm -f "$DMG"
-hdiutil create -volname "Jarvis" -srcfolder "$TMP" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "Wesley" -srcfolder "$TMP" -ov -format UDZO "$DMG" >/dev/null
+# Même appli sous l'ancien nom de fichier, pour les Mac encore en version Jarvis : leur mise à jour automatique
+# cherche « Jarvis-<version>-mac-<puce>.dmg » contenant « Jarvis.app ». Une fois installé, Wesley se renomme en
+# Wesley.app à la mise à jour suivante. (Renommer le dossier .app ne touche pas à la signature.)
+mv "$TMP/Wesley.app" "$TMP/Jarvis.app"
+codesign --verify --deep --strict "$TMP/Jarvis.app"
+rm -f "installateur/Jarvis-${VERSION}-mac-${PUCE}.dmg"
+hdiutil create -volname "Jarvis" -srcfolder "$TMP" -ov -format UDZO "installateur/Jarvis-${VERSION}-mac-${PUCE}.dmg" >/dev/null
 rm -rf "$TMP"
 
 # Notarisation Apple (seulement avec un certificat Developer ID et les identifiants Apple) : le .dmg s'ouvre
@@ -90,4 +101,4 @@ elif [[ "$IDENTITE" == "Developer ID Application"* ]]; then
 fi
 echo
 echo "Terminé : $DMG"
-echo "Installe-le : ouvre le .dmg, glisse Jarvis dans Applications, puis clic droit > Ouvrir la première fois."
+echo "Installe-le : ouvre le .dmg, glisse Wesley dans Applications, puis clic droit > Ouvrir la première fois."

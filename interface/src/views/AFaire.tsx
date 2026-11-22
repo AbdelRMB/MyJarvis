@@ -4,7 +4,7 @@ import { Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { t } from "../lib/i18n";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Statut = "a_faire" | "en_cours" | "fait";
@@ -99,7 +99,7 @@ export function VueAFaire() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("À faire")}
-        sousTitre={t("Ce que tu as prévu de faire. Dis simplement à Jarvis : « souviens-toi que je dois appeler le garage », « rappelle-moi de sortir les poubelles à 20 h », puis « qu'est-ce que j'ai prévu ? » ou « c'est fait ».")}
+        sousTitre={t("Ce que tu as prévu de faire. Dis simplement à Wesley : « souviens-toi que je dois appeler le garage », « rappelle-moi de sortir les poubelles à 20 h », puis « qu'est-ce que j'ai prévu ? » ou « c'est fait ».")}
         actions={
           nbFaits > 0 && (
             <Bouton variante="fantome" icone={<Trash2 className="size-4" />} onClick={viderFaits}>
@@ -136,7 +136,7 @@ export function VueAFaire() {
       </Panneau>
 
       {!liste ? null : liste.length === 0 ? (
-        <Vide icone={<ListChecks />} titre={t("Rien de prévu")} texte={t("Ajoute une tâche ci-dessus, ou dis à Jarvis ce que tu dois faire.")} />
+        <Vide icone={<ListChecks />} titre={t("Rien de prévu")} texte={t("Ajoute une tâche ci-dessus, ou dis à Wesley ce que tu dois faire.")} />
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           {COLONNES.map((c) => {

@@ -15,13 +15,13 @@ type Regle = {
   description: string;
   appareil: string;
   declencheur: { type: TypeDecl; phrase?: string };
-  action: { type: "prevenir" | "jarvis"; consigne: string; message?: string };
+  action: { type: "prevenir" | "wesley"; consigne: string; message?: string };
 };
 type Etat = { regles: Regle[]; boites: { cid: string; nom: string }[]; machine: string };
 const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const VIDE = {
   nom: "", type: "horaire" as TypeDecl, heure: "08:00", jours: [] as number[], minutes: 60,
-  expediteur: "", sujet: "", contient: "", connecteur: "", action: "jarvis", consigne: "", message: "", partout: false, phrase: "",
+  expediteur: "", sujet: "", contient: "", connecteur: "", action: "wesley", consigne: "", message: "", partout: false, phrase: "",
 };
 const ICONES: Record<TypeDecl, typeof Clock> = { horaire: Clock, intervalle: Repeat, demarrage: Power, mail: Mail, commande: Wand2 };
 const EXEMPLES = [
@@ -45,7 +45,7 @@ export function VueAutomatisations() {
       setE(
         await api<Etat>("/api/automatisations", {
           method: "POST",
-          json: { ...f, action: f.type === "commande" ? "jarvis" : f.action, appareil: f.type === "mail" || f.type === "commande" || f.partout ? "" : e?.machine },
+          json: { ...f, action: f.type === "commande" ? "wesley" : f.action, appareil: f.type === "mail" || f.type === "commande" || f.partout ? "" : e?.machine },
         }),
       );
       setF(VIDE);
@@ -71,7 +71,7 @@ export function VueAutomatisations() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Automatisations")}
-        sousTitre={t("Jarvis agit tout seul : à heure fixe, à intervalle, au démarrage ou quand un mail arrive. Les routines se lancent quand tu dis leur phrase (« mode travail »). Tu peux aussi lui dire : « tous les matins à 8 h, lis-moi mon agenda ».")}
+        sousTitre={t("Wesley agit tout seul : à heure fixe, à intervalle, au démarrage ou quand un mail arrive. Les routines se lancent quand tu dis leur phrase (« mode travail »). Tu peux aussi lui dire : « tous les matins à 8 h, lis-moi mon agenda ».")}
         actions={
           <Bouton variante="fantome" icone={<Volume2 className="size-4" />} onClick={tester}>
             {t("Tester la voix")}
@@ -96,7 +96,7 @@ export function VueAutomatisations() {
           <select value={f.type} onChange={(x) => setF({ ...f, type: x.target.value as TypeDecl })} className={select} aria-label={t("Quand")}>
             <option value="horaire">{t("À heure fixe")}</option>
             <option value="intervalle">{t("Toutes les X minutes")}</option>
-            <option value="demarrage">{t("Au démarrage de Jarvis")}</option>
+            <option value="demarrage">{t("Au démarrage de Wesley")}</option>
             <option value="mail">{t("Quand un mail arrive")}</option>
             <option value="commande">{t("Routine : quand je dis une phrase")}</option>
           </select>
@@ -141,10 +141,10 @@ export function VueAutomatisations() {
           )}
 
           <select value={f.action} onChange={(x) => setF({ ...f, action: x.target.value })} className={select} aria-label={t("Action")}>
-            <option value="jarvis">{t("Demander quelque chose à Jarvis (il te lit le résultat)")}</option>
+            <option value="wesley">{t("Demander quelque chose à Wesley (il te lit le résultat)")}</option>
             <option value="prevenir">{t("Me dire un message")}</option>
           </select>
-          {f.action === "jarvis" ? (
+          {f.action === "wesley" ? (
             <Champ
               className="sm:col-span-2"
               placeholder={t("Consigne (ex : lis mon agenda du jour et résume-le)")}
@@ -170,7 +170,7 @@ export function VueAutomatisations() {
       </Panneau>
 
       {!e ? null : e.regles.length === 0 ? (
-        <Vide icone={<Zap />} titre={t("Aucune automatisation")} texte={t("Crée-en une ci-dessus, ou demande-la à Jarvis.")} />
+        <Vide icone={<Zap />} titre={t("Aucune automatisation")} texte={t("Crée-en une ci-dessus, ou demande-la à Wesley.")} />
       ) : (
         <div className="space-y-2">
           {e.regles.map((r) => {

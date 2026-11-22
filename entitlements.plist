@@ -2,7 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- Droits de l'appli Jarvis sur macOS (runtime renforcé : micro, AppleScript, code Python embarqué) -->
+    <!-- Droits de l'appli Wesley sur macOS (runtime renforcé : micro, AppleScript, code Python embarqué) -->
     <key>com.apple.security.device.audio-input</key>
     <true/>
     <key>com.apple.security.automation.apple-events</key>

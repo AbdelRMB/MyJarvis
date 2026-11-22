@@ -31,7 +31,7 @@ import { sons } from "../audio/bips";
 import { taire } from "../audio/tts";
 import { cx } from "../lib/format";
 import { useAudio } from "../stores/audio";
-import { useJarvis } from "../stores/jarvis";
+import { useWesley } from "../stores/wesley";
 import { useReglages, type ModeMicro, type Vue } from "../stores/reglages";
 import { useSysteme } from "../stores/systeme";
 import { useToasts } from "../stores/toasts";
@@ -62,7 +62,7 @@ const GROUPES: { id: string; libelle: string; vues: Vue[]; admin?: boolean }[] =
   { id: "memoire", libelle: t("Ma mémoire"), vues: ["historique", "memoire"] },
   { id: "automatiser", libelle: t("Automatiser"), vues: ["taches", "automatisations", "sites", "connecteurs"] },
   { id: "machines", libelle: t("Mes machines"), vues: ["appareils", "systeme", "activite", "arsenal"] },
-  { id: "jarvis", libelle: t("Jarvis"), vues: ["reglages", "majs", "tickets"] },
+  { id: "wesley", libelle: t("Wesley"), vues: ["reglages", "majs", "tickets"] },
   { id: "admin", libelle: t("Administration"), vues: ["stats"], admin: true },
 ];
 const PAR_ID = Object.fromEntries(NAV.map((n) => [n.id, n])) as Record<Vue, (typeof NAV)[number]>;
@@ -79,9 +79,9 @@ function MiniReacteur({ actif }: { actif: boolean }) {
 
 export function BarreLaterale({ admin = false }: { admin?: boolean }) {
   const { vue, menuReduit, groupesFermes, maj } = useReglages();
-  const connecte = useJarvis((s) => s.connecte);
-  const occupe = useJarvis((s) => s.occupe);
-  const nom = useJarvis((s) => s.session?.nom ?? "");
+  const connecte = useWesley((s) => s.connecte);
+  const occupe = useWesley((s) => s.occupe);
+  const nom = useWesley((s) => s.session?.nom ?? "");
   const ollama = useSysteme((s) => s.dernier?.ollama ?? false);
   const micActif = useAudio((s) => s.micActif);
 
@@ -96,7 +96,7 @@ export function BarreLaterale({ admin = false }: { admin?: boolean }) {
         <MiniReacteur actif={occupe} />
         {!menuReduit && (
           <div className="min-w-0">
-            <div className="font-display text-[15px] font-black tracking-[0.3em] text-hud [text-shadow:0_0_14px_rgb(60_232_255/.5)]">{t("JARVIS")}</div>
+            <div className="font-display text-[15px] font-black tracking-[0.3em] text-hud [text-shadow:0_0_14px_rgb(60_232_255/.5)]">{t("WESLEY")}</div>
             <div className="truncate text-[10px] tracking-wider text-tres-doux">{t("ASSISTANT PERSONNEL")}</div>
           </div>
         )}
@@ -197,7 +197,7 @@ export function NavMobile() {
 const MODES: { id: ModeMicro; libelle: string; aide: string }[] = [
   { id: "ptt", libelle: t("Appui"), aide: t("Maintiens Espace ou le bouton micro pour parler") },
   { id: "auto", libelle: t("Auto"), aide: t("Mains libres : ta phrase part quand tu te tais") },
-  { id: "eveil", libelle: t("« Jarvis »"), aide: t("Ne réagit qu'aux phrases qui commencent par « Jarvis »") },
+  { id: "eveil", libelle: t("« Wesley »"), aide: t("Ne réagit qu'aux phrases qui commencent par « Wesley »") },
 ];
 
 export function BarreHaut() {
@@ -244,7 +244,7 @@ export function BarreHaut() {
           if (tts) taire();
           maj({ tts: !tts });
         }}
-        title={tts ? "Couper la voix de Jarvis" : "Activer la voix de Jarvis"}
+        title={tts ? "Couper la voix de Wesley" : "Activer la voix de Wesley"}
         className={cx("grid size-9 place-items-center rounded-md border border-ligne", tts ? "text-hud" : "text-tres-doux")}
       >
         {tts ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}

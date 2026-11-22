@@ -1,9 +1,9 @@
-import { useJarvis } from "../stores/jarvis";
+import { useWesley } from "../stores/wesley";
 import { t } from "./i18n";
 
-/** Système de l'ordinateur où tourne Jarvis (pour adapter les textes). */
+/** Système de l'ordinateur où tourne Wesley (pour adapter les textes). */
 export function useOS() {
-  const p = useJarvis((s) => s.session?.plateforme ?? "windows");
+  const p = useWesley((s) => s.session?.plateforme ?? "windows");
   const mac = p === "mac";
   return {
     mac,

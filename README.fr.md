@@ -1,28 +1,28 @@
 <p align="center">
-  <img src="jarvis.png" alt="Jarvis" width="120">
+  <img src="wesley.png" alt="Wesley" width="120">
 </p>
 
-<h1 align="center">J.A.R.V.I.S.</h1>
+<h1 align="center">Wesley</h1>
 
 <p align="center">
   <strong>L'assistant vocal en français qui pilote vraiment ton ordinateur.</strong><br>
-  Dis <em>« Jarvis, … »</em> : il ouvre tes applis, clique, tape, lit ton écran, code dans VS Code,
+  Dis <em>« Wesley, … »</em> : il ouvre tes applis, clique, tape, lit ton écran, code dans VS Code,
   utilise tes sites (même avec double authentification) et gère tes serveurs.<br>
   Avec <strong>l'IA de ton choix</strong> : Claude, GPT, Gemini, Mistral, DeepSeek, Grok, OpenRouter…
   ou <strong>Ollama / LM Studio (100 % local, gratuit)</strong>. macOS et Windows.
 </p>
 
 <p align="center">
-  <a href="https://github.com/AbdelRMB/MyJarvis/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/AbdelRMB/MyJarvis?label=version&color=2f81f7"></a>
-  <a href="https://github.com/AbdelRMB/MyJarvis/releases"><img alt="Téléchargements" src="https://img.shields.io/github/downloads/AbdelRMB/MyJarvis/total?label=t%C3%A9l%C3%A9chargements&color=2f81f7"></a>
+  <a href="https://github.com/AbdelRMB/Wesley/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/AbdelRMB/Wesley?label=version&color=2f81f7"></a>
+  <a href="https://github.com/AbdelRMB/Wesley/releases"><img alt="Téléchargements" src="https://img.shields.io/github/downloads/AbdelRMB/Wesley/total?label=t%C3%A9l%C3%A9chargements&color=2f81f7"></a>
   <img alt="Plateformes" src="https://img.shields.io/badge/plateformes-macOS%20(puce%20Apple)%20%7C%20Windows%2010%2F11-555">
   <img alt="Python 3.12" src="https://img.shields.io/badge/python-3.12-3776ab?logo=python&logoColor=white">
   <a href="LICENSE"><img alt="Licence GPL v3" src="https://img.shields.io/badge/licence-GPLv3-blue"></a>
-  <a href="https://github.com/AbdelRMB/MyJarvis/stargazers"><img alt="Étoiles GitHub" src="https://img.shields.io/github/stars/AbdelRMB/MyJarvis?style=social"></a>
+  <a href="https://github.com/AbdelRMB/Wesley/stargazers"><img alt="Étoiles GitHub" src="https://img.shields.io/github/stars/AbdelRMB/Wesley?style=social"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/AbdelRMB/MyJarvis/releases/latest"><strong>⬇ Télécharger</strong></a> ·
+  <a href="https://github.com/AbdelRMB/Wesley/releases/latest"><strong>⬇ Télécharger</strong></a> ·
   <a href="#-ce-que-tu-peux-lui-dire">Exemples</a> ·
   <a href="#-fonctionnalités">Fonctionnalités</a> ·
   <a href="#-vie-privée-et-sécurité">Vie privée</a> ·
@@ -31,19 +31,19 @@
 </p>
 
 <p align="center">
-  <a href="docs/demo.mp4"><img src="docs/demo.webp" alt="Démo de Jarvis : commande vocale, VS Code et tests, analyse de l'écran, formulaire intranet avec 2FA et accord, message WhatsApp" width="800"></a>
+  <a href="docs/demo.mp4"><img src="docs/demo.webp" alt="Démo de Wesley : commande vocale, VS Code et tests, analyse de l'écran, formulaire intranet avec 2FA et accord, message WhatsApp" width="800"></a>
   <br><sub>▶ <a href="docs/demo.mp4">Voir en HD (MP4)</a> · <a href="docs/demo-en.mp4">version anglaise</a></sub>
 </p>
 
 ---
 
-## ✨ Pourquoi Jarvis ?
+## ✨ Pourquoi Wesley ?
 
-La plupart des « assistants IA » sont une fenêtre de discussion. Jarvis est un **agent qui a des mains** : il se sert
+La plupart des « assistants IA » sont une fenêtre de discussion. Wesley est un **agent qui a des mains** : il se sert
 de ta souris, de ton clavier, de tes applis, de tes fichiers, de ton navigateur et de tes serveurs, et te dit à voix
 haute ce qu'il a fait.
 
-- 🎙️ **Mains libres.** Le mot « Jarvis » est reconnu **sur ton ordinateur** (openWakeWord + Whisper). Rien n'est
+- 🎙️ **Mains libres.** Le mot « Wesley » est reconnu **sur ton ordinateur** (Whisper, en local). Rien n'est
   envoyé tant qu'il n'a pas entendu son nom. Tu peux lui couper la parole en parlant.
 - 🧠 **L'IA de ton choix comme cerveau.** Claude (le plus intelligent), OpenAI, Google Gemini, Mistral, DeepSeek,
   Grok, OpenRouter, Groq, Cerebras, Together, Fireworks, Kimi, Qwen, Cohere, Hugging Face, n'importe quelle API
@@ -64,7 +64,7 @@ haute ce qu'il a fait.
 
 ## 💬 Ce que tu peux lui dire
 
-> « Jarvis, ouvre Discord et mets ma playlist concentration. »
+> « Wesley, ouvre Discord et mets ma playlist concentration. »
 >
 > « Regarde mon écran : pourquoi ce build plante ? »
 >
@@ -80,53 +80,53 @@ haute ce qu'il a fait.
 
 ## 🚀 Démarrer en 2 minutes
 
-1. **Télécharge** la [dernière version](https://github.com/AbdelRMB/MyJarvis/releases/latest) :
+1. **Télécharge** la [dernière version](https://github.com/AbdelRMB/Wesley/releases/latest) :
 
    | Ton ordinateur | Fichier |
    |---|---|
-   | Mac avec puce Apple (M1 à M4) | `Jarvis-<version>-mac-arm64.dmg` |
-   | PC Windows 10/11 | `JarvisSetup-<version>.exe` |
+   | Mac avec puce Apple (M1 à M4) | `Wesley-<version>-mac-arm64.dmg` |
+   | PC Windows 10/11 | `WesleySetup-<version>.exe` |
 
-2. **Installe** : glisse Jarvis dans Applications (Mac) ou lance l'installateur (Windows, sans droits administrateur).
+2. **Installe** : glisse Wesley dans Applications (Mac) ou lance l'installateur (Windows, sans droits administrateur).
 3. **Crée ton compte** (ou utilise-le en local, sans compte), puis choisis un cerveau dans **Réglages › Cerveau** :
    clique sur l'IA voulue et colle sa clé API (l'écran indique où la créer) : Claude, OpenAI, Gemini, Mistral,
    DeepSeek, Grok, OpenRouter… Ou installe [Ollama](https://ollama.com) et tape `ollama pull qwen3.5:9b`
    (ou prends [LM Studio](https://lmstudio.ai)) pour un cerveau local gratuit.
 
-Puis dis **« Jarvis, … »** ou appuie sur `Ctrl+Alt+J` (Windows) / `⌃⌥J` (Mac).
+Puis dis **« Wesley, … »** ou appuie sur `Ctrl+Alt+W` (Windows) / `⌃⌥W` (Mac).
 
 > 🤖 **Encore plus simple :** clone ce dépôt, ouvre-le dans [Claude Code](https://claude.com/claude-code) et dis
-> **« Installe Jarvis »**. Le dépôt contient un guide d'installation (`CLAUDE.md`) et Claude fait tout, en te
+> **« Installe Wesley »**. Le dépôt contient un guide d'installation (`CLAUDE.md`) et Claude fait tout, en te
 > demandant ton accord avant d'installer quoi que ce soit.
 
 <details>
 <summary><strong>Installation en détail (autorisations, SmartScreen, mises à jour)</strong></summary>
 
 **Mac**
-1. Ouvre le `.dmg` et glisse **Jarvis** dans **Applications**. L'appli est signée et vérifiée par Apple.
-2. Dans **Réglages Système › Confidentialité et sécurité**, autorise Jarvis pour le **Micro**, l'**Accessibilité**
+1. Ouvre le `.dmg` et glisse **Wesley** dans **Applications**. L'appli est signée et vérifiée par Apple.
+2. Dans **Réglages Système › Confidentialité et sécurité**, autorise Wesley pour le **Micro**, l'**Accessibilité**
    (raccourcis, souris, clavier) et l'**Enregistrement de l'écran** (pour qu'il voie ton écran).
 
-Jarvis vit dans la **barre des menus** et se lance à l'ouverture de ta session.
+Wesley vit dans la **barre des menus** et se lance à l'ouverture de ta session.
 
 **Windows**
-1. Lance `JarvisSetup-<version>.exe`. Si Windows affiche « Windows a protégé votre ordinateur », clique sur
+1. Lance `WesleySetup-<version>.exe`. Si Windows affiche « Windows a protégé votre ordinateur », clique sur
    **Informations complémentaires › Exécuter quand même**.
-2. Coche **« Lancer Jarvis au démarrage de Windows »** si tu veux qu'il soit toujours prêt.
+2. Coche **« Lancer Wesley au démarrage de Windows »** si tu veux qu'il soit toujours prêt.
 
-Jarvis vit près de l'**horloge** (zone de notification).
+Wesley vit près de l'**horloge** (zone de notification).
 
 **Premier lancement**
-- Si cet ordinateur avait déjà une mémoire Jarvis (ancienne version), elle est ajoutée à ton compte, sans doublon.
+- Si cet ordinateur avait déjà une mémoire Wesley (ancienne version), elle est ajoutée à ton compte, sans doublon.
 - Claude est payant à l'usage : l'abonnement Claude Pro n'inclut pas de crédit API.
 - Ollama demande une carte graphique avec environ 8 Go de mémoire.
 
 **Mettre à jour** : l'écran **Mises à jour** affiche chaque version avec sa description et l'installe en un clic.
-Jarvis peut aussi se mettre à jour tout seul au prochain démarrage.
+Wesley peut aussi se mettre à jour tout seul au prochain démarrage.
 
 </details>
 
-> L'interface existe en français et en anglais (Réglages › Interface). Jarvis parle français par défaut.
+> L'interface existe en français et en anglais (Réglages › Interface). Wesley parle français par défaut.
 
 ---
 
@@ -150,13 +150,13 @@ Jarvis peut aussi se mettre à jour tout seul au prochain démarrage.
 | **Appareils** | Pilote tes autres ordinateurs ; liste À faire et tickets sur ton téléphone |
 
 <details>
-<summary><strong>Utiliser Jarvis : raccourcis</strong></summary>
+<summary><strong>Utiliser Wesley : raccourcis</strong></summary>
 
 | Action | Comment |
 |---|---|
-| L'appeler | Dis **« Jarvis, ouvre Discord »** d'une traite, ou « Jarvis » puis ta demande. Ou `Ctrl+Alt+J` / `⌃⌥J`, ou clic sur l'icône. |
-| Le faire taire | **« Jarvis, stop »** (même pendant qu'il parle), ou `Ctrl+Alt+S` / `⌃⌥S`, même fenêtre cachée. |
-| Fermer la fenêtre | Elle se cache seulement. Pour quitter : icône Jarvis › Quitter. |
+| L'appeler | Dis **« Wesley, ouvre Discord »** d'une traite, ou « Wesley » puis ta demande. Ou `Ctrl+Alt+W` / `⌃⌥W`, ou clic sur l'icône. |
+| Le faire taire | **« Wesley, stop »** (même pendant qu'il parle), ou `Ctrl+Alt+S` / `⌃⌥S`, même fenêtre cachée. |
+| Fermer la fenêtre | Elle se cache seulement. Pour quitter : icône Wesley › Quitter. |
 | Dans la fenêtre | `Échap` = stop · `Ctrl+K` = écrire · `Alt+1…9` = écrans |
 
 </details>
@@ -165,10 +165,10 @@ Jarvis peut aussi se mettre à jour tout seul au prochain démarrage.
 
 - **Cerveau Ollama ou LM Studio = rien ne sort de ton ordinateur.** Avec une IA dans le cloud (Claude, OpenAI, Gemini…), tes messages, souvenirs et résultats
   d'outils sont envoyés à ce fournisseur.
-- **Écoute 100 % locale.** Le son n'est traité qu'après « Jarvis ».
+- **Écoute 100 % locale.** Le son n'est traité qu'après « Wesley ».
 - **Ton mot de passe ne quitte jamais l'appareil.** Il dérive une clé de connexion et une clé de coffre, qui chiffre
   ta clé API et tes mots de passe avant l'envoi. Ta mémoire et ton historique sont stockés sur le serveur, protégés
-  mais pas chiffrés de bout en bout. Tu peux aussi utiliser Jarvis **sans compte**.
+  mais pas chiffrés de bout en bout. Tu peux aussi utiliser Wesley **sans compte**.
 - **Il demande d'abord** avant les clics destructeurs (supprimer, envoyer, payer…) et chaque commande `sudo`.
 - L'interface locale n'écoute que sur `127.0.0.1` (Host vérifié, jeton par session, Origin vérifiée).
 - **Arrêt d'urgence** : souris dans le coin haut-gauche de l'écran. Toutes les actions sont journalisées
@@ -179,7 +179,7 @@ Jarvis peut aussi se mettre à jour tout seul au prochain démarrage.
 ## 🏗️ Comment ça marche
 
 ```
- « Jarvis, … » ──► openWakeWord + Whisper (local) ──► Agent (Claude / OpenAI / Ollama)
+ « Wesley, … » ──► Whisper (local) ──► Agent (Claude / OpenAI / Ollama)
                                                          │  appels d'outils
                                                          ▼
        applis · fichiers · souris/clavier · écran · navigateur · SSH · serveurs MCP · connecteurs
@@ -189,7 +189,7 @@ Jarvis peut aussi se mettre à jour tout seul au prochain démarrage.
                                 serveur de comptes (FastAPI + SQLite) : mémoire, historique, synchro
 ```
 
-- **Cœur** : Python 3.12 (`jarvis/`), outils dans `jarvis/outils/`, serveur local `jarvis/web.py`.
+- **Cœur** : Python 3.12 (`wesley/`), outils dans `wesley/outils/`, serveur local `wesley/web.py`.
 - **Interface** : React + TypeScript + Tailwind (`interface/`), affichée dans une fenêtre native (pywebview).
 - **Serveur de comptes** : FastAPI + SQLite (`serveur/`), auto-hébergeable.
 
@@ -199,10 +199,10 @@ Jarvis peut aussi se mettre à jour tout seul au prochain démarrage.
 
 Toutes les contributions sont bienvenues, de la faute de frappe au nouvel outil. Commence par
 [`CONTRIBUTING.md`](CONTRIBUTING.md) et les
-[good first issues](https://github.com/AbdelRMB/MyJarvis/labels/good%20first%20issue).
-Un bug, une idée ? [Ouvre une issue](https://github.com/AbdelRMB/MyJarvis/issues/new/choose) (en français ou en anglais).
+[good first issues](https://github.com/AbdelRMB/Wesley/labels/good%20first%20issue).
+Un bug, une idée ? [Ouvre une issue](https://github.com/AbdelRMB/Wesley/issues/new/choose) (en français ou en anglais).
 
-Si Jarvis t'est utile, **une ⭐ aide beaucoup** : c'est comme ça que d'autres découvrent le projet.
+Si Wesley t'est utile, **une ⭐ aide beaucoup** : c'est comme ça que d'autres découvrent le projet.
 
 <details>
 <summary><strong>Installer l'environnement de développement</strong></summary>
@@ -221,24 +221,24 @@ python3.12 -m venv .venv-mac && .venv-mac/bin/pip install -r requirements-mac.tx
 # Windows
 py -3.12 -m venv .venv; .venv\Scripts\pip install -r requirements.txt -r requirements-voix.txt
 cd interface; npm ci; npm run build; cd ..
-.venv\Scripts\pythonw lanceur.pyw          # ou jarvis-web.bat (navigateur) / jarvis.bat (terminal)
+.venv\Scripts\pythonw lanceur.pyw          # ou wesley-web.bat (navigateur) / wesley.bat (terminal)
 ```
 
 **Structure**
 
 | Dossier / fichier | Rôle |
 |---|---|
-| `jarvis/` | Cœur en Python : agent, outils (`outils/`), voix, écoute, serveur local (`web.py`), compte (`compte.py`), mises à jour |
-| `interface/` | Interface React + TypeScript + Tailwind, compilée dans `jarvis/static/` |
+| `wesley/` | Cœur en Python : agent, outils (`outils/`), voix, écoute, serveur local (`web.py`), compte (`compte.py`), mises à jour |
+| `interface/` | Interface React + TypeScript + Tailwind, compilée dans `wesley/static/` |
 | `serveur/` | Serveur des comptes (FastAPI + SQLite), appli mobile et pages légales (`mobile/`) |
-| `jarvis.spec` / `jarvis-mac.spec` | Recettes PyInstaller (Windows / Mac) |
+| `wesley.spec` / `wesley-mac.spec` | Recettes PyInstaller (Windows / Mac) |
 | `installateur.iss` | Installateur Windows (Inno Setup) |
 | `construire.bat` / `construire-mac.sh` | Construire les installateurs |
-| `jarvis/version.py` + `CHANGELOG.md` | Version, et description de chaque mise à jour |
+| `wesley/version.py` + `CHANGELOG.md` | Version, et description de chaque mise à jour |
 
 **Interface en direct** : `cd interface && npm run dev` (http://localhost:5173, branchée sur le serveur Python lancé à côté).
 
-**Ajouter un outil** dans `jarvis/outils/*.py` :
+**Ajouter un outil** dans `wesley/outils/*.py` :
 ```python
 @outil
 def mon_outil(param: str):
@@ -248,33 +248,33 @@ def mon_outil(param: str):
 ```
 
 **Construire les installateurs** : `bash construire-mac.sh` (Mac) ou `construire.bat` (Windows, Inno Setup 6), ou sur
-GitHub : **Actions › Versions de Jarvis › Run workflow**.
+GitHub : **Actions › Versions de Wesley › Run workflow**.
 
 **Héberger ton serveur de comptes** : lance `serveur/app.py` avec uvicorn derrière un proxy HTTPS (variables
-`JARVIS_DB` et `JARVIS_CLE_APPLI`), puis dans le `config.json` de l'appli : `"serveur_comptes"` et `"cle_appli"`.
+`WESLEY_DB` et `WESLEY_CLE_APPLI`), puis dans le `config.json` de l'appli : `"serveur_comptes"` et `"cle_appli"`.
 
 **Où sont mes données ?**
 
 | | Mac | Windows |
 |---|---|---|
-| Réglages de l'appareil, journaux, cache du compte | `~/Library/Application Support/Jarvis` | `%LOCALAPPDATA%\Jarvis` |
+| Réglages de l'appareil, journaux, cache du compte | `~/Library/Application Support/Wesley` | `%LOCALAPPDATA%\Wesley` |
 | Mémoire, historique, connecteurs, réglages communs | dans ton **compte** (et en cache local) | idem |
 | Clé API, mots de passe des connecteurs | Trousseau macOS + coffre chiffré du compte | Gestionnaire d'identifiants + coffre chiffré du compte |
 
-Diagnostic : `logs/jarvis.log` (démarrage, erreurs), `logs/perf.log` (vitesse du modèle), `logs/couts.json`
+Diagnostic : `logs/wesley.log` (démarrage, erreurs), `logs/perf.log` (vitesse du modèle), `logs/couts.json`
 (dépenses estimées de l'API Claude).
 
 </details>
 
 ## ⭐ Historique des étoiles
 
-<a href="https://star-history.com/#AbdelRMB/MyJarvis&Date">
-  <img src="https://api.star-history.com/svg?repos=AbdelRMB/MyJarvis&type=Date" alt="Historique des étoiles" width="600">
+<a href="https://star-history.com/#AbdelRMB/Wesley&Date">
+  <img src="https://api.star-history.com/svg?repos=AbdelRMB/Wesley&type=Date" alt="Historique des étoiles" width="600">
 </a>
 
 ## 📄 Licence
 
-Copyright (C) 2026 Abdelrahim Riche. Jarvis est un logiciel libre sous **GNU General Public License v3** (ou toute
+Copyright (C) 2026 Abdelrahim Riche. Wesley est un logiciel libre sous **GNU General Public License v3** (ou toute
 version ultérieure) : tu peux l'utiliser, l'étudier, le modifier et le partager ; toute version modifiée que tu
 distribues doit rester sous cette même licence, avec son code source. Il est fourni **sans aucune garantie**.
 Texte complet : [LICENSE](LICENSE).

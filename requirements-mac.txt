@@ -1,4 +1,4 @@
-# Dépendances de Jarvis pour macOS (Python 3.12)
+# Dépendances de Wesley pour macOS (Python 3.12)
 anthropic
 beautifulsoup4
 ddgs

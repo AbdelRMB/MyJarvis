@@ -12,7 +12,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Jarvis version / Version de Jarvis
+      label: Wesley version / Version de Wesley
       placeholder: "1.10.0 (Settings › Updates)"
     validations:
       required: true
@@ -39,5 +39,5 @@ body:
     id: journal
     attributes:
       label: Log excerpt / Extrait du journal
-      description: "End of jarvis.log (Mac: ~/Library/Application Support/Jarvis/logs, Windows: %LOCALAPPDATA%\Jarvis\logs). Remove any personal data."
+      description: "End of wesley.log (Mac: ~/Library/Application Support/Wesley/logs, Windows: %LOCALAPPDATA%\Wesley\logs). Remove any personal data."
       render: text

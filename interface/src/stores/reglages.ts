@@ -72,7 +72,7 @@ const stockageSur = () => {
 
 export const useReglages = create<Reglages & { maj: (p: Partial<Reglages>) => void }>()(
   persist((set) => ({ ...DEFAUT, maj: (p) => set(p) }), {
-    name: "jarvis.reglages.v2",
+    name: "wesley.reglages.v2",
     storage: createJSONStorage(stockageSur),
     version: 3,
     // v0 -> v1 : nouvelle voix serveur, envoi plus réactif

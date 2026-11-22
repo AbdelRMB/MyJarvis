@@ -35,7 +35,7 @@ if (mode === "apercu") {
     }
   }
 } else {
-  const sortie = path.resolve(args[0] || "jarvis-demo.mp4");
+  const sortie = path.resolve(args[0] || "wesley-demo.mp4");
   const ff = spawn(ffmpeg, ["-y", "-f", "image2pipe", "-framerate", String(FPS), "-c:v", "mjpeg", "-i", "-",
     "-c:v", "libx264", "-preset", "slow", "-crf", "16", "-pix_fmt", "yuv420p", "-movflags", "+faststart", sortie],
     { stdio: ["pipe", "inherit", "inherit"] });

@@ -13,9 +13,9 @@ export type BlocOutil = {
 export type Bloc = BlocTexte | BlocPensee | BlocOutil;
 
 export type MessageUtilisateur = { id: string; role: "user"; texte: string; date: number };
-export type MessageJarvis = { id: string; role: "jarvis"; blocs: Bloc[]; date: number; enCours: boolean };
+export type MessageWesley = { id: string; role: "wesley"; blocs: Bloc[]; date: number; enCours: boolean };
 export type MessageSysteme = { id: string; role: "info" | "erreur"; texte: string; date: number };
-export type Message = MessageUtilisateur | MessageJarvis | MessageSysteme;
+export type Message = MessageUtilisateur | MessageWesley | MessageSysteme;
 
 export type Session = { jeton: string; nom: string; nb_outils: number; plateforme?: "windows" | "mac" | "linux" };
 
@@ -58,7 +58,7 @@ export type ConfigServeur = {
 
 export type Fait = { fait: string; categorie: string; date?: string; fid?: string; modifie?: number };
 export type JourHistorique = { jour: string; nb: number; apercu: string; pcs?: string[] };
-export type EntreeHistorique = { heure: string; role: "user" | "jarvis"; texte: string; pc?: string };
+export type EntreeHistorique = { heure: string; role: "user" | "wesley"; texte: string; pc?: string };
 export type Action = { date: string; outil: string; args: Record<string, unknown>; resultat: string | null };
 export type Outil = {
   nom: string;

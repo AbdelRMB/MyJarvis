@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><title>Démo Jarvis</title>
+<html lang="fr"><head><meta charset="utf-8"><title>Démo Wesley</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="icones.js"></script>
 <style>
@@ -142,13 +142,13 @@ header{height:64px;flex:none;border-bottom:1px solid var(--ligne);display:flex;a
 <div id="stage">
  <div id="app" class="grille">
   <aside class="sb">
-   <div class="logo"><svg viewBox="0 0 40 40" width="36" height="36"><circle cx="20" cy="20" r="17" fill="none" stroke="#3ce8ff" stroke-width="1.5" stroke-dasharray="20 6.7" opacity=".8"/><circle cx="20" cy="20" r="12" fill="none" stroke="#3ce8ff" stroke-width="3" stroke-dasharray="4 2.3" opacity=".5"/><circle cx="20" cy="20" r="6" fill="#3ce8ff" style="filter:drop-shadow(0 0 5px #3ce8ff)"/></svg><div><b>JARVIS</b><small>ASSISTANT PERSONNEL</small></div></div>
+   <div class="logo"><svg viewBox="0 0 40 40" width="36" height="36"><circle cx="20" cy="20" r="17" fill="none" stroke="#3ce8ff" stroke-width="1.5" stroke-dasharray="20 6.7" opacity=".8"/><circle cx="20" cy="20" r="12" fill="none" stroke="#3ce8ff" stroke-width="3" stroke-dasharray="4 2.3" opacity=".5"/><circle cx="20" cy="20" r="6" fill="#3ce8ff" style="filter:drop-shadow(0 0 5px #3ce8ff)"/></svg><div><b>WESLEY</b><small>ASSISTANT PERSONNEL</small></div></div>
    <nav id="nav"></nav>
    <div class="sbbas"><div><span class="dot"></span>Liaison serveur</div><div><span class="dot"></span>Claude</div><div><span class="dot"></span>Micro</div><div style="color:var(--doux);margin-top:4px">Connecté en tant que <span style="color:var(--texte)">Abdelrahim</span></div></div>
   </aside>
   <div class="main">
    <header>
-    <div class="seg"><span>Appui</span><span>Auto</span><span class="on">« Jarvis »</span></div>
+    <div class="seg"><span>Appui</span><span>Auto</span><span class="on">« Wesley »</span></div>
     <div class="btn" id="bmic"></div><div class="btn" id="bvol"></div>
     <div style="flex:1"></div>
     <div class="btn" id="bcl"></div>
@@ -168,7 +168,7 @@ header{height:64px;flex:none;border-bottom:1px solid var(--ligne);display:flex;a
     </div>
     <div class="droite">
      <div><canvas id="reac" width="596" height="596"></canvas>
-      <div class="statut"><b id="stL">En attente</b><span id="stD">Dis « Jarvis, … »</span></div></div>
+      <div class="statut"><b id="stL">En attente</b><span id="stD">Dis « Wesley, … »</span></div></div>
      <div class="pan coins"><h4>AUDIO</h4><div style="padding:14px 16px"><div style="font-size:12px;color:var(--doux);margin-bottom:10px">Microphone (USB)</div><div class="vu" id="vu"></div><div id="entendu" style="margin-top:10px;font-size:13px;color:var(--doux);display:none"></div></div></div>
      <div class="pan coins" style="flex:1;min-height:0;overflow:hidden"><h4>ACTIONS DE LA SESSION <span class="badge" id="nbA">0</span></h4><ul id="actions"><li id="aucune" style="justify-content:center;color:var(--td);font-size:14px;border:0;padding:24px">Aucune action pour l'instant.</li></ul></div>
     </div>
@@ -177,7 +177,7 @@ header{height:64px;flex:none;border-bottom:1px solid var(--ligne);display:flex;a
 
   <!-- fenêtres du bureau -->
   <div class="fen" id="wTerm" style="left:330px;top:160px;width:680px;height:372px;background:#0d1117">
-   <div class="barre" style="background:#161b22;color:#8b949e"><div class="f"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div><span style="margin-left:10px">MyJarvis — Terminal — Visual Studio Code</span></div>
+   <div class="barre" style="background:#161b22;color:#8b949e"><div class="f"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div><span style="margin-left:10px">Wesley — Terminal — Visual Studio Code</span></div>
    <div id="termTxt" class="mono" style="padding:18px 22px;font-size:14.5px;line-height:1.75;color:#c9d1d9;white-space:pre"></div>
   </div>
   <div class="fen" id="wErr" style="left:290px;top:128px;width:900px;height:560px;background:#fff">
@@ -206,7 +206,7 @@ header{height:64px;flex:none;border-bottom:1px solid var(--ligne);display:flex;a
     </div>
     <div class="toast" id="toast">🔐 <span><b>Connexion automatique</b> · code 2FA 482 913 calculé</span></div>
     <div class="ok" id="ok">✓ Demande envoyée · en attente de validation par ton responsable</div>
-    <div class="hl" id="hl"><b>JARVIS</b></div>
+    <div class="hl" id="hl"><b>WESLEY</b></div>
    </div>
   </div>
   <div class="fen" id="wWa" style="left:420px;top:150px;width:600px;height:390px;background:#0b141a">
@@ -221,17 +221,17 @@ header{height:64px;flex:none;border-bottom:1px solid var(--ligne);display:flex;a
 
   <div id="scan"></div>
   <div id="focus"><i></i><i></i><i></i><i></i><em>ANALYSE</em></div>
-  <div id="dlg"><div class="carte"><div class="t" id="dlgI">Jarvis demande ton accord</div><p>Cliquer sur « Envoyer la demande » sur intranet.entreprise.fr</p><pre>Congés payés · du mer. 23/12/2026 au dim. 27/12/2026</pre><div class="b"><span style="color:var(--doux)">Refuser</span><span id="bAut" style="background:var(--hud);color:var(--fond);box-shadow:0 0 18px rgba(60,232,255,.35)">Autoriser</span></div></div></div>
+  <div id="dlg"><div class="carte"><div class="t" id="dlgI">Wesley demande ton accord</div><p>Cliquer sur « Envoyer la demande » sur intranet.entreprise.fr</p><pre>Congés payés · du mer. 23/12/2026 au dim. 27/12/2026</pre><div class="b"><span style="color:var(--doux)">Refuser</span><span id="bAut" style="background:var(--hud);color:var(--fond);box-shadow:0 0 18px rgba(60,232,255,.35)">Autoriser</span></div></div></div>
   <svg id="curseur" viewBox="0 0 24 24"><path d="M4 2 L4 20 L9 15.5 L12.5 22.5 L15.5 21 L12 14 L19 14 Z" fill="#fff" stroke="#000" stroke-width="1.4" stroke-linejoin="round"/></svg>
  </div>
 
  <div id="chap"><div class="num" id="chN">01</div><div><div class="fr" id="chF"></div><div class="en" id="chE"></div></div></div>
  <div id="cap"><div class="p"><div class="mic" id="capMic"></div><div><div class="fr" id="capF"></div><div class="en" id="capE"></div></div></div></div>
 
- <div class="plein" id="intro"><canvas id="cvIntro" width="720" height="720"></canvas><div class="titre" id="iTitre">J.A.R.V.I.S.</div><div class="tag" id="iTag">L'assistant vocal qui pilote vraiment ton ordinateur</div><div class="tag2" id="iTag2">The voice assistant that actually drives your computer</div></div>
- <div class="plein" id="fin"><canvas id="cvFin" width="720" height="720" style="width:220px;height:220px"></canvas><div class="titre" style="font-size:54px;margin-top:6px">J.A.R.V.I.S.</div>
+ <div class="plein" id="intro"><canvas id="cvIntro" width="720" height="720"></canvas><div class="titre" id="iTitre">Wesley</div><div class="tag" id="iTag">L'assistant vocal qui pilote vraiment ton ordinateur</div><div class="tag2" id="iTag2">The voice assistant that actually drives your computer</div></div>
+ <div class="plein" id="fin"><canvas id="cvFin" width="720" height="720" style="width:220px;height:220px"></canvas><div class="titre" style="font-size:54px;margin-top:6px">Wesley</div>
   <div class="pills" id="fPills"><span>🧠 Claude · OpenAI · <b>Ollama 100 % local</b></span><span>💻 macOS · Windows</span><span>🔓 Open source · GPLv3</span></div>
-  <div class="gh" id="fGh"><svg viewBox="0 0 16 16" width="28" height="28"><path fill="#04090f" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github.com/AbdelRMB/MyJarvis <span style="font-size:24px">⭐</span></div>
+  <div class="gh" id="fGh"><svg viewBox="0 0 16 16" width="28" height="28"><path fill="#04090f" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>github.com/AbdelRMB/Wesley <span style="font-size:24px">⭐</span></div>
   <div class="sous" id="fSous">Gratuit · Free — installe-le en 2 minutes</div>
  </div>
 </div>
@@ -241,13 +241,13 @@ const EN=new URLSearchParams(location.search).get("lang")==="en";
 const tr=(fr,en)=>EN?en:fr;
 if(EN){document.documentElement.lang="en";const PAIRES=[
  ["ASSISTANT PERSONNEL","PERSONAL ASSISTANT"],[">Liaison serveur<",">Server link<"],[">Micro<",">Microphone<"],["Connecté en tant que","Signed in as"],
- ["<span>Appui</span>","<span>Push</span>"],["« Jarvis »","“Jarvis”"],["LUNDI 23 NOVEMBRE","MONDAY, NOVEMBER 23"],[">Conversation en cours<",">Current conversation<"],
+ ["<span>Appui</span>","<span>Push</span>"],["« Wesley »","“Wesley”"],["LUNDI 23 NOVEMBRE","MONDAY, NOVEMBER 23"],[">Conversation en cours<",">Current conversation<"],
  ["Bonjour Abdelrahim.","Hello Abdelrahim."],["Que puis-je faire pour vous ?","What can I do for you?"],
  ["Ouvre mon dernier projet dans VS Code","Open my latest project in VS Code"],["Quelle météo aujourd'hui ?","What's the weather today?"],
  ["Qu'est-ce qui consomme le plus de mémoire ?","What's using the most memory?"],["Fais une capture et dis-moi ce que tu vois","Take a screenshot and tell me what you see"],
  ["Résume les actus tech du jour","Summarize today's tech news"],["Crée un projet Vite React dans Documents","Create a Vite React project in Documents"],
  ["Demande-moi n'importe quoi…","Ask me anything…"],["Entrée pour envoyer · Maj+Entrée nouvelle ligne · Espace maintenu pour parler · Échap pour stopper","Enter to send · Shift+Enter new line · Hold Space to talk · Esc to stop"],
- [">En attente<",">Waiting<"],["Dis « Jarvis, … »","Say “Jarvis, …”"],["ACTIONS DE LA SESSION","SESSION ACTIONS"],["Aucune action pour l'instant.","No actions yet."],
+ [">En attente<",">Waiting<"],["Dis « Wesley, … »","Say “Wesley, …”"],["ACTIONS DE LA SESSION","SESSION ACTIONS"],["Aucune action pour l'instant.","No actions yet."],
  ["localhost:5173/boutique","localhost:5173/shop"],["Ma Boutique","My Shop"],["<span>Produits</span>","<span>Products</span>"],["Panier (0)","Cart (0)"],
  ["ListeProduits.tsx","ProductList.tsx"],["&lt;ListeProduits&gt;","&lt;ProductList&gt;"],["at ListeProduits (","at ProductList ("],
  ["intranet.entreprise.fr/rh/conges/nouvelle","intranet.company.com/hr/time-off/new"],["▣ Espace RH","▣ HR Portal"],["Service informatique","IT department"],
@@ -275,29 +275,29 @@ const DUREE=54.5;
  const G=[["",[["message-square","Assistant",1],["list-checks",tr("À faire","To do")]]],[tr("Ma mémoire","My memory"),[["rotate-ccw-clock",tr("Historique","History")],["brain",tr("Mémoire","Memory")]]],
  [tr("Automatiser","Automate"),[["list-todo",tr("Tâches","Tasks")],["zap",tr("Automatisations","Automations")],["globe",tr("Sites appris","Learned sites")],["plug",tr("Connecteurs","Connectors")]]],
  [tr("Mes machines","My machines"),[["laptop",tr("Mes appareils","My devices")],["cpu",tr("Système","System")],["activity",tr("Activité","Activity")],["wrench","Arsenal"]]],
- ["Jarvis",[["settings",tr("Réglages","Settings")],["download",tr("Mises à jour","Updates")],["life-buoy","Tickets"]]]];
+ ["Wesley",[["settings",tr("Réglages","Settings")],["download",tr("Mises à jour","Updates")],["life-buoy","Tickets"]]]];
  let h="";for(const [g,items] of G){if(g)h+=`<div class="grp">${g}${IC("chevron-down",13)}</div>`;for(const [i,l,on] of items)h+=`<div class="ni${on?" on":""}">${IC(i,18)}${l}</div>`;}
  $("nav").innerHTML=h;
  $("bmic").innerHTML=IC("mic",17);$("bvol").innerHTML=IC("volume-2",17);$("bcl").innerHTML=IC("bell",17);
  $("modele").innerHTML=IC("brain",14)+"claude-sonnet-5-5";$("smic").innerHTML=IC("mic",19);$("senv").innerHTML=IC("arrow-up",19);
- $("capMic").innerHTML=IC("mic",22);$("dlgI").innerHTML=IC("shield-exclamation-point",19)+tr("Jarvis demande ton accord","Jarvis asks for your approval");
+ $("capMic").innerHTML=IC("mic",22);$("dlgI").innerHTML=IC("shield-exclamation-point",19)+tr("Wesley demande ton accord","Wesley asks for your approval");
  $("vu").innerHTML="<i></i>".repeat(44);
 })();
 
 /* ---------- scénario ---------- */
 const SC=[
  {ch:[4.9,15.0],num:"01",chF:"Pilote ton ordinateur",chE:"Drives your computer",
-  ec:[5.3,8.1],fr:"Jarvis, ouvre mon projet dans VS Code et lance les tests.",en:"“Jarvis, open my project in VS Code and run the tests.”",
+  ec:[5.3,8.1],fr:"Wesley, ouvre mon projet dans VS Code et lance les tests.",en:"“Wesley, open my project in VS Code and run the tests.”",
   tr:[8.1,8.6],an:[8.6,9.1],
-  outils:[["vscode_ouvrir",9.1,9.8,"MyJarvis"],["terminal",9.8,12.1,"npm test"]],
-  pa:[12.3,14.9],rep:"C'est fait : **MyJarvis** est ouvert dans VS Code et les **42 tests passent**. ✅"},
+  outils:[["vscode_ouvrir",9.1,9.8,"Wesley"],["terminal",9.8,12.1,"npm test"]],
+  pa:[12.3,14.9],rep:"C'est fait : **Wesley** est ouvert dans VS Code et les **42 tests passent**. ✅"},
  {ch:[15.6,26.0],num:"02",chF:"Voit ton écran",chE:"Sees your screen",
-  ec:[16.3,19.1],fr:"Jarvis, regarde mon écran : pourquoi ma page reste blanche ?",en:"“Jarvis, look at my screen: why is my page blank?”",
+  ec:[16.3,19.1],fr:"Wesley, regarde mon écran : pourquoi ma page reste blanche ?",en:"“Wesley, look at my screen: why is my page blank?”",
   tr:[19.1,19.6],an:[19.6,20.0],
   outils:[["regarder_ecran",20.0,22.0,"écran principal"]],
   pa:[22.2,25.9],rep:"L'erreur vient de **ListeProduits.tsx, ligne 42** : `produits` est encore vide au premier affichage, donc `.map` plante. Mets `produits ?? []` et la page s'affichera. Je corrige ?"},
  {ch:[26.6,39.0],num:"03",chF:"Utilise tes sites, même avec 2FA",chE:"Uses your websites, 2FA included",
-  ec:[27.2,30.0],fr:"Jarvis, pose mes congés du 23 au 27 décembre sur l'intranet.",en:"“Jarvis, book my time off from Dec 23 to 27 on the intranet.”",
+  ec:[27.2,30.0],fr:"Wesley, pose mes congés du 23 au 27 décembre sur l'intranet.",en:"“Wesley, book my time off from Dec 23 to 27 on the intranet.”",
   tr:[30.0,30.5],an:[30.5,30.8],
   outils:[["site_chercher",30.8,31.2,"intranet"],["navigateur_ouvrir",31.2,31.7,"intranet.entreprise.fr/rh/conges"],["site_se_connecter",31.7,32.6,"intranet.entreprise.fr"],["navigateur_remplir",32.6,34.4,"Type, Du, Au"],["navigateur_cliquer",34.4,36.7,"Envoyer la demande"]],
   pa:[37.0,39.0],rep:"C'est envoyé ✅ Ta demande de congés du **23 au 27 décembre** attend la validation de ton responsable."},
@@ -308,10 +308,10 @@ const SC=[
   pa:[45.6,48.4],rep:"C'est fait : message envoyé à **Karim**, et je te rappelle d'acheter du pain à **18 h**."},
 ];
 if(EN){const E=[
- {chF:"Drives your computer",fr:"Jarvis, open my project in VS Code and run the tests.",rep:"Done: **MyJarvis** is open in VS Code and all **42 tests pass**. ✅",args:["MyJarvis","npm test"]},
- {chF:"Sees your screen",fr:"Jarvis, look at my screen: why is my page blank?",rep:"The error comes from **ProductList.tsx, line 42**: `products` is still undefined on the first render, so `.map` crashes. Use `products ?? []` and the page will show up. Want me to fix it?",args:["main screen"]},
- {chF:"Uses your websites, 2FA included",fr:"Jarvis, book my time off from December 23 to 27 on the intranet.",rep:"Submitted ✅ Your time-off request for **December 23–27** is waiting for your manager's approval.",args:["intranet","intranet.company.com/hr/time-off","intranet.company.com","Type, From, To","Submit request"]},
- {chF:"Gets things done for you",fr:"Jarvis, tell Karim on WhatsApp I'll be there in 10 minutes, and remind me to buy bread at 6 pm.",rep:"Done: message sent to **Karim**, and I'll remind you to buy bread at **6 pm**.",args:["Karim","6:00 PM · buy bread"]}];
+ {chF:"Drives your computer",fr:"Wesley, open my project in VS Code and run the tests.",rep:"Done: **Wesley** is open in VS Code and all **42 tests pass**. ✅",args:["Wesley","npm test"]},
+ {chF:"Sees your screen",fr:"Wesley, look at my screen: why is my page blank?",rep:"The error comes from **ProductList.tsx, line 42**: `products` is still undefined on the first render, so `.map` crashes. Use `products ?? []` and the page will show up. Want me to fix it?",args:["main screen"]},
+ {chF:"Uses your websites, 2FA included",fr:"Wesley, book my time off from December 23 to 27 on the intranet.",rep:"Submitted ✅ Your time-off request for **December 23–27** is waiting for your manager's approval.",args:["intranet","intranet.company.com/hr/time-off","intranet.company.com","Type, From, To","Submit request"]},
+ {chF:"Gets things done for you",fr:"Wesley, tell Karim on WhatsApp I'll be there in 10 minutes, and remind me to buy bread at 6 pm.",rep:"Done: message sent to **Karim**, and I'll remind you to buy bread at **6 pm**.",args:["Karim","6:00 PM · buy bread"]}];
  SC.forEach((s,k)=>{const e=E[k];s.chF=e.chF;s.chE="";s.fr=e.fr;s.en="";s.rep=e.rep;s.outils.forEach((o,i)=>o[3]=e.args[i]);});}
 const T0=10*3600+46*60+12;
 const hms=s=>{s=Math.floor(s);return [s/3600|0,(s%3600)/60|0,s%60].map(x=>String(x).padStart(2,"0")).join(":")};
@@ -333,7 +333,7 @@ const lenVis=s=>[...s.replace(/\*\*|`/g,"")].length;
 for(const [k,s] of SC.entries()){
  const u=document.createElement("div");u.className="mu";u.innerHTML=`<div>${s.fr}</div>`;u.id="mu"+k;u.style.display="none";$("filIn").appendChild(u);
  const j=document.createElement("div");j.className="mj";j.id="mj"+k;j.style.display="none";
- j.innerHTML=`<div class="av"><span></span></div><div class="c"><div class="tete"><b>JARVIS</b><span>${hm(T0+s.an[0])}</span></div>`+
+ j.innerHTML=`<div class="av"><span></span></div><div class="c"><div class="tete"><b>WESLEY</b><span>${hm(T0+s.an[0])}</span></div>`+
   s.outils.map((o,i)=>`<div class="outil" id="o${k}_${i}" style="display:none"><span class="ic"></span><span class="n">${o[0]}</span><span class="a">${o[3]}</span><span class="ms"></span></div>`).join("")+
   `<div class="points" id="pt${k}"><span></span><span></span><span></span></div><div class="prose" id="rep${k}"></div></div>`;
  $("filIn").appendChild(j);
@@ -429,7 +429,7 @@ window.render=function(t){
 
  /* horloge, statut */
  $("heure").textContent=hms(T0+t);
- const S=(EN?{attente:["Waiting","Say “Jarvis, …”","var(--hud)"],ecoute:["Listening","I'm listening…","var(--vert)"],trans:["Transcription","Analyzing your voice…","var(--hud)"],ana:["Thinking","Thinking…","var(--hud)"],exec:["Running",(st.outil||"").replace(/_/g," "),"var(--ambre)"],parle:["Sending","Say “Jarvis, stop” or press Esc to cut","var(--hud)"]}:{attente:["En attente","Dis « Jarvis, … »","var(--hud)"],ecoute:["Écoute","Je t'écoute…","var(--vert)"],trans:["Transcription","J'analyse ta voix…","var(--hud)"],ana:["Analyse","Je réfléchis…","var(--hud)"],exec:["Exécution",(st.outil||"").replace(/_/g," "),"var(--ambre)"],parle:["Transmission","Dis « Jarvis, stop » ou Échap pour couper","var(--hud)"]})[st.e];
+ const S=(EN?{attente:["Waiting","Say “Wesley, …”","var(--hud)"],ecoute:["Listening","I'm listening…","var(--vert)"],trans:["Transcription","Analyzing your voice…","var(--hud)"],ana:["Thinking","Thinking…","var(--hud)"],exec:["Running",(st.outil||"").replace(/_/g," "),"var(--ambre)"],parle:["Sending","Say “Wesley, stop” or press Esc to cut","var(--hud)"]}:{attente:["En attente","Dis « Wesley, … »","var(--hud)"],ecoute:["Écoute","Je t'écoute…","var(--vert)"],trans:["Transcription","J'analyse ta voix…","var(--hud)"],ana:["Analyse","Je réfléchis…","var(--hud)"],exec:["Exécution",(st.outil||"").replace(/_/g," "),"var(--ambre)"],parle:["Transmission","Dis « Wesley, stop » ou Échap pour couper","var(--hud)"]})[st.e];
  $("stL").textContent=S[0];$("stL").style.color=S[2];$("stL").style.textShadow=`0 0 14px ${S[2]}`;$("stD").textContent=S[1];
  $("bmic").className="btn"+(st.e==="ecoute"?" actif":"");
  rApp(t,dt,st.e,lvl);

@@ -81,9 +81,9 @@ const PERMISSIONS: { id: string; libelle: string; alerte?: string; regle: string
 
 /** Bloc de commandes à coller sur le serveur (avec le compte habituel de l'utilisateur, qui a sudo). */
 function scriptServeur(u: string, publique: string, droits: Droits, permis: string[], deuxFA: boolean): string {
-  const f = `/etc/sudoers.d/jarvis-${u}`;
+  const f = `/etc/sudoers.d/wesley-${u}`;
   const l = [
-    `# Jarvis : préparation du serveur pour l'utilisateur ${u}`,
+    `# Wesley : préparation du serveur pour l'utilisateur ${u}`,
     `U=${u}; PATH="$PATH:/usr/local/sbin:/usr/sbin:/sbin"`,
     `id -u "$U" >/dev/null 2>&1 || sudo adduser --disabled-password --gecos "" "$U"`,
     `H=$(getent passwd "$U" | cut -d: -f6); G=$(id -gn "$U")`,
@@ -107,13 +107,13 @@ function scriptServeur(u: string, publique: string, droits: Droits, permis: stri
   if (deuxFA)
     l.push(
       `if ! sudo grep -q "^Match User $U\\$" /etc/ssh/sshd_config; then`,
-      `  sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.avant-jarvis`,
+      `  sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.avant-wesley`,
       `  printf '\\nMatch User %s\\n    AuthenticationMethods publickey\\n' "$U" | sudo tee -a /etc/ssh/sshd_config >/dev/null`,
       `  if sudo sshd -t; then sudo systemctl reload ssh 2>/dev/null || sudo systemctl reload sshd`,
-      `  else sudo cp /etc/ssh/sshd_config.avant-jarvis /etc/ssh/sshd_config; echo "Config SSH refusée : remise comme avant."; fi`,
+      `  else sudo cp /etc/ssh/sshd_config.avant-wesley /etc/ssh/sshd_config; echo "Config SSH refusée : remise comme avant."; fi`,
       `fi`,
     );
-  l.push(`echo; echo "== Jarvis : $U prêt =="; sudo -l -U "$U" 2>/dev/null | sed -n '/NOPASSWD/p' || true`);
+  l.push(`echo; echo "== Wesley : $U prêt =="; sudo -l -U "$U" 2>/dev/null | sed -n '/NOPASSWD/p' || true`);
   return l.join("\n");
 }
 
@@ -194,14 +194,14 @@ function GuideCleSSH({
       </div>
       {!publique && (
         <p className="text-[12px] text-tres-doux">
-          {t("Jarvis crée une clé rien que pour lui et te guide pour l'ajouter au serveur. Avec une clé, plus besoin de mot de passe ni de code d'authentification, et elle suit ton compte sur tous tes appareils.")}
+          {t("Wesley crée une clé rien que pour lui et te guide pour l'ajouter au serveur. Avec une clé, plus besoin de mot de passe ni de code d'authentification, et elle suit ton compte sur tous tes appareils.")}
         </p>
       )}
       {publique && (
         <ol className="list-decimal space-y-3 pl-5 text-[13px] leading-relaxed">
           {nouvelle && <li>{t("La clé privée est dans le formulaire ci-dessous (champ « Clé privée SSH »). Elle sera enregistrée quand tu cliqueras sur « Connecter ».")}</li>}
           <li className="space-y-2">
-            <span className="block">{t("Choisis ce que Jarvis pourra faire sur le serveur :")}</span>
+            <span className="block">{t("Choisis ce que Wesley pourra faire sur le serveur :")}</span>
             <div className="space-y-1.5 rounded-md border border-ligne p-2.5">
               {(
                 [
@@ -235,18 +235,18 @@ function GuideCleSSH({
               )}
               {droits === "complets" && (
                 <p className="ml-6 text-[12px] text-ambre">
-                  {t("Jarvis pourra tout faire sur le serveur. Chaque commande sudo te demandera quand même « Autoriser / Refuser ».")}
+                  {t("Wesley pourra tout faire sur le serveur. Chaque commande sudo te demandera quand même « Autoriser / Refuser ».")}
                 </p>
               )}
               <label className="flex items-center gap-2 border-t border-ligne pt-1.5">
                 <input type="checkbox" checked={deuxFA} onChange={(e) => setDeuxFA(e.target.checked)} className="accent-hud" />
-                {t("Mon serveur demande un code d'authentification (2FA) : la clé de Jarvis suffira")}
+                {t("Mon serveur demande un code d'authentification (2FA) : la clé de Wesley suffira")}
               </label>
             </div>
           </li>
           <li>
             {!nomValide ? (
-              <span className="text-ambre">{t("Remplis d'abord le champ « Utilisateur » ci-dessous (par exemple jarvis) : le bloc de commandes apparaîtra ici.")}</span>
+              <span className="text-ambre">{t("Remplis d'abord le champ « Utilisateur » ci-dessous (par exemple wesley) : le bloc de commandes apparaîtra ici.")}</span>
             ) : (
               <>
                 {connexion
@@ -302,7 +302,7 @@ function Editeur({
         json: { type: def.type, conf, secrets: Object.fromEntries(Object.entries(secrets).filter(([k, v]) => v !== "" || aVider.includes(k))), actif: true },
       });
       if (r.erreur) toast(r.erreur, "erreur");
-      else toast(`${def.nom} connecté — ${r.outils.length} outil(s) ajouté(s) à Jarvis.`, "succes");
+      else toast(`${def.nom} connecté — ${r.outils.length} outil(s) ajouté(s) à Wesley.`, "succes");
       onFini();
     } catch (e) {
       toast((e as Error).message, "erreur");
@@ -491,13 +491,13 @@ export function VueConnecteurs() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Connecteurs")}
-        sousTitre={t("Branche tes services : leurs outils s'ajoutent à Jarvis. La liste est partagée entre tes PC ; les mots de passe restent sur chaque PC.")}
+        sousTitre={t("Branche tes services : leurs outils s'ajoutent à Wesley. La liste est partagée entre tes PC ; les mots de passe restent sur chaque PC.")}
       />
 
       <h2 className="titre-hud mb-3 text-[11px] text-hud">{t("Connectés")}</h2>
       {installes.length === 0 ? (
         <div className="coins mb-8 border border-ligne bg-surface/40">
-          <Vide icone={<Plug />} titre={t("Aucun service connecté")} texte={t("Choisis un service ci-dessous. Par exemple Gmail pour que Jarvis lise et envoie tes mails.")} />
+          <Vide icone={<Plug />} titre={t("Aucun service connecté")} texte={t("Choisis un service ci-dessous. Par exemple Gmail pour que Wesley lise et envoie tes mails.")} />
         </div>
       ) : (
         <div className="mb-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">

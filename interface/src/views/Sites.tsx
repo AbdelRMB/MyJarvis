@@ -4,7 +4,7 @@ import { Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { t } from "../lib/i18n";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Resume = { id: string; nom: string; url: string; pages: number; procedures: number; astuces: number; guide: boolean; modifie: string; explore: string };
@@ -72,7 +72,7 @@ function ConnexionAuto({ id, connexion, onMaj }: { id: string; connexion?: Detai
         </span>
       </summary>
       <p className="mt-2 text-[12px] text-doux">
-        {t("Jarvis se connecte tout seul, même avec double authentification. Tes identifiants vont dans ton coffre chiffré : ils ne sont jamais réaffichés ni montrés à l'IA.")}
+        {t("Wesley se connecte tout seul, même avec double authentification. Tes identifiants vont dans ton coffre chiffré : ils ne sont jamais réaffichés ni montrés à l'IA.")}
       </p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         <Champ placeholder={connexion?.identifiant ? t("Identifiant (déjà enregistré)") : t("Identifiant")} value={f.identifiant} onChange={(x) => setF({ ...f, identifiant: x.target.value })} />
@@ -139,12 +139,12 @@ function DetailSite({ id, etat, recharger }: { id: string; etat: Etat; recharger
       <ol className="mb-4 space-y-3 text-[13px]">
         <li className="flex flex-wrap items-center gap-3">
           <span className="w-5 text-hud">1.</span>
-          <span className="flex-1 text-doux">{t("Ouvre le site dans le navigateur de Jarvis et connecte-toi (une seule fois, la session est gardée).")}</span>
+          <span className="flex-1 text-doux">{t("Ouvre le site dans le navigateur de Wesley et connecte-toi (une seule fois, la session est gardée).")}</span>
           <Bouton taille="sm" icone={<LogIn className="size-3.5" />} onClick={() => agir("ouvrir")}>{t("Ouvrir pour me connecter")}</Bouton>
         </li>
         <li className="flex flex-wrap items-center gap-3">
           <span className="w-5 text-hud">2.</span>
-          <span className="flex-1 text-doux">{t("Jarvis parcourt le site sans rien modifier et apprend ses pages, menus, boutons et formulaires.")}</span>
+          <span className="flex-1 text-doux">{t("Wesley parcourt le site sans rien modifier et apprend ses pages, menus, boutons et formulaires.")}</span>
           {exploreIci ? (
             <Bouton taille="sm" variante="danger" icone={<Square className="size-3.5" />} onClick={() => agir("arreter")}>{t("Arrêter")}</Bouton>
           ) : (
@@ -253,7 +253,7 @@ function DetailSite({ id, etat, recharger }: { id: string; etat: Etat; recharger
       )}
 
       <button className="mt-4 text-[12px] text-tres-doux hover:text-rouge" onClick={async () => {
-        if (!confirm(t("Oublier ce site et tout ce que Jarvis en a appris ?"))) return;
+        if (!confirm(t("Oublier ce site et tout ce que Wesley en a appris ?"))) return;
         await api(`/api/sites/${id}`, { method: "DELETE" }).catch(() => {});
         recharger();
       }}>
@@ -263,7 +263,7 @@ function DetailSite({ id, etat, recharger }: { id: string; etat: Etat; recharger
   );
 }
 
-/** Mac : Jarvis peut aussi travailler dans le navigateur de l'utilisateur (Safari, Chrome…), sous ses yeux. */
+/** Mac : Wesley peut aussi travailler dans le navigateur de l'utilisateur (Safari, Chrome…), sous ses yeux. */
 function TonNavigateur() {
   const [r, setR] = useState<{ ok: boolean; message: string } | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -280,12 +280,12 @@ function TonNavigateur() {
     <details className="mb-6 rounded-md border border-ligne px-4 py-3">
       <summary className="cursor-pointer text-sm">{t("Travailler dans TON navigateur (Safari, Chrome, Edge, Brave, Arc)")}</summary>
       <p className="mt-2 text-[13px] text-doux">
-        {t("Dis « sur ma page… » ou « dans Safari… » : Jarvis agit dans l'onglet que tu as ouvert, là où tu es connecté, et entoure chaque élément avant de cliquer pour que tu voies ce qu'il fait. À autoriser une fois :")}
+        {t("Dis « sur ma page… » ou « dans Safari… » : Wesley agit dans l'onglet que tu as ouvert, là où tu es connecté, et entoure chaque élément avant de cliquer pour que tu voies ce qu'il fait. À autoriser une fois :")}
       </p>
       <ul className="mt-2 list-disc space-y-1 pl-5 text-[12px] text-doux">
         <li>{t("Safari : Réglages › Avancées › coche « Afficher les fonctionnalités pour les développeurs web », puis menu Développement › « Autoriser JavaScript depuis les Apple Events ».")}</li>
         <li>{t("Chrome, Edge, Brave, Arc : menu Affichage › Options pour les développeurs › « Autoriser JavaScript à partir des événements Apple ».")}</li>
-        <li>{t("macOS te demandera ensuite d'autoriser Jarvis à contrôler ce navigateur : accepte.")}</li>
+        <li>{t("macOS te demandera ensuite d'autoriser Wesley à contrôler ce navigateur : accepte.")}</li>
       </ul>
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Bouton taille="sm" chargement={enCours} onClick={tester}>{t("Tester sur l'onglet ouvert")}</Bouton>
@@ -328,16 +328,16 @@ export function VueSites() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Sites appris")}
-        sousTitre={t("Fais apprendre par cœur tes sites (intranet, logiciels d'entreprise…) à Jarvis : il saura directement où aller et quoi faire. Ce qu'il apprend reste sur cet ordinateur.")}
+        sousTitre={t("Fais apprendre par cœur tes sites (intranet, logiciels d'entreprise…) à Wesley : il saura directement où aller et quoi faire. Ce qu'il apprend reste sur cet ordinateur.")}
       />
       {nav && !nav.executable && (
         <div className="mb-6 rounded-md border border-ambre/40 bg-ambre/5 p-4 text-[13px]">
-          <p className="mb-3 text-ambre">{t("Jarvis a besoin d'un navigateur à lui (Chrome, Edge ou Brave). Aucun n'est installé : télécharge Chrome for Testing, le Chrome officiel de Google pour l'automatisation (environ 150 Mo).")}</p>
+          <p className="mb-3 text-ambre">{t("Wesley a besoin d'un navigateur à lui (Chrome, Edge ou Brave). Aucun n'est installé : télécharge Chrome for Testing, le Chrome officiel de Google pour l'automatisation (environ 150 Mo).")}</p>
           {nav.installation.en_cours ? (
             <div className="h-1.5 overflow-hidden rounded bg-surface-3"><div className="h-full bg-hud" style={{ width: `${nav.installation.pct}%` }} /></div>
           ) : (
             <Bouton variante="primaire" icone={<Download className="size-4" />} onClick={() => api<Nav>("/api/navigateur/installer", { method: "POST" }).then(charger).catch((x) => toast((x as Error).message, "erreur"))}>
-              {t("Télécharger le navigateur de Jarvis")}
+              {t("Télécharger le navigateur de Wesley")}
             </Bouton>
           )}
           {nav.installation.erreur && <p className="mt-2 text-rouge">{nav.installation.erreur}</p>}
@@ -363,7 +363,7 @@ export function VueSites() {
         {e && choisi && e.sites.some((s) => s.id === choisi) ? (
           <DetailSite key={choisi} id={choisi} etat={e} recharger={charger} />
         ) : (
-          <Vide icone={<BookOpen />} titre={t("Aucun site appris")} texte={t("Ajoute un site, connecte-toi dans le navigateur de Jarvis, puis lance l'exploration. Tu peux aussi lui dire : « apprends le site de mon intranet ».")} />
+          <Vide icone={<BookOpen />} titre={t("Aucun site appris")} texte={t("Ajoute un site, connecte-toi dans le navigateur de Wesley, puis lance l'exploration. Tu peux aussi lui dire : « apprends le site de mon intranet ».")} />
         )}
       </div>
     </div>

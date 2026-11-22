@@ -1,11 +1,11 @@
 import { t } from "../lib/i18n";
 /**
- * Chaîne vocale : phrase captée → Whisper (serveur) → filtrage mot d'activation → envoi à Jarvis.
+ * Chaîne vocale : phrase captée → Whisper (serveur) → filtrage mot d'activation → envoi à Wesley.
  * Branche aussi la voix et les bips sur les événements de la conversation.
  */
 import { api } from "../lib/api";
 import { audio, majAudio, useAudio } from "../stores/audio";
-import { arreter, bus, envoyer, signalerParole, useJarvis } from "../stores/jarvis";
+import { arreter, bus, envoyer, signalerParole, useWesley } from "../stores/wesley";
 import { reglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 import { sons } from "./bips";
@@ -16,15 +16,15 @@ let suiviActif = true;    // Réglages › Application › Conversation suivie
 let dernierVocal = 0;     // dernière demande faite à la voix
 
 const mots = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").match(/[a-z0-9']+/g) ?? [];
-/** La phrase entendue reprend surtout ce que Jarvis dit : c'est l'écho de sa voix, pas toi. */
+/** La phrase entendue reprend surtout ce que Wesley dit : c'est l'écho de sa voix, pas toi. */
 function estEcho(entendu: string) {
   const dit = new Set(mots(texteEnCours()));
   const m = mots(entendu);
   return m.length > 0 && m.filter((x) => dit.has(x)).length / m.length >= 0.5;
 }
 
-// Même règles que l'écoute de fond (jarvis/ecoute.py) : « Jarvis », « Hé/Et/Ok/Dis Jarvis », transcriptions approximatives
-const NOM = String.raw`(?:d[ie]\s?)?(?:j|dj)[ae]r?v[iy](?:s|ce|sse|ss)?`;
+// Même règles que l'écoute de fond (wesley/ecoute.py) : « Wesley », « Hé/Et/Ok/Dis Wesley », transcriptions approximatives
+const NOM = String.raw`(?:w|ou|v)[eéè]s{1,2}t?[\s-]?l(?:ey|ee|ie|ay|y|i|é|e)s?`;   // Wesley, Wesly, Westley, Ouesley…
 const MOTS_STOP = String.raw`(?:stop+|arr[êe]te[sz]?(?:[- ]toi)?|annule|tais[- ]toi|taisez[- ]vous|chut+|silence|ça suffit|ca suffit|attends|pause|ferme[- ]la|c'est bon)`;
 const RX_EVEIL = new RegExp(String.raw`^\W*(?:(?:hey|hé|he|eh|et|é|ok|okay|dis|salut|bonjour)\W+)?` + NOM + String.raw`\b[\s,.!?:;-]*`, "i");
 const RX_STOP = new RegExp(String.raw`^\W*(?:` + NOM + String.raw`\W+)?` + MOTS_STOP + String.raw`(?![a-zà-ÿ])`, "i");
@@ -52,22 +52,22 @@ export async function transcrire(morceaux: Float32Array[]) {
 
 export function stopTout() {
   taire();
-  if (useJarvis.getState().occupe) arreter();
+  if (useWesley.getState().occupe) arreter();
   sons.stop();
 }
 
 function traiterParole(texte: string, auto: boolean) {
   if (!texte) return;
   majAudio({ derniereTranscription: texte });
-  const { occupe } = useJarvis.getState();
+  const { occupe } = useWesley.getState();
   const a = audio();
   if (RX_STOP.test(texte) && (occupe || a.parle)) return stopTout();
   if (auto && occupe) return; // mains libres : on ignore ce qui est dit pendant une tâche
   if (reglages().mode === "eveil" && Date.now() > a.eveilJusqua) {
-    if (!RX_EVEIL.test(texte)) return; // ce n'était pas pour Jarvis
+    if (!RX_EVEIL.test(texte)) return; // ce n'était pas pour Wesley
     texte = texte.replace(RX_EVEIL, "").trim();
     if (texte.length < 3) {
-      // « Jarvis ? » tout seul : il attend la suite
+      // « Wesley ? » tout seul : il attend la suite
       majAudio({ eveilJusqua: Date.now() + 8000 });
       sons.eveil();
       return;
@@ -85,7 +85,7 @@ export function brancherVoix() {
   if (branche) return;
   branche = true;
 
-  // Tu parles par-dessus Jarvis : « stop » le coupe, « Jarvis, … » le coupe et lance la nouvelle demande
+  // Tu parles par-dessus Wesley : « stop » le coupe, « Wesley, … » le coupe et lance la nouvelle demande
   let interruptionEnCours = false;
   micro.surInterruption = async (morceaux) => {
     if (interruptionEnCours) return;
@@ -102,14 +102,14 @@ export function brancherVoix() {
         const suite = await transcrire(morceaux); // transcription précise de la nouvelle demande
         traiterParole(suite || texte, false);
       } else if (suiviActif && reglages().echo && mots(texte).length >= 3 && !estEcho(texte)) {
-        // tu lui coupes la parole sans dire « Jarvis » : il se tait et écoute ta nouvelle demande
+        // tu lui coupes la parole sans dire « Wesley » : il se tait et écoute ta nouvelle demande
         majAudio({ derniereTranscription: texte, eveilJusqua: Date.now() + 3000 });
         stopTout();
         const suite = await transcrire(morceaux);
         traiterParole(suite || texte, false);
       }
     } catch {
-      /* interruption non comprise : on laisse Jarvis continuer */
+      /* interruption non comprise : on laisse Wesley continuer */
     } finally {
       interruptionEnCours = false;
     }
@@ -126,7 +126,7 @@ export function brancherVoix() {
     }
   };
 
-  window.addEventListener("jarvis:debut-ecoute", (e) => {
+  window.addEventListener("wesley:debut-ecoute", (e) => {
     const { auto } = (e as CustomEvent<{ auto: boolean }>).detail;
     if (audio().parle) taire();
     const r = reglages();
@@ -143,7 +143,7 @@ export function brancherVoix() {
     sons.outil();
   });
   bus.addEventListener("erreur", () => sons.erreur());
-  // « Hey Jarvis » entendu par l'écoute de fond de l'appli (même fenêtre cachée)
+  // « Hey Wesley » entendu par l'écoute de fond de l'appli (même fenêtre cachée)
   bus.addEventListener("vocal", (e) => {
     const v = (e as CustomEvent<{ etat: string; texte?: string }>).detail;
     if (v.etat === "eveil") {
@@ -160,11 +160,11 @@ export function brancherVoix() {
     .catch(() => {});
   useAudio.subscribe((s, avant) => {
     if (s.parle !== avant.parle) signalerParole(s.parle);
-    // conversation suivie (micro de la fenêtre, mode « Jarvis ») : après sa réponse, la suite sans redire son nom
+    // conversation suivie (micro de la fenêtre, mode « Wesley ») : après sa réponse, la suite sans redire son nom
     if (avant.parle && !s.parle)
       setTimeout(() => {
         const a = audio();
-        if (suiviActif && !a.parle && !useJarvis.getState().occupe && reglages().mode === "eveil" && !a.ecouteFond && Date.now() - dernierVocal < 180000)
+        if (suiviActif && !a.parle && !useWesley.getState().occupe && reglages().mode === "eveil" && !a.ecouteFond && Date.now() - dernierVocal < 180000)
           majAudio({ eveilJusqua: Date.now() + 8000 });
       }, 800);
   });

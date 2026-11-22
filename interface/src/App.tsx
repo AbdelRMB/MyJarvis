@@ -14,7 +14,7 @@ import { AccordPolitique } from "./components/Politique";
 import { GardeVue } from "./components/GardeVue";
 import { api, ouvrirSession } from "./lib/api";
 import { majAudio } from "./stores/audio";
-import { bus, connecter, useJarvis } from "./stores/jarvis";
+import { bus, connecter, useWesley } from "./stores/wesley";
 import { useReglages, type Vue } from "./stores/reglages";
 import { rafraichirSysteme } from "./stores/systeme";
 import { VueActivite } from "./views/Activite";
@@ -77,19 +77,19 @@ function useRaccourcis() {
 
 const PARAMS = new URLSearchParams(location.search);
 const FENETRE_BUREAU = PARAMS.has("appli");
-if (PARAMS.get("vue") === "majs") useReglages.getState().maj({ vue: "majs" });   // raccourci « Mettre à jour Jarvis »
+if (PARAMS.get("vue") === "majs") useReglages.getState().maj({ vue: "majs" });   // raccourci « Mettre à jour Wesley »
 
 export default function App() {
   const [demarre, setDemarre] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [compte, setCompte] = useState<Compte | null>(null);
-  const session = useJarvis((s) => s.session);
+  const session = useWesley((s) => s.session);
   const vue = useReglages((s) => s.vue);
 
   useEffect(() => {
     ouvrirSession()
       .then((s) => {
-        useJarvis.setState({ session: s });
+        useWesley.setState({ session: s });
         api<Compte>("/api/compte").then(setCompte).catch(() => {});
         api<{ config: { langue?: string } }>("/api/config")
           .then((c) => {
@@ -124,7 +124,7 @@ export default function App() {
     return () => bus.removeEventListener("compte_deconnecte", sur);
   }, []);
 
-  // Automatisations : Jarvis prévient à voix haute (voix choisie dans Réglages › Voix), même fenêtre cachée
+  // Automatisations : Wesley prévient à voix haute (voix choisie dans Réglages › Voix), même fenêtre cachée
   useEffect(() => {
     const sur = (ev: Event) => {
       const texte = (ev as CustomEvent<string>).detail;

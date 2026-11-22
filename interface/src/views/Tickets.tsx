@@ -4,7 +4,7 @@ import { Badge, Bouton, Champ, EnTetePage, Onglets, Panneau, Vide } from "../com
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { t } from "../lib/i18n";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Genre = "bug" | "amelioration" | "idee" | "question" | "autre";
@@ -77,10 +77,10 @@ function BandeauRapport({ onEnvoye }: { onEnvoye: (e: Etat) => void }) {
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 size-5 flex-none text-ambre" />
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">{r.plantage ? t("Jarvis s'est arrêté à cause d'une erreur") : t("Jarvis a rencontré une erreur")}</div>
+          <div className="text-sm font-medium">{r.plantage ? t("Wesley s'est arrêté à cause d'une erreur") : t("Wesley a rencontré une erreur")}</div>
           <div className="mt-0.5 truncate font-mono text-[12px] text-doux">{r.titre}</div>
           <p className="mt-2 text-[13px] text-doux">
-            {t("Envoie le rapport au développeur pour qu'il la corrige. Il contient la version, le système, l'erreur et la fin du journal de Jarvis.")}{" "}
+            {t("Envoie le rapport au développeur pour qu'il la corrige. Il contient la version, le système, l'erreur et la fin du journal de Wesley.")}{" "}
             <button className="text-hud underline" onClick={() => setVoir(!voir)}>
               {voir ? t("Masquer") : t("Voir ce qui sera envoyé")}
             </button>
@@ -151,7 +151,7 @@ function LigneTicket({
                 rows={3}
                 value={reponse}
                 onChange={(e) => setReponse(e.target.value)}
-                placeholder={t("Réponse à l'auteur (il la verra dans son Jarvis)")}
+                placeholder={t("Réponse à l'auteur (il la verra dans son Wesley)")}
                 className="w-full rounded-md border border-ligne-forte bg-surface-2 p-2 text-sm outline-none focus:border-hud"
               />
               <div className="flex flex-wrap items-center gap-2">
@@ -165,7 +165,7 @@ function LigneTicket({
                   </button>
                 ))}
                 {onCorriger && (x.statut === "ouvert" || x.statut === "en_cours") && (
-                  <Bouton taille="sm" icone={<Code2 className="size-3.5" />} onClick={onCorriger} title={t("Lance Claude Code sur le code de Jarvis pour traiter ce ticket (branche à relire)")}>
+                  <Bouton taille="sm" icone={<Code2 className="size-3.5" />} onClick={onCorriger} title={t("Lance Claude Code sur le code de Wesley pour traiter ce ticket (branche à relire)")}>
                     {t("Corriger avec Claude Code")}
                   </Bouton>
                 )}
@@ -229,7 +229,7 @@ export function VueTickets() {
     } catch (er) {
       const msg = (er as Error).message;
       if (!projet && /dossier/i.test(msg)) {
-        const p = prompt(t("Dossier du code de Jarvis sur cet ordinateur (retenu pour la suite) :"), "~/Desktop/jarvis-real");
+        const p = prompt(t("Dossier du code de Wesley sur cet ordinateur (retenu pour la suite) :"), "~/Desktop/wesley-real");
         if (p) return corriger(x, p);
         return;
       }
@@ -250,7 +250,7 @@ export function VueTickets() {
     return (
       <div className="h-full overflow-y-auto p-4 md:p-8">
         <EnTetePage titre={t("Tickets")} />
-        <Vide icone={<LifeBuoy />} titre={t("Connecte-toi à un compte Jarvis")} texte={t("Les tickets sont envoyés depuis ton compte en ligne.")} />
+        <Vide icone={<LifeBuoy />} titre={t("Connecte-toi à un compte Wesley")} texte={t("Les tickets sont envoyés depuis ton compte en ligne.")} />
       </div>
     );
 
@@ -259,7 +259,7 @@ export function VueTickets() {
 
   return (
     <div className="h-full overflow-y-auto p-4 md:p-8">
-      <EnTetePage titre={t("Tickets")} sousTitre={t("Un bug, une idée, une amélioration ? Envoie-la au développeur de Jarvis. Tu peux aussi le dire à Jarvis : « signale un bug : … ».")} />
+      <EnTetePage titre={t("Tickets")} sousTitre={t("Un bug, une idée, une amélioration ? Envoie-la au développeur de Wesley. Tu peux aussi le dire à Wesley : « signale un bug : … ».")} />
 
       {e?.admin && (
         <div className="mb-6">

@@ -97,7 +97,7 @@ export function VueSysteme() {
             </div>
           )}
           <p className="text-doux">
-            {t("Avec 8 Go de VRAM, les autres applis qui utilisent la carte graphique (jeux, LDPlayer, Wallpaper Engine…) font déborder le modèle sur le CPU : Jarvis devient plus lent. Libère la VRAM avant de jouer.")}
+            {t("Avec 8 Go de VRAM, les autres applis qui utilisent la carte graphique (jeux, LDPlayer, Wallpaper Engine…) font déborder le modèle sur le CPU : Wesley devient plus lent. Libère la VRAM avant de jouer.")}
           </p>
         </Panneau>
       </div>

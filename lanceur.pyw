@@ -7,6 +7,6 @@ if not getattr(sys, "frozen", False):
     sys.path.insert(0, ici)
     os.chdir(ici)
 
-from jarvis.app import main  # noqa: E402
+from wesley.app import main  # noqa: E402
 
 main()

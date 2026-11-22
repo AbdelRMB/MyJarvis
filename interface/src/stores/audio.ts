@@ -11,9 +11,9 @@ type EtatAudio = {
   enregistre: boolean;
   transcrit: boolean;
   parle: boolean;
-  eveilJusqua: number;      // mode « Jarvis » : fenêtre d'écoute après avoir entendu son nom
+  eveilJusqua: number;      // mode « Wesley » : fenêtre d'écoute après avoir entendu son nom
   derniereTranscription: string;
-  ecouteFond: boolean;            // appli de bureau : « Hey Jarvis » géré par le serveur
+  ecouteFond: boolean;            // appli de bureau : « Hey Wesley » géré par le serveur
   vocalServeur: "eveil" | "transcription" | null;
   voix: VoixDispo[];
 };

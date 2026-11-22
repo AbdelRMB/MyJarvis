@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { t } from "../lib/i18n";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { useReglages, type Vue } from "../stores/reglages";
 
 type Notif = { id: string; ts: number; titre: string; texte: string; genre: "info" | "succes" | "alerte" | "erreur"; vue: string; lue: boolean };

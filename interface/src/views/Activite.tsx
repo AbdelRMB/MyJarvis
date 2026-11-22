@@ -5,7 +5,7 @@ import { Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import type { Action } from "../lib/types";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 const estErreur = (r: string | null) => !!r && /^Erreur/.test(r);
@@ -117,7 +117,7 @@ export function VueActivite() {
           <Champ value={filtre} onChange={(e) => setFiltre(e.target.value)} placeholder={t("Filtrer par outil ou paramètre…")} className="h-9 border-0 bg-transparent px-0" />
         </div>
         {visibles.length === 0 ? (
-          <Vide icone={<Activity />} titre={t("Aucune action")} texte={t("Les actions de Jarvis sur ton PC apparaîtront ici.")} />
+          <Vide icone={<Activity />} titre={t("Aucune action")} texte={t("Les actions de Wesley sur ton PC apparaîtront ici.")} />
         ) : (
           <ul>
             {visibles.map((a, i) => (

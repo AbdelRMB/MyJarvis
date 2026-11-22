@@ -34,7 +34,7 @@ export function VueHistorique() {
 
   return (
     <div className="flex h-full min-h-0 flex-col p-4 md:p-8">
-      <EnTetePage titre={t("Historique")} sousTitre={t("Toutes tes conversations avec Jarvis, jour par jour.")} />
+      <EnTetePage titre={t("Historique")} sousTitre={t("Toutes tes conversations avec Wesley, jour par jour.")} />
       {jours.length === 0 ? (
         <Vide icone={<History />} titre={t("Aucune conversation")} texte={t("Les échanges apparaîtront ici dès ta première demande.")} />
       ) : (
@@ -76,7 +76,7 @@ export function VueHistorique() {
                       e.role === "user" ? "rounded-2xl rounded-br-sm border border-hud/25 bg-hud/10 px-4 py-2 text-hud-clair" : "border-l-2 border-hud/40 pl-4 text-left",
                     )}
                   >
-                    {e.role === "jarvis" ? <Markdown texte={e.texte} /> : <span className="whitespace-pre-wrap">{e.texte}</span>}
+                    {e.role === "wesley" ? <Markdown texte={e.texte} /> : <span className="whitespace-pre-wrap">{e.texte}</span>}
                   </div>
                 </div>
               ))}

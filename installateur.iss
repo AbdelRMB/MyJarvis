@@ -1,29 +1,32 @@
-; Programme d'installation de Jarvis (Inno Setup 6) : "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installateur.iss
-; Prérequis : avoir construit dist\Jarvis avec  .venv\Scripts\pyinstaller jarvis.spec --noconfirm
+; Programme d'installation de Wesley (Inno Setup 6) : "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installateur.iss
+; Prérequis : avoir construit dist\Wesley avec  .venv\Scripts\pyinstaller wesley.spec --noconfirm
 
-; La version vient de jarvis/version.py (construire.bat et GitHub Actions passent /DVersion=x.y.z)
+; La version vient de wesley/version.py (construire.bat et GitHub Actions passent /DVersion=x.y.z)
 #ifndef Version
   #define Version "0.0.0"
 #endif
 
 [Setup]
 AppId={{6E0B7C1A-4C1F-4B9B-9E2A-3F7D1A2B9C01}
-AppName=Jarvis
+AppName=Wesley
 AppVersion={#Version}
-AppVerName=Jarvis {#Version}
+AppVerName=Wesley {#Version}
 AppPublisher=Abdelrahim Riche
 AppCopyright=© Abdelrahim Riche
 VersionInfoCompany=Abdelrahim Riche
-VersionInfoDescription=Installation de Jarvis
+VersionInfoDescription=Installation de Wesley
 VersionInfoVersion={#Version}
-DefaultDirName={localappdata}\Programs\Jarvis
-DefaultGroupName=Jarvis
+DefaultDirName={localappdata}\Programs\Wesley
+; même AppId que du temps de Jarvis (avant la 2.0.0) : la mise à jour remplace l'ancienne installation, mais
+; dans le nouveau dossier (l'ancien, …\Programs\Jarvis, est supprimé par Wesley après son premier démarrage)
+UsePreviousAppDir=no
+DefaultGroupName=Wesley
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=installateur
-OutputBaseFilename=JarvisSetup-{#Version}
-SetupIconFile=jarvis.ico
-UninstallDisplayIcon={app}\Jarvis.exe
+OutputBaseFilename=WesleySetup-{#Version}
+SetupIconFile=wesley.ico
+UninstallDisplayIcon={app}\Wesley.exe
 Compression=lzma2/normal
 SolidCompression=yes
 WizardStyle=modern
@@ -36,27 +39,37 @@ ArchitecturesAllowed=x64compatible
 Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 
 [Tasks]
-Name: "demarrage"; Description: "Lancer Jarvis au démarrage de Windows (caché, il attend que tu l'appelles)"; GroupDescription: "Options :"
+Name: "demarrage"; Description: "Lancer Wesley au démarrage de Windows (caché, il attend que tu l'appelles)"; GroupDescription: "Options :"
 Name: "bureau"; Description: "Créer une icône sur le bureau"; GroupDescription: "Options :"
 
 [Files]
-Source: "dist\Jarvis\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Wesley\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[InstallDelete]
+; raccourcis de l'ancien nom (Jarvis, avant la 2.0.0)
+Type: files; Name: "{userprograms}\Jarvis.lnk"
+Type: files; Name: "{userprograms}\Mettre à jour Jarvis.lnk"
+Type: files; Name: "{userdesktop}\Jarvis.lnk"
 
 [Icons]
-Name: "{userprograms}\Jarvis"; Filename: "{app}\Jarvis.exe"; Comment: "Ton assistant personnel"
-Name: "{userprograms}\Mettre à jour Jarvis"; Filename: "{app}\Jarvis.exe"; Parameters: "--maj"; Comment: "Voir et installer les mises à jour de Jarvis"
-Name: "{userdesktop}\Jarvis"; Filename: "{app}\Jarvis.exe"; Tasks: bureau
+Name: "{userprograms}\Wesley"; Filename: "{app}\Wesley.exe"; Comment: "Ton assistant personnel"
+Name: "{userprograms}\Mettre à jour Wesley"; Filename: "{app}\Wesley.exe"; Parameters: "--maj"; Comment: "Voir et installer les mises à jour de Wesley"
+Name: "{userdesktop}\Wesley"; Filename: "{app}\Wesley.exe"; Tasks: bureau
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Jarvis"; ValueData: """{app}\Jarvis.exe"" --cache"; Tasks: demarrage; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Wesley"; ValueData: """{app}\Wesley.exe"" --cache"; Tasks: demarrage; Flags: uninsdeletevalue
+; lancement au démarrage enregistré sous l'ancien nom (Jarvis)
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Jarvis"; Flags: deletevalue
 
 [Run]
-Filename: "{app}\Jarvis.exe"; Description: "Lancer Jarvis maintenant"; Flags: nowait postinstall skipifsilent
-; mise à jour depuis l'appli (installation silencieuse) : Jarvis redémarre tout seul
-Filename: "{app}\Jarvis.exe"; Flags: nowait skipifnotsilent
+; mise à jour depuis une version nommée Jarvis : elle doit être fermée avant le premier lancement de Wesley
+Filename: "{sys}\taskkill.exe"; Parameters: "/IM Jarvis.exe /F"; Flags: runhidden
+Filename: "{app}\Wesley.exe"; Description: "Lancer Wesley maintenant"; Flags: nowait postinstall skipifsilent
+; mise à jour depuis l'appli (installation silencieuse) : Wesley redémarre tout seul
+Filename: "{app}\Wesley.exe"; Flags: nowait skipifnotsilent
 
 [UninstallRun]
-Filename: "{sys}\taskkill.exe"; Parameters: "/IM Jarvis.exe /F"; Flags: runhidden; RunOnceId: "ArretJarvis"
+Filename: "{sys}\taskkill.exe"; Parameters: "/IM Wesley.exe /F"; Flags: runhidden; RunOnceId: "ArretWesley"
 
 [Messages]
-french.WelcomeLabel2=Jarvis va être installé sur ce PC.%n%nIl démarre avec Windows, reste caché près de l'horloge, et apparaît quand tu dis « Jarvis » ou que tu appuies sur Ctrl+Alt+J.%n%nSa mémoire est partagée avec tes autres PC via OneDrive.
+french.WelcomeLabel2=Wesley va être installé sur ce PC.%n%nIl démarre avec Windows, reste caché près de l'horloge, et apparaît quand tu dis « Wesley » ou que tu appuies sur Ctrl+Alt+W.%n%nSa mémoire est partagée avec tes autres PC via OneDrive.

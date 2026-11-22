@@ -4,12 +4,12 @@ import { Badge, Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/u
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { t } from "../lib/i18n";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Statut = "en_cours" | "terminee" | "echec" | "arretee" | "interrompue";
 type Resume = { id: string; titre: string; statut: Statut; outil: string; projet: string; branche: string; dossier: string; cree: number; maj: number; etape: number; bilan: string };
-type Entree = { ts: number; genre: "utilisateur" | "jarvis" | "claude" | "outil" | "info" | "erreur"; texte: string };
+type Entree = { ts: number; genre: "utilisateur" | "wesley" | "claude" | "outil" | "info" | "erreur"; texte: string };
 type Tache = Resume & { consigne: string; ajouts: string[]; journal: Entree[] };
 
 const STATUTS: Record<Statut, [string, string]> = {
@@ -21,7 +21,7 @@ const STATUTS: Record<Statut, [string, string]> = {
 };
 const QUI: Record<Entree["genre"], [string, typeof User]> = {
   utilisateur: ["Toi", User],
-  jarvis: ["Jarvis → agent", Bot],
+  wesley: ["Wesley → agent", Bot],
   claude: ["Agent", Bot],
   outil: ["Action", Wrench],
   info: ["Info", CircleDot],
@@ -102,7 +102,7 @@ export function VueTaches() {
     <div className="flex h-full min-h-0 flex-col p-4 md:p-8">
       <EnTetePage
         titre={t("Tâches")}
-        sousTitre={t("Le code que Jarvis fait en arrière-plan (avec Claude Code ou lui-même), chacun sur sa branche. Continue à lui parler pendant ce temps : il peut changer une tâche en cours.")}
+        sousTitre={t("Le code que Wesley fait en arrière-plan (avec Claude Code ou lui-même), chacun sur sa branche. Continue à lui parler pendant ce temps : il peut changer une tâche en cours.")}
       />
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[340px_1fr]">
         <div className="flex min-h-0 flex-col gap-3">
@@ -111,7 +111,7 @@ export function VueTaches() {
               rows={3}
               value={nouvelle.consigne}
               onChange={(e) => setNouvelle({ ...nouvelle, consigne: e.target.value })}
-              placeholder={t("Ce qu'il faut coder… (ou demande-le simplement à Jarvis)")}
+              placeholder={t("Ce qu'il faut coder… (ou demande-le simplement à Wesley)")}
               className="w-full rounded-md border border-ligne-forte bg-surface-2 p-2 text-sm outline-none focus:border-hud"
             />
             <Champ className="mt-2" placeholder={t("Dossier du projet (ex : ~/Desktop/mon-projet)")} value={nouvelle.projet} onChange={(e) => setNouvelle({ ...nouvelle, projet: e.target.value })} />
@@ -120,9 +120,9 @@ export function VueTaches() {
               onChange={(e) => setNouvelle({ ...nouvelle, outil: e.target.value })}
               className="mt-2 h-10 w-full rounded-md border border-ligne-forte bg-surface-2 px-3 text-sm"
             >
-              <option value="claude_code">{t("Claude Code, piloté par Jarvis")}</option>
-              <option value="codex">{t("Codex (OpenAI), piloté par Jarvis")}</option>
-              <option value="jarvis">{t("Jarvis code lui-même (cerveau choisi)")}</option>
+              <option value="claude_code">{t("Claude Code, piloté par Wesley")}</option>
+              <option value="codex">{t("Codex (OpenAI), piloté par Wesley")}</option>
+              <option value="wesley">{t("Wesley code lui-même (cerveau choisi)")}</option>
             </select>
             <Bouton className="mt-2" variante="primaire" icone={<Play />} disabled={!nouvelle.consigne.trim() || !nouvelle.projet.trim()} onClick={creer}>
               {t("Lancer")}
@@ -130,7 +130,7 @@ export function VueTaches() {
           </Panneau>
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
             {liste.length === 0 ? (
-              <Vide icone={<ListTodo />} titre={t("Aucune tâche")} texte={t("Dis à Jarvis : « code-moi … dans mon projet … »")} />
+              <Vide icone={<ListTodo />} titre={t("Aucune tâche")} texte={t("Dis à Wesley : « code-moi … dans mon projet … »")} />
             ) : (
               liste.map((x) => (
                 <button
@@ -158,7 +158,7 @@ export function VueTaches() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-base font-semibold">{detail.titre}</h2>
                   <Pastille s={detail.statut} />
-                  <Badge ton="doux">{detail.outil === "claude_code" ? "Claude Code" : detail.outil === "codex" ? "Codex" : "Jarvis"}</Badge>
+                  <Badge ton="doux">{detail.outil === "claude_code" ? "Claude Code" : detail.outil === "codex" ? "Codex" : "Wesley"}</Badge>
                   <Badge ton="doux">
                     {t("étape")} {detail.etape}
                   </Badge>
@@ -190,7 +190,8 @@ export function VueTaches() {
               </div>
               <div ref={defilement} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
                 {(detail.journal ?? []).map((e, i) => {
-                  const [qui, Icone] = QUI[e.genre] ?? [e.genre, CircleDot];
+                  // « jarvis » : journal d'une tâche lancée avant la 2.0.0, quand l'appli s'appelait Jarvis
+                  const [qui, Icone] = QUI[(e.genre as string) === "jarvis" ? "wesley" : e.genre] ?? [e.genre, CircleDot];
                   return (
                     <div key={i} className={cx("flex gap-2 text-[13px]", e.genre === "outil" && "text-doux")}>
                       <Icone className={cx("mt-0.5 size-4 flex-none", e.genre === "utilisateur" ? "text-ambre" : e.genre === "erreur" ? "text-rouge" : "text-hud")} />

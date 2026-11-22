@@ -43,7 +43,7 @@ header { display: flex; align-items: center; justify-content: space-between; pad
 main { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .bulle { max-width: 86%; padding: 10px 13px; border-radius: 16px; white-space: pre-wrap; word-wrap: break-word; }
 .bulle.moi { align-self: flex-end; background: rgba(60, 232, 255, .14); border: 1px solid rgba(60, 232, 255, .35); border-bottom-right-radius: 4px; }
-.bulle.jarvis { align-self: flex-start; background: var(--surface2); border: 1px solid var(--ligne); border-bottom-left-radius: 4px; }
+.bulle.wesley { align-self: flex-start; background: var(--surface2); border: 1px solid var(--ligne); border-bottom-left-radius: 4px; }
 .bulle.erreur { border-color: rgba(255, 93, 108, .5); color: #ffc3c9; }
 .meta { font-size: 11px; color: var(--doux); margin-top: 4px; }
 .vide { margin: auto; text-align: center; color: var(--doux); padding: 24px; }

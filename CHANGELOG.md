@@ -1,7 +1,14 @@
-# Versions de Jarvis
+# Versions de Wesley
 
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
+
+## 2.0.0
+- **Jarvis s'appelle maintenant Wesley.** Le nom « Jarvis » était déjà pris : ton assistant a un nouveau nom, rien d'autre ne change. Ta mémoire, ton historique, tes connecteurs, tes réglages et ton compte sont gardés tels quels, et la mise à jour se fait toute seule comme d'habitude. / **Jarvis is now called Wesley.** The name was already taken; your memory, history, connectors, settings and account are all kept.
+  - **Pour l'appeler, dis « Wesley »** (« Wesley, ouvre Discord », « Hé Wesley », « Ok Wesley »). Il ne répond plus à « Jarvis ». / **Say "Wesley"** to call it.
+  - **Nouveau raccourci : Ctrl+Alt+W** (⌃⌥W sur Mac), W comme Wesley, à la place de Ctrl+Alt+J. Si tu avais choisi un autre raccourci, il est gardé. « Ctrl+Alt+S » coupe toujours la parole. / **New shortcut: Ctrl+Alt+W.**
+  - **L'appli s'appelle Wesley partout** : menu Démarrer, zone de notification, barre des menus, lancement au démarrage. L'ancienne installation « Jarvis » est retirée automatiquement. / The app is named Wesley everywhere; the old Jarvis install is removed.
+  - **Sur Mac, autorise Wesley une fois** : pour macOS, c'est une nouvelle appli. Il faut donc redonner les accès (Micro, Accessibilité, Enregistrement de l'écran) dans Réglages Système › Confidentialité et sécurité. Wesley te les redemande au premier lancement. / **On Mac, grant the permissions again** (microphone, accessibility, screen recording): macOS sees Wesley as a new app.
 
 ## 1.10.1
 - **Choisis l'IA que tu veux comme cerveau** : en plus de Claude, OpenAI et Ollama, Jarvis marche maintenant avec **Google Gemini**, **Mistral AI**, **DeepSeek**, **Grok (xAI)**, **OpenRouter** (une seule clé pour des centaines de modèles), **Groq**, **Cerebras**, **Together AI**, **Fireworks AI**, **Kimi (Moonshot)**, **Qwen (Alibaba)**, **Cohere**, **Hugging Face**, et en local **LM Studio**. L'option **Autre (compatible OpenAI)** accepte n'importe quel service qui parle le même langage (vLLM, Jan, llama.cpp, LocalAI…). Dans Réglages › Cerveau, clique sur l'IA, colle ta clé (le lien pour la créer est indiqué), choisis le modèle dans la liste ou écris son nom, puis « Tester ». Plusieurs offrent un essai gratuit (Gemini, Mistral, Groq, Cerebras, OpenRouter). Ta clé est rangée dans ton coffre chiffré et te suit sur tous tes appareils, comme ton choix de modèle. / **Pick any AI as Jarvis's brain**: Gemini, Mistral, DeepSeek, Grok, OpenRouter, Groq, Cerebras, Together, Fireworks, Kimi, Qwen, Cohere, Hugging Face, LM Studio, or any OpenAI-compatible service, in addition to Claude, OpenAI and Ollama.

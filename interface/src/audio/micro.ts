@@ -147,8 +147,8 @@ class Micro {
     // ~350 ms gardés en mémoire pour ne pas couper le début de la phrase
     this.preRoll.push(d);
     if (this.preRoll.length > 8) this.preRoll.shift();
-    // Jarvis parle : l'annulation d'écho du navigateur retire sa voix du micro,
-    // donc ce qui dépasse le seuil, c'est toi qui l'interromps (« stop », « Jarvis, … »).
+    // Wesley parle : l'annulation d'écho du navigateur retire sa voix du micro,
+    // donc ce qui dépasse le seuil, c'est toi qui l'interromps (« stop », « Wesley, … »).
     if (a.parle) {
       this.surveillerInterruption(d, rms, r.seuil);
       return;
@@ -163,7 +163,7 @@ class Micro {
   private interruption: Float32Array[] | null = null;
   private intDebut = 0;
   private intDernierSon = 0;
-  /** Phrase dite par-dessus la voix de Jarvis (max 2,5 s), transmise à surInterruption. */
+  /** Phrase dite par-dessus la voix de Wesley (max 2,5 s), transmise à surInterruption. */
   surInterruption: ((morceaux: Float32Array[]) => void) | null = null;
 
   private surveillerInterruption(d: Float32Array, rms: number, seuil: number) {
@@ -191,7 +191,7 @@ class Micro {
     this.morceaux = auto ? [...this.preRoll] : [];
     this.debut = this.dernierSon = performance.now();
     majAudio({ enregistre: true });
-    window.dispatchEvent(new CustomEvent("jarvis:debut-ecoute", { detail: { auto } }));
+    window.dispatchEvent(new CustomEvent("wesley:debut-ecoute", { detail: { auto } }));
   }
 
   finEnregistrement() {

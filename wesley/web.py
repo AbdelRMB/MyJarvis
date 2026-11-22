@@ -1,0 +1,1720 @@
+"""Serveur de l'interface web de Wesley (FastAPI, 127.0.0.1 uniquement).
+
+Lancer : wesley-web.bat  (ou .venv\\Scripts\\python.exe -m wesley.web)
+Le front (React) est dans /interface ; `npm run build` le compile dans wesley/static.
+"""
+import asyncio
+import os
+import inspect
+import json
+import re
+import secrets
+import shutil
+import subprocess
+import threading
+import time
+import webbrowser
+from pathlib import Path
+
+import numpy as np
+import ollama
+import psutil
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
+
+from . import connecteurs, memoire, outils, tts
+from .modeles import charger_whisper
+from .plateforme import CACHE_FENETRE, MAC, WIN
+from .agent import Wesley
+from .config import CONFIG, MACHINE, PARTAGE, RACINE, sauver_config, sauver_profil
+from .fournisseurs import CLES_MODELES, PAR_ID as IA, est_compatible
+
+HOTE, PORT = "127.0.0.1", int(os.environ.get("WESLEY_PORT", 7777))
+STATIC = Path(__file__).parent / "static"
+JETON = secrets.token_urlsafe(24)
+HOTES_OK = {"127.0.0.1", "localhost"}
+CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
+               "max_etapes_outils", "whisper_modele", "nom_utilisateur",
+               "cerveau", "claude_modele", "claude_effort", "langue",
+               "briefing_matin", "conversation_suivie", "maj_auto", "conseiller", "recherche_web_native",
+               *CLES_MODELES, "perso_url"]
+
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+wesley: Wesley | None = None
+verrou_tache = threading.Lock()
+_whisper, _whisper_nom, _whisper_verrou = None, None, threading.Lock()
+_clients: set = set()          # files d'attente des onglets connectés
+_boucle: asyncio.AbstractEventLoop | None = None
+_seq = 0
+
+
+# ---------- sécurité ----------
+def _hote(valeur: str | None) -> str:
+    v = (valeur or "").split("://")[-1].split("/")[0]
+    return v.rsplit(":", 1)[0] if ":" in v else v
+
+
+@app.middleware("http")
+async def garde_hote(req: Request, suite):
+    # bloque le DNS rebinding : seul un Host local est accepté
+    if _hote(req.headers.get("host")) not in HOTES_OK:
+        return JSONResponse({"detail": "Hôte refusé"}, 403)
+    return await suite(req)
+
+
+def _verifier(req: Request):
+    if req.headers.get("x-jeton") != JETON:
+        raise HTTPException(403, "Jeton invalide")
+
+
+@app.get("/api/session")
+def session():
+    """Sans en-tête CORS : seule une page servie en local peut lire ce jeton."""
+    return {"jeton": JETON, "nom": CONFIG["nom_utilisateur"], "nb_outils": len(outils.OUTILS),
+            "plateforme": "mac" if MAC else "windows" if WIN else "linux"}
+
+
+# ---------- diffusion vers tous les onglets ----------
+def diffuser(**m):
+    if _boucle:
+        for q in list(_clients):
+            _boucle.call_soon_threadsafe(q.put_nowait, m)
+
+
+# ---------- état système ----------
+def _gpu():
+    if not shutil.which("nvidia-smi"):
+        return None
+    try:
+        out = subprocess.run(["nvidia-smi", "--query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu",
+                              "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=3,
+                             **CACHE_FENETRE).stdout.strip().split("\n")[0]
+        nom, util, used, tot, temp = [x.strip() for x in out.split(",")]
+        return {"nom": nom, "util": float(util), "vram_used": float(used) / 1024, "vram_total": float(tot) / 1024,
+                "temp": float(temp)}
+    except Exception:
+        return None
+
+
+@app.get("/api/systeme")
+def systeme(req: Request):
+    _verifier(req)
+    try:
+        charges = [{"nom": m.model, "vram": (m.size_vram or 0) / 2**30, "taille": (m.size or 0) / 2**30}
+                   for m in ollama.ps().models]
+        ollama_ok = True
+    except Exception:
+        charges, ollama_ok = [], False
+    ram = psutil.virtual_memory()
+    disque = psutil.disk_usage("C:\\" if WIN else "/")
+    return {"cpu": psutil.cpu_percent(interval=None), "ram": ram.percent, "ram_used": ram.used / 2**30,
+            "ram_total": ram.total / 2**30, "disque": disque.percent, "disque_libre": disque.free / 2**30,
+            "gpu": _gpu(), "ollama": ollama_ok, "charges": charges, "cerveau": CONFIG.get("cerveau", "ollama"),
+            "modele": _nom_modele(),
+            "cle_claude_manquante": (CONFIG.get("cerveau") == "claude" and not __import__("os").environ.get("ANTHROPIC_API_KEY"))
+            or (est_compatible(CONFIG.get("cerveau")) and not _ia().cle_configuree()),
+            "occupe": verrou_tache.locked(), "uptime": int(time.time() - psutil.boot_time())}
+
+
+# ---------- config ----------
+@app.get("/api/config")
+def lire_config(req: Request):
+    _verifier(req)
+    try:
+        modeles = sorted(m.model for m in ollama.list().models)
+    except Exception:
+        modeles = [CONFIG["modele"]]
+    return {"config": {k: CONFIG[k] for k in CLES_CONFIG}, "modeles": modeles}
+
+
+@app.post("/api/config")
+async def ecrire_config(req: Request):
+    _verifier(req)
+    data = await req.json()
+    ancien_cerveau = CONFIG.get("cerveau")
+    for k in CLES_CONFIG:
+        if k in data:
+            CONFIG[k] = data[k]
+    if CONFIG.get("cerveau") != ancien_cerveau:
+        # les deux cerveaux n'ont pas le même format d'historique : nouvelle conversation
+        wesley.arreter = True
+        wesley.reset()
+        diffuser(type="reset")
+        diffuser(type="info", texte="Cerveau : " + _nom_cerveau())
+        if CONFIG["cerveau"] != "ollama":
+            threading.Thread(target=Wesley.liberer, daemon=True).start()   # rend la VRAM
+        else:
+            threading.Thread(target=wesley.prechauffer, daemon=True).start()
+    sauver_config(CLES_CONFIG)
+    sauver_profil()   # prénom et cerveau : communs à tous les PC
+    return {"ok": True}
+
+
+# ---------- mémoire ----------
+@app.get("/api/memoire")
+def lire_memoire(req: Request):
+    _verifier(req)
+    return memoire._charger()
+
+
+@app.post("/api/memoire")
+async def ajouter_fait(req: Request):
+    _verifier(req)
+    d = await req.json()
+    if not str(d.get("fait", "")).strip():
+        raise HTTPException(400, "Fait vide")
+    return {"message": memoire.ajouter(d["fait"].strip(), d.get("categorie") or "general")}
+
+
+@app.delete("/api/memoire")
+async def supprimer_fait(req: Request):
+    """Bouton « Oublier » : supprimé partout (sauf si un autre appareil l'utilise après)."""
+    _verifier(req)
+    d = await req.json()
+    return {"supprimes": memoire.supprimer_un(d.get("fid", ""), d.get("fait", ""))}
+
+
+@app.put("/api/memoire")
+async def modifier_fait(req: Request):
+    _verifier(req)
+    d = await req.json()
+    if not str(d.get("fait", "")).strip():
+        raise HTTPException(400, "Fait vide")
+    if not memoire.modifier(d.get("fid", ""), d["fait"], d.get("categorie")):
+        raise HTTPException(404, "Souvenir introuvable (actualise la mémoire).")
+    return {"ok": True}
+
+
+@app.get("/api/memoire/journal")
+async def journal_memoire(req: Request):
+    """Historique de ta mémoire gardé par le serveur : qui a ajouté, modifié, utilisé ou supprimé quoi, et quand."""
+    _verifier(req)
+    from . import compte
+    try:
+        return await asyncio.to_thread(compte.journal_memoire)
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/memoire/restaurer")
+async def restaurer_fait(req: Request):
+    _verifier(req)
+    d = await req.json()
+    memoire.restaurer(d["fid"], d["fait"], d.get("categorie") or "general")
+    return {"ok": True}
+
+
+@app.post("/api/memoriser_session")
+def memoriser_session(req: Request):
+    _verifier(req)
+    if not verrou_tache.acquire(blocking=False):
+        raise HTTPException(409, "Wesley est occupé")
+    try:
+        return {"faits": wesley.extraire_souvenirs()}
+    finally:
+        verrou_tache.release()
+
+
+# ---------- historique ----------
+RX_LIGNE = re.compile(r"^\[(\d\d:\d\d)\] ([^:]+): ?(.*)$")
+
+
+@app.get("/api/historique")
+def jours(req: Request):
+    _verifier(req)
+    out = []
+    jours = memoire.fichiers_par_jour()
+    for j in sorted(jours, reverse=True):
+        lignes = [l for _, _, l in memoire.lignes_du_jour(jours[j])]
+        premier = next((RX_LIGNE.match(l).group(3) for l in lignes if RX_LIGNE.match(l)), "")
+        out.append({"jour": j, "nb": sum(1 for l in lignes if RX_LIGNE.match(l)), "apercu": premier[:120],
+                    "pcs": sorted({f.stem.split("__")[1] for f in jours[j] if "__" in f.stem})})
+    return out
+
+
+@app.get("/api/historique/{jour}")
+def jour(jour: str, req: Request):
+    _verifier(req)
+    if not re.fullmatch(r"\d{4}-\d\d-\d\d", jour):
+        raise HTTPException(400)
+    fichiers = memoire.fichiers_par_jour().get(jour)
+    if not fichiers:
+        raise HTTPException(404)
+    entrees = []
+    for f in fichiers:   # chaque PC séparément : les lignes de suite restent attachées à leur message
+        pc = f.stem.split("__")[1] if "__" in f.stem else ""
+        for l in f.read_text(encoding="utf-8").splitlines():
+            m = RX_LIGNE.match(l)
+            if m:
+                entrees.append({"heure": m.group(1), "role": "wesley" if m.group(2).lower() in ("wesley", "jarvis") else "user",
+                                "texte": m.group(3), "pc": pc})
+            elif entrees:
+                entrees[-1]["texte"] += "\n" + l
+    return sorted(entrees, key=lambda e: e["heure"])
+
+
+# ---------- journal des actions & outils ----------
+RX_ACTION = re.compile(r"^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d),\d+ (\w+) (.*)$")
+RX_RES = re.compile(r"^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d,\d+\s+-> (.*)$")
+
+
+@app.get("/api/actions")
+def actions(req: Request, n: int = 200):
+    _verifier(req)
+    f = RACINE / "logs" / "actions.log"
+    if not f.exists():
+        return []
+    with open(f, "rb") as fh:
+        fh.seek(0, 2)
+        fh.seek(max(0, fh.tell() - 400_000))
+        lignes = fh.read().decode("utf-8", "replace").splitlines()
+    out = []
+    for l in lignes:
+        if m := RX_RES.match(l):
+            if out:
+                out[-1]["resultat"] = m.group(1)
+        elif m := RX_ACTION.match(l):
+            try:
+                args = json.loads(m.group(3))
+            except Exception:
+                args = {"brut": m.group(3)}
+            out.append({"date": m.group(1), "outil": m.group(2), "args": args, "resultat": None})
+    return out[-n:][::-1]
+
+
+@app.get("/api/outils")
+def liste_outils(req: Request):
+    _verifier(req)
+    out = []
+    for nom, o in OUTILS_TRIES():
+        f = o["schema"]["function"]
+        out.append({"nom": nom, "description": f["description"], "module": o["fn"].__module__.rsplit(".", 1)[-1],
+                    "params": [{"nom": k, "type": v["type"], "description": v["description"],
+                                "requis": k in f["parameters"]["required"]} for k, v in f["parameters"]["properties"].items()],
+                    "doc": inspect.getdoc(o["fn"]) or ""})
+    return out
+
+
+def OUTILS_TRIES():
+    return sorted(outils.OUTILS.items(), key=lambda kv: (kv[1]["fn"].__module__, kv[0]))
+
+
+# ---------- reconnaissance vocale ----------
+def _modele_whisper():
+    global _whisper, _whisper_nom
+    if _whisper is None or _whisper_nom != CONFIG["whisper_modele"]:
+        _whisper = charger_whisper(CONFIG["whisper_modele"])
+        _whisper_nom = CONFIG["whisper_modele"]
+    return _whisper
+
+
+def _transcrire(audio: np.ndarray, langue: str) -> str:
+    with _whisper_verrou:
+        segs, _ = _modele_whisper().transcribe(audio, language=langue or None, vad_filter=True, beam_size=1,
+                                               initial_prompt="Wesley, open VS Code." if langue == "en" else "Wesley, ouvre VS Code.")
+        return " ".join(s.text for s in segs).strip()
+
+
+_rapide, _rapide_verrou = None, threading.Lock()
+
+
+def transcrire_rapide(audio: np.ndarray) -> str:
+    """Petit Whisper (« base ») pour reconnaître le nom « Wesley » dans l'écoute de fond : ~0,3 s par phrase."""
+    global _rapide
+    with _rapide_verrou:
+        if _rapide is None:
+            _rapide = charger_whisper("base", cpu_threads=4)
+        en = CONFIG.get("langue") == "en"
+        segs, _ = _rapide.transcribe(audio, language="en" if en else "fr", beam_size=1, vad_filter=False,
+                                     initial_prompt="Wesley, open Discord." if en else "Wesley, ouvre Discord.",
+                                     condition_on_previous_text=False)
+        return " ".join(s.text for s in segs).strip()
+
+
+@app.post("/api/transcrire_rapide")
+async def transcrire_vite(req: Request):
+    """Petit Whisper pour les interruptions (« stop ») pendant que Wesley parle : ~0,3 s."""
+    _verifier(req)
+    audio = np.frombuffer(await req.body(), dtype=np.float32)
+    if audio.size < 16000 * 0.2:
+        return {"texte": ""}
+    return {"texte": await asyncio.to_thread(transcrire_rapide, audio)}
+
+
+@app.post("/api/transcrire")
+async def transcrire(req: Request, langue: str = "fr"):
+    """Corps : PCM float32 mono 16 kHz brut."""
+    _verifier(req)
+    audio = np.frombuffer(await req.body(), dtype=np.float32)
+    if audio.size < 16000 * 0.3:
+        return {"texte": ""}
+    t0 = time.time()
+    texte = await asyncio.to_thread(_transcrire, audio, langue)
+    return {"texte": texte, "secondes": round(time.time() - t0, 2)}
+
+
+@app.post("/api/precharger_whisper")
+async def precharger(req: Request):
+    _verifier(req)
+    t0 = time.time()
+
+    def charger():
+        with _whisper_verrou:
+            _modele_whisper()
+    await asyncio.to_thread(charger)
+    return {"ok": True, "secondes": round(time.time() - t0, 1)}
+
+
+# ---------- cerveaux compatibles OpenAI (OpenAI, Gemini, Mistral, DeepSeek, Grok, OpenRouter, LM Studio…) ----------
+def _ia():
+    from . import openai_cerveau
+    return openai_cerveau
+
+
+def _nom_modele() -> str:
+    c = CONFIG.get("cerveau")
+    if c == "claude":
+        return CONFIG["claude_modele"]
+    if est_compatible(c):
+        return CONFIG.get(f"{c}_modele") or IA[c]["nom"]
+    return CONFIG["modele"]
+
+
+def _nom_cerveau() -> str:
+    c = CONFIG.get("cerveau")
+    if c == "claude":
+        return "Claude " + CONFIG["claude_modele"]
+    if est_compatible(c):
+        return IA[c]["nom"] + (" " + CONFIG.get(f"{c}_modele") if CONFIG.get(f"{c}_modele") else "")
+    return "Ollama local " + CONFIG["modele"]
+
+
+def _fid(fid: str) -> str:
+    if fid not in IA:
+        raise HTTPException(404, "IA inconnue.")
+    return fid
+
+
+@app.get("/api/ia")
+def liste_ia(req: Request):
+    _verifier(req)
+    from .fournisseurs import pour_interface
+    return {"fournisseurs": pour_interface()}
+
+
+@app.get("/api/ia/{fid}")
+async def etat_ia(fid: str, req: Request):
+    _verifier(req)
+    o = _ia()
+    fid = _fid(fid)
+    modeles, erreur = [], ""
+    if o.cle_configuree(fid):
+        try:
+            modeles = await asyncio.to_thread(o.modeles, fid)
+        except Exception as e:
+            erreur = f"Liste des modèles indisponible ({type(e).__name__}) : tu peux écrire le nom du modèle à la main."
+    return {"cle": o.cle_configuree(fid), "cle_masquee": o.cle_masquee(fid), "modeles": modeles,
+            "modele": CONFIG.get(f"{fid}_modele") or "", "conseille": IA[fid].get("defaut", ""),
+            "url": o.url(fid) or "", "erreur": erreur}
+
+
+@app.post("/api/ia/{fid}/cle")
+async def cle_ia(fid: str, req: Request):
+    _verifier(req)
+    o = _ia()
+    fid = _fid(fid)
+    cle = str((await req.json()).get("cle", "")).strip()
+    prefixe = IA[fid].get("prefixe")
+    if cle and prefixe and not cle.startswith(prefixe):
+        raise HTTPException(400, f"Ce n'est pas une clé {IA[fid]['nom']} (elle commence par {prefixe}).")
+    o.definir_cle(cle, fid=fid)
+    return await etat_ia(fid, req)
+
+
+@app.post("/api/ia/{fid}/tester")
+async def tester_ia(fid: str, req: Request):
+    _verifier(req)
+    o = _ia()
+    fid = _fid(fid)
+    try:
+        texte, s = await asyncio.to_thread(o.tester, fid)
+    except Exception as e:
+        raise HTTPException(502, f"Échec : {e}")
+    return {"texte": texte, "secondes": round(s, 1), "modele": o.modele(fid)}
+
+
+# ---------- cerveau Claude ----------
+@app.get("/api/claude")
+def etat_claude(req: Request):
+    _verifier(req)
+    from . import claude
+    return {"cle": claude.cle_configuree(), "cle_masquee": claude.cle_masquee(), "couts": claude.resume_couts(),
+            "modeles": [{"id": k, "nom": v} for k, v in claude.MODELES.items()]}
+
+
+@app.post("/api/claude/cle")
+async def cle_claude(req: Request):
+    _verifier(req)
+    from . import claude
+    cle = str((await req.json()).get("cle", "")).strip()
+    if cle and not cle.startswith("sk-ant-"):
+        raise HTTPException(400, "Ce n'est pas une clé API Anthropic (elle commence par sk-ant-).")
+    claude.definir_cle(cle)
+    return {"cle": claude.cle_configuree(), "cle_masquee": claude.cle_masquee()}
+
+
+@app.post("/api/claude/tester")
+async def tester_claude(req: Request):
+    _verifier(req)
+    from . import claude
+
+    def essai():
+        t0 = time.time()
+        r = claude.client().messages.create(model=CONFIG["claude_modele"], max_tokens=50,
+                                            output_config={"effort": "low"},
+                                            messages=[{"role": "user", "content": "Réponds juste : opérationnel."}])
+        claude.enregistrer_cout(r.usage, CONFIG["claude_modele"])
+        return "".join(b.text for b in r.content if b.type == "text"), time.time() - t0
+    try:
+        texte, s = await asyncio.to_thread(essai)
+    except Exception as e:
+        raise HTTPException(502, f"Échec : {e}")
+    return {"reponse": texte, "secondes": round(s, 2)}
+
+
+# ---------- connecteurs (Gmail, agenda, GitHub, Notion, MCP…) ----------
+@app.get("/api/connecteurs")
+def liste_connecteurs(req: Request):
+    _verifier(req)
+    return {"catalogue": connecteurs.catalogue(), "installes": connecteurs.etat()}
+
+
+@app.post("/api/ssh/generer-cle")
+def generer_cle_ssh(req: Request):
+    _verifier(req)
+    return connecteurs.generer_cle_ssh()
+
+
+@app.get("/api/ssh/cle-publique")
+def cle_publique_ssh(cid: str, req: Request):
+    _verifier(req)
+    try:
+        return {"publique": connecteurs.cle_publique_ssh(cid)}
+    except Exception as e:
+        raise HTTPException(400, f"Clé enregistrée illisible : {e}"[:300])
+
+
+@app.post("/api/connecteurs/{cid:path}/tester")
+async def tester_connecteur(cid: str, req: Request):
+    _verifier(req)
+    try:
+        return {"message": await asyncio.to_thread(connecteurs.tester, cid)}
+    except Exception as e:
+        raise HTTPException(400, f"{e}"[:300])
+
+
+@app.post("/api/connecteurs/{cid:path}")
+async def enregistrer_connecteur(cid: str, req: Request):
+    _verifier(req)
+    d = await req.json()
+    try:
+        await asyncio.to_thread(connecteurs.enregistrer, cid, d.get("type"), d.get("conf"), d.get("secrets"),
+                                d.get("actif", True))
+    except Exception as e:
+        raise HTTPException(400, f"{e}"[:300])
+    return connecteurs.etat().get(cid, {})
+
+
+@app.delete("/api/connecteurs/{cid:path}")
+async def supprimer_connecteur(cid: str, req: Request):
+    _verifier(req)
+    await asyncio.to_thread(connecteurs.supprimer, cid)
+    return {"ok": True}
+
+
+# ---------- application de bureau (fenêtre, démarrage, écoute de fond) ----------
+APPLI = {"active": False, "afficher": None, "ecoute": None, "quitter": None, "relancer_raccourcis": None, "icone": None}   # renseigné par wesley/app.py
+PAROLE = {"actif": False, "depuis": 0.0}   # la fenêtre signale quand Wesley parle (pour l'écoute de fond)
+
+
+def wesley_occupe() -> bool:
+    """Wesley parle ou travaille : l'écoute de fond guette « stop » même mêlé à sa voix."""
+    parle = PAROLE["actif"] and time.time() - PAROLE["depuis"] < 300   # sécurité si la fenêtre disparaît
+    return parle or verrou_tache.locked()
+
+
+def stop_vocal():
+    """« Wesley, stop » ou Ctrl+Alt+S : coupe la voix et la tâche en cours."""
+    if wesley is not None:
+        wesley.arreter = True
+    outils.arreter_tout()
+    PAROLE["actif"] = False
+    diffuser(type="stop_voix")
+    print("  Stop demandé")
+
+
+# ---------- compte en ligne ----------
+def _etat_compte():
+    from . import compte
+    e = compte.etat()
+    return {"connecte": compte.connecte(), "mode": compte.mode(), "email": e.get("email", ""),
+            "prenom": e.get("prenom", ""), "serveur": compte.serveur(), "machine": MACHINE, "admin": compte.est_admin(),
+            "politique_a_accepter": compte.politique_a_accepter(),
+            "url_confidentialite": compte.serveur() + "/mobile/confidentialite.html",
+            "url_mentions": compte.serveur() + "/mobile/mentions-legales.html"}
+
+
+@app.post("/api/ouvrir-lien")
+async def ouvrir_lien(req: Request):
+    """Ouvre une page dans le navigateur de l'ordinateur (la fenêtre de Wesley n'en est pas un)."""
+    _verifier(req)
+    from . import compte
+    url = str((await req.json()).get("url", ""))
+    # seulement les pages du serveur de comptes et du dépôt GitHub : jamais une adresse quelconque
+    if not (url.startswith(compte.serveur() + "/") or url.startswith("https://github.com/")):
+        raise HTTPException(400, "Adresse non autorisée.")
+    webbrowser.open(url)
+    return {"ok": True}
+
+
+def _apres_connexion():
+    """Le compte a changé : nouvelle conversation avec la mémoire et les connecteurs de ce compte."""
+    from .agent import prompt_systeme
+    if wesley is not None:
+        wesley.reset()
+        wesley.messages[0]["content"] = prompt_systeme()
+    diffuser(type="reset")
+    threading.Thread(target=connecteurs.demarrer_tous, daemon=True).start()
+
+
+@app.get("/api/compte")
+def lire_compte(req: Request):
+    _verifier(req)
+    return _etat_compte()
+
+
+@app.post("/api/compte/{action}")
+async def agir_compte(action: str, req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json() if action in ("inscription", "connexion", "supprimer") else {}
+    try:
+        if action == "inscription":
+            r = await asyncio.to_thread(compte.inscrire, d.get("email", ""), d.get("mot_de_passe", ""), d.get("prenom", ""),
+                                        bool(d.get("politique")))
+        elif action == "politique":   # accepte la version actuelle de la politique de confidentialité
+            await asyncio.to_thread(compte.accepter_politique)
+            r = {}
+        elif action == "exporter":    # « Télécharger mes données » : fichier JSON dans Téléchargements
+            f = await asyncio.to_thread(compte.exporter_donnees)
+            r = {"fichier": str(f)}
+            try:
+                from .plateforme import ouvrir_chemin
+                ouvrir_chemin(str(f.parent))   # montre le dossier Téléchargements
+            except Exception:
+                pass
+        elif action == "supprimer":   # « Supprimer mon compte » (mot de passe redemandé)
+            await asyncio.to_thread(compte.supprimer_compte, d.get("mot_de_passe", ""))
+            r = {"supprime": True}
+        elif action == "connexion":
+            r = await asyncio.to_thread(compte.connecter, d.get("email", ""), d.get("mot_de_passe", ""))
+        elif action == "deconnexion":
+            await asyncio.to_thread(compte.deconnecter)
+            r = {}
+        elif action == "importer":   # bouton « Envoyer la mémoire de cet appareil vers mon compte »
+            r = {"import": await asyncio.to_thread(compte.importer_appareil)}
+            await asyncio.to_thread(compte.synchroniser)
+        elif action == "synchroniser":
+            await asyncio.to_thread(compte.synchroniser)
+            r = {}
+        elif action == "local":   # « Utiliser Wesley en local » : pas de compte, rien n'est envoyé
+            await asyncio.to_thread(compte.choisir_local)
+            r = {}
+        elif action == "changer_mode":   # « Passer en ligne » depuis le local (ou l'inverse)
+            await asyncio.to_thread(compte.changer_de_mode)
+            r = {}
+        else:
+            raise HTTPException(404, "Action inconnue.")
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    if action in ("inscription", "connexion", "deconnexion", "importer", "local", "supprimer"):
+        _apres_connexion()
+    return {**_etat_compte(), **r}
+
+
+# ---------- confirmations (ex : commande qui modifie un serveur SSH en mode « confirmation ») ----------
+_confirmations: dict = {}
+
+
+def demander_confirmation(titre: str, detail: str = "", delai: float = 180) -> bool:
+    """Affiche « Autoriser / Refuser » dans la fenêtre de Wesley et attend la réponse (refus si STOP ou sans réponse)."""
+    import uuid
+    cid = uuid.uuid4().hex[:10]
+    attente = {"ev": threading.Event(), "ok": False}
+    _confirmations[cid] = attente
+    if APPLI.get("afficher"):
+        try:
+            APPLI["afficher"]()   # la question doit être vue, même fenêtre cachée
+        except Exception:
+            pass
+    debut = time.time()
+    try:
+        while time.time() - debut < delai and not attente["ev"].is_set():
+            if outils.ARRET.is_set():
+                break
+            # renvoyée régulièrement : l'interface peut s'être (re)connectée entre-temps
+            diffuser(type="confirmation", id=cid, titre=titre, detail=detail[:4000])
+            attente["ev"].wait(2)
+    finally:
+        _confirmations.pop(cid, None)
+        diffuser(type="confirmation_fin", id=cid)
+    return attente["ok"]
+
+
+def demander_texte(titre: str, detail: str = "", delai: float = 300) -> str:
+    """Wesley a besoin d'une info (ex : le code reçu par SMS) : champ de saisie dans sa fenêtre, réponse attendue."""
+    import uuid
+    cid = uuid.uuid4().hex[:10]
+    attente = {"ev": threading.Event(), "ok": False, "texte": ""}
+    _confirmations[cid] = attente
+    if APPLI.get("afficher"):
+        try:
+            APPLI["afficher"]()
+        except Exception:
+            pass
+    debut = time.time()
+    try:
+        while time.time() - debut < delai and not attente["ev"].is_set():
+            if outils.ARRET.is_set():
+                break
+            diffuser(type="confirmation", id=cid, titre=titre, detail=detail[:2000], saisie=True)
+            attente["ev"].wait(2)
+    finally:
+        _confirmations.pop(cid, None)
+        diffuser(type="confirmation_fin", id=cid)
+    return attente["texte"] if attente["ok"] else ""
+
+
+@app.post("/api/confirmation")
+async def repondre_confirmation(req: Request):
+    _verifier(req)
+    d = await req.json()
+    c = _confirmations.get(d.get("id"))
+    if c:
+        c["ok"] = bool(d.get("ok"))
+        c["texte"] = str(d.get("texte", ""))[:500]
+        c["ev"].set()
+    return {"ok": bool(c)}
+
+
+@app.post("/api/fenetre/afficher")
+async def afficher_fenetre(req: Request):
+    _verifier(req)
+    try:
+        vue = (await req.json()).get("vue")
+    except Exception:
+        vue = None
+    if APPLI["afficher"]:
+        APPLI["afficher"](vue)
+    return {"ok": bool(APPLI["afficher"])}
+
+
+# ---------- mes appareils ----------
+@app.get("/api/appareils")
+async def lister_appareils(req: Request):
+    _verifier(req)
+    from . import appareils, compte
+    liste, erreur = [], ""
+    if compte.connecte():
+        try:
+            liste = await asyncio.to_thread(appareils.lister)
+        except compte.ErreurCompte as e:
+            erreur = str(e)
+    derniere = ""
+    try:
+        from . import mises_a_jour
+        journal = (await asyncio.to_thread(mises_a_jour.lister)).get("journal") or []
+        derniere = journal[0]["version"] if journal else ""
+    except Exception:
+        pass
+    return {"appareils": liste, "reglages": appareils.reglages(), "journal": list(reversed(appareils.journal()))[:100],
+            "connecte": compte.connecte(), "mode": compte.mode(), "erreur": erreur, "derniere_version": derniere}
+
+
+@app.post("/api/appareils/reglages")
+async def regler_appareil(req: Request):
+    _verifier(req)
+    from . import appareils
+    d = await req.json()
+    appareils.regler(d.get("accepte"), d.get("mode"))
+    return await lister_appareils(req)
+
+
+@app.post("/api/appareils/{aid}/deconnecter")
+async def deconnecter_un_appareil(aid: str, req: Request):
+    _verifier(req)
+    from . import appareils, compte
+    moi = next((a for a in await asyncio.to_thread(appareils.lister) if a["moi"]), None)
+    if moi and moi["id"] == aid:   # cet appareil-ci : déconnexion complète
+        await asyncio.to_thread(compte.deconnecter)
+        return {"moi": True}
+    try:
+        return await asyncio.to_thread(appareils.deconnecter, aid)
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/appareils/{aid}/mettre_a_jour")
+async def mettre_a_jour_appareil(aid: str, req: Request):
+    """Met à jour Wesley sur un autre appareil allumé (il télécharge, s'installe et redémarre)."""
+    _verifier(req)
+    from . import appareils
+    try:
+        r = await asyncio.to_thread(appareils.envoyer, aid, {"type": "mettre_a_jour"}, 120)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"resultat": r.get("resultat", ""), "ok": r.get("ok", False)}
+
+
+@app.post("/api/appareils/{aid}/demander")
+async def demander_appareil(aid: str, req: Request):
+    """Depuis l'onglet Appareils : envoyer une demande à un autre appareil et attendre sa réponse."""
+    _verifier(req)
+    from . import appareils
+    texte = (await req.json()).get("texte", "").strip()
+    try:
+        r = await asyncio.to_thread(appareils.envoyer, aid, {"type": "demande", "texte": texte}, 600)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"resultat": r.get("resultat", ""), "ok": r.get("ok", False)}
+
+
+# ---------- notifications (cloche) ----------
+@app.get("/api/notifications")
+def lire_notifications(req: Request):
+    _verifier(req)
+    from . import notifications
+    return list(reversed(notifications.lister()))
+
+
+@app.post("/api/notifications/{action}")
+async def agir_notifications(action: str, req: Request):
+    _verifier(req)
+    from . import notifications
+    if action == "lues":
+        d = await req.json()
+        notifications.marquer_lues(d.get("ids"))
+    elif action == "effacer":
+        notifications.effacer()
+    return {"ok": True}
+
+
+# ---------- agents de code (Claude Code, Codex) ----------
+@app.get("/api/agents_code")
+async def etat_agents_code(req: Request):
+    _verifier(req)
+    from . import agents_code
+    etats = await asyncio.gather(*(asyncio.to_thread(agents_code.etat, a) for a in agents_code.NOMS))
+    return [{**e, "probleme": agents_code.probleme(e)} for e in etats]
+
+
+@app.post("/api/agents_code/{agent}/{action}")
+async def agir_agent_code(agent: str, action: str, req: Request):
+    _verifier(req)
+    from . import agents_code
+    if agent not in agents_code.NOMS:
+        raise HTTPException(404, "Agent inconnu.")
+    fn = {"connecter": agents_code.connecter, "deconnecter": agents_code.deconnecter, "installer": agents_code.installer}.get(action)
+    if not fn:
+        raise HTTPException(404, "Action inconnue.")
+    return {"message": await asyncio.to_thread(fn, agent)}
+
+
+# ---------- tâches de fond (code avec Claude Code / Wesley) ----------
+@app.get("/api/taches")
+def lister_taches(req: Request):
+    _verifier(req)
+    from . import taches
+    return [taches.resume(t) for t in taches.lister()]
+
+
+@app.get("/api/taches/{tid}")
+def lire_tache(tid: str, req: Request):
+    _verifier(req)
+    from . import taches
+    t = taches.lire(tid)
+    if not t:
+        raise HTTPException(404, "Tâche introuvable.")
+    return t
+
+
+@app.post("/api/taches")
+async def creer_tache(req: Request):
+    _verifier(req)
+    from . import taches
+    d = await req.json()
+    try:
+        t = await asyncio.to_thread(taches.creer, d.get("consigne", ""), d.get("projet", ""), d.get("outil", "claude_code"), d.get("titre", ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return taches.resume(t)
+
+
+@app.post("/api/taches/{tid}/{action}")
+async def agir_tache(tid: str, action: str, req: Request):
+    _verifier(req)
+    from . import taches
+    if action == "consigne":
+        return {"message": taches.mettre_a_jour(tid, (await req.json()).get("texte", ""))}
+    if action == "arreter":
+        return {"message": taches.arreter(tid)}
+    if action == "reprendre":
+        t = taches.lire(tid)
+        if t and t["statut"] != "en_cours":
+            t["statut"] = "en_cours"
+            taches._sauver(t)
+            taches.demarrer(tid)
+        return {"message": "Tâche reprise."}
+    if action == "ouvrir":
+        t = taches.lire(tid)
+        if t and t.get("dossier"):
+            from .plateforme import ouvrir_chemin
+            ouvrir_chemin(t["dossier"])
+        return {"ok": True}
+    raise HTTPException(404, "Action inconnue.")
+
+
+@app.delete("/api/taches/{tid}")
+def supprimer_tache(tid: str, req: Request):
+    _verifier(req)
+    from . import taches
+    return {"ok": taches.supprimer(tid)}
+
+
+# ---------- automatisations ----------
+@app.get("/api/automatisations")
+def lister_automatisations(req: Request):
+    _verifier(req)
+    from . import automatisations
+    boites = [{"cid": cid, "nom": f"{c.nom} — {c.etiquette()}"} for cid, c in automatisations._boites().items()]
+    return {"regles": [{**r, "description": automatisations.decrire(r)} for r in automatisations.lister()], "boites": boites,
+            "machine": MACHINE}
+
+
+@app.post("/api/automatisations")
+async def creer_automatisation(req: Request):
+    _verifier(req)
+    from . import automatisations
+    d = await req.json()
+    typ = d.get("type", "mail")
+    if typ == "mail" and not (d.get("expediteur") or d.get("sujet") or d.get("contient")):
+        raise HTTPException(400, "Indique au moins un expéditeur, un mot du sujet ou un mot du texte.")
+    if typ == "horaire" and not d.get("heure"):
+        raise HTTPException(400, "Indique l'heure.")
+    if typ == "intervalle" and not d.get("minutes"):
+        raise HTTPException(400, "Indique l'intervalle en minutes.")
+    if d.get("action") == "jarvis":   # ancien nom de l'appli
+        d["action"] = "wesley"
+    if d.get("action") == "wesley" and not d.get("consigne", "").strip():
+        raise HTTPException(400, "Indique ce que Wesley doit faire.")
+    automatisations.creer(d.get("nom", ""), d.get("expediteur", ""), d.get("sujet", ""), d.get("contient", ""),
+                          d.get("connecteur", ""), d.get("action", "prevenir"), d.get("consigne", ""), typ,
+                          d.get("heure", ""), d.get("jours") or [], int(d.get("minutes") or 0),
+                          None if d.get("appareil") is None else d.get("appareil"), d.get("message", ""), d.get("phrase", ""))
+    return lister_automatisations(req)
+
+
+@app.patch("/api/automatisations/{rid}")
+async def modifier_automatisation(rid: str, req: Request):
+    _verifier(req)
+    from . import automatisations
+    automatisations.modifier(rid, **(await req.json()))
+    return lister_automatisations(req)
+
+
+@app.delete("/api/automatisations/{rid}")
+def supprimer_automatisation(rid: str, req: Request):
+    _verifier(req)
+    from . import automatisations
+    automatisations.supprimer(rid)
+    return lister_automatisations(req)
+
+
+@app.post("/api/automatisations/{rid}/lancer")
+def lancer_routine(rid: str, req: Request):
+    """Bouton « Lancer » d'une routine : Wesley l'exécute dans la conversation, comme si tu l'avais demandée."""
+    _verifier(req)
+    from . import automatisations
+    r = next((x for x in automatisations.lister() if x["id"] == rid), None)
+    if not r:
+        raise HTTPException(404, "Routine introuvable.")
+    threading.Thread(target=executer, args=(automatisations.consigne_routine(r),), daemon=True).start()
+    return {"ok": True}
+
+
+@app.post("/api/automatisations/tester")
+async def tester_annonce(req: Request):
+    """Bouton « Tester la voix » : Wesley parle comme il le fera pour une automatisation."""
+    _verifier(req)
+    from . import annonces
+    annonces.annoncer("This is a test: this is how I'll let you know." if CONFIG.get("langue") == "en"
+                      else "Ceci est un test : c'est comme ça que je te préviendrai.")
+    return {"ok": True}
+
+
+# ---------- liste « À faire » ----------
+@app.get("/api/afaire")
+def lister_afaire(req: Request):
+    _verifier(req)
+    from . import afaire
+    return afaire.lister()
+
+
+@app.post("/api/afaire")
+async def creer_afaire(req: Request):
+    _verifier(req)
+    from . import afaire
+    d = await req.json()
+    if not str(d.get("titre", "")).strip():
+        raise HTTPException(400, "Indique la tâche.")
+    afaire.ajouter(d["titre"], d.get("note", ""), d.get("echeance", ""), d.get("priorite", "normale"), d.get("statut", "a_faire"),
+                   rappel=d.get("rappel", ""))
+    return afaire.lister()
+
+
+@app.patch("/api/afaire/{tid}")
+async def modifier_afaire(tid: str, req: Request):
+    _verifier(req)
+    from . import afaire
+    d = await req.json()
+    afaire.modifier(tid, **{k: d.get(k) for k in ("titre", "note", "echeance", "rappel", "priorite", "statut")})
+    return afaire.lister()
+
+
+@app.delete("/api/afaire/{tid}")
+def supprimer_afaire(tid: str, req: Request):
+    _verifier(req)
+    from . import afaire
+    if tid == "faits":
+        afaire.vider_faits()
+    else:
+        afaire.supprimer(tid)
+    return afaire.lister()
+
+
+# ---------- statistiques de l'appli (administrateurs) ----------
+_telechargements = {"t": 0.0, "donnees": None}
+
+
+def _telechargements_github() -> dict:
+    """Téléchargements de chaque installateur publié (API publique GitHub, gardée 10 min en cache)."""
+    if _telechargements["donnees"] is not None and time.time() - _telechargements["t"] < 600:
+        return _telechargements["donnees"]
+    import requests
+    from .version import DEPOT
+    try:
+        r = requests.get(f"https://api.github.com/repos/{DEPOT}/releases?per_page=100", timeout=15,
+                         headers={"Accept": "application/vnd.github+json", "User-Agent": "Wesley"})
+        r.raise_for_status()
+        versions = []
+        for rel in r.json():
+            if rel.get("draft"):
+                continue
+            fichiers = {"windows": 0, "mac": 0}
+            for a in rel.get("assets", []):
+                n = a.get("name", "")
+                cle = "mac" if n.endswith(".dmg") else "windows" if n.endswith(".exe") else None
+                if cle:
+                    fichiers[cle] += a.get("download_count", 0)
+            versions.append({"version": rel["tag_name"].lstrip("v"), "date": (rel.get("published_at") or "")[:10],
+                             **fichiers, "total": fichiers["windows"] + fichiers["mac"]})
+        donnees = {"versions": versions, "total": sum(v["total"] for v in versions), "erreur": ""}
+    except Exception as e:
+        donnees = {"versions": [], "total": 0, "erreur": f"GitHub injoignable ({type(e).__name__})."}
+    _telechargements.update(t=time.time(), donnees=donnees)
+    return donnees
+
+
+@app.get("/api/admin/stats")
+async def statistiques_appli(req: Request, jours: int = 30):
+    _verifier(req)
+    from . import compte
+    if not compte.est_admin():
+        raise HTTPException(403, "Réservé aux administrateurs.")
+    try:
+        stats = await asyncio.to_thread(compte.statistiques, jours)
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    stats["telechargements"] = await asyncio.to_thread(_telechargements_github)
+    return stats
+
+
+# ---------- tickets (bugs, améliorations, idées) ----------
+@app.get("/api/tickets")
+async def lister_tickets(req: Request):
+    _verifier(req)
+    from . import compte
+    if not compte.connecte():
+        return {"connecte": False, "admin": False, "miens": [], "tous": []}
+    try:
+        miens = await asyncio.to_thread(compte.mes_tickets)
+        admin = compte.est_admin()
+        tous = await asyncio.to_thread(compte.tous_les_tickets) if admin else []
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return {"connecte": True, "admin": admin, "miens": miens, "tous": tous}
+
+
+@app.get("/api/rapport")
+def lire_rapport(req: Request):
+    _verifier(req)
+    from . import rapport
+    r = rapport.en_attente()
+    return {"rapport": {"titre": r["titre"], "ts": r["ts"], "plantage": r.get("plantage", False), "apercu": rapport.contenu(r)}
+            if r else None}
+
+
+@app.post("/api/rapport")
+async def envoyer_rapport(req: Request):
+    _verifier(req)
+    from . import compte, rapport
+    d = await req.json()
+    try:
+        await asyncio.to_thread(rapport.envoyer, d.get("commentaire", ""))
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
+
+
+@app.delete("/api/rapport")
+def ignorer_rapport(req: Request):
+    _verifier(req)
+    from . import rapport
+    rapport.ignorer()
+    return {"ok": True}
+
+
+@app.post("/api/tickets")
+async def creer_ticket(req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json()
+    if len(str(d.get("titre", "")).strip()) < 3:
+        raise HTTPException(400, "Donne un titre au ticket.")
+    try:
+        await asyncio.to_thread(compte.creer_ticket, d.get("genre", "bug"), d["titre"].strip(), d.get("description", ""))
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
+
+
+@app.patch("/api/tickets/{tid}")
+async def traiter_ticket(tid: int, req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json()
+    try:
+        await asyncio.to_thread(compte.traiter_ticket, tid, d.get("statut", ""), d.get("reponse"))
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
+
+
+@app.post("/api/tickets/{tid}/corriger")
+async def corriger_ticket(tid: int, req: Request):
+    _verifier(req)
+    from . import compte
+    d = await req.json()
+    try:
+        t = await asyncio.to_thread(compte.corriger_ticket, tid, d.get("projet", ""))
+    except (compte.ErreurCompte, ValueError) as e:
+        raise HTTPException(400, str(e))
+    return {"tache": t["id"], **(await lister_tickets(req))}
+
+
+@app.delete("/api/tickets/{tid}")
+async def supprimer_ticket(tid: int, req: Request):
+    _verifier(req)
+    from . import compte
+    try:
+        await asyncio.to_thread(compte.supprimer_ticket, tid)
+    except compte.ErreurCompte as e:
+        raise HTTPException(400, str(e))
+    return await lister_tickets(req)
+
+
+# ---------- autorisations du système (micro, écran, accessibilité, fichiers, applis) ----------
+@app.get("/api/autorisations")
+def lire_autorisations(req: Request):
+    _verifier(req)
+    from . import autorisations
+    return autorisations.etat()
+
+
+@app.post("/api/autorisations/{action}")
+async def agir_autorisation(action: str, req: Request):
+    _verifier(req)
+    from . import autorisations
+    d = await req.json()
+    if action == "demander":
+        r = await asyncio.to_thread(autorisations.demander, d["id"])
+    elif action == "retirer":
+        r = await asyncio.to_thread(autorisations.retirer, d["id"])
+    elif action == "reglages":
+        autorisations.ouvrir_reglages(d["id"])
+        r = "reglages"
+    elif action == "ignorer":
+        autorisations.ignorer(d.get("ids", []))
+        r = "ignore"
+    else:
+        raise HTTPException(404, "Action inconnue.")
+    return {"resultat": r, **autorisations.etat()}
+
+
+# ---------- mises à jour ----------
+@app.get("/api/majs")
+def lister_majs(req: Request):
+    _verifier(req)
+    from . import mises_a_jour
+    return mises_a_jour.lister()
+
+
+@app.post("/api/majs/jeton")
+async def jeton_majs(req: Request):
+    _verifier(req)
+    from . import mises_a_jour
+    mises_a_jour.definir_jeton((await req.json()).get("jeton", ""))
+    return mises_a_jour.lister()
+
+
+@app.post("/api/majs/installer")
+async def installer_maj(req: Request):
+    _verifier(req)
+    from . import mises_a_jour
+    version = (await req.json()).get("version", "")
+    if not APPLI["quitter"]:
+        raise HTTPException(400, "Les mises à jour s'installent depuis l'application Wesley installée.")
+    try:
+        mises_a_jour.installer(version, lambda etape, pct, texte: diffuser(type="maj", etape=etape, pct=pct, texte=texte),
+                               APPLI["quitter"])
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.get("/api/appli")
+def etat_appli(req: Request):
+    _verifier(req)
+    from . import demarrage
+    return {"appli": APPLI["active"], "plateforme": "mac" if MAC else "windows" if WIN else "linux",
+            "demarrage_auto": demarrage.est_actif(), "machine": MACHINE,
+            "ecoute_fond": CONFIG.get("ecoute_fond", True),
+            "ecoute_active": bool(APPLI["ecoute"] and APPLI["ecoute"].actif),
+            "seuil_eveil": CONFIG.get("seuil_eveil", 0.5), "raccourci": CONFIG.get("raccourci"),
+            "silence_fin": CONFIG.get("silence_fin", 2.5)}
+
+
+@app.post("/api/appli")
+async def regler_appli(req: Request):
+    _verifier(req)
+    from . import demarrage
+    d = await req.json()
+    if "demarrage_auto" in d:
+        demarrage.activer(bool(d["demarrage_auto"]))
+    for k in ("ecoute_fond", "seuil_eveil"):
+        if k in d:
+            CONFIG[k] = d[k]
+            sauver_config([k])
+    if "silence_fin" in d:   # partagé entre tous tes ordinateurs
+        CONFIG["silence_fin"] = max(0.5, min(15.0, float(d["silence_fin"])))
+        sauver_config(["silence_fin"])
+        sauver_profil()
+    if APPLI["ecoute"] and "ecoute_fond" in d:
+        APPLI["ecoute"].demarrer() if d["ecoute_fond"] else APPLI["ecoute"].arreter()
+    return etat_appli(req)
+
+
+VOCAL = {"ts": 0.0}   # dernière demande faite à la voix (conversation suivie)
+
+
+def _ecouter_suite_bientot():
+    """La voix de Wesley s'est tue : si la réponse est finie et que la demande était orale, on écoute la suite
+    8 s sans redire « Wesley »."""
+    def verifier():
+        time.sleep(0.8)   # entre deux phrases, la voix s'arrête un instant : on attend d'être sûr
+        ecoute = APPLI.get("ecoute")
+        if (CONFIG.get("conversation_suivie", True) and ecoute is not None and ecoute.actif and not PAROLE["actif"]
+                and not verrou_tache.locked() and time.time() - VOCAL["ts"] < 180):
+            ecoute.ecouter_suite(8.0)
+            diffuser(type="vocal", etat="suite")
+    threading.Thread(target=verifier, daemon=True).start()
+
+
+def commande_vocale(audio: np.ndarray):
+    """Phrase dite après « Hey Wesley » (fenêtre éventuellement cachée) : transcription puis exécution."""
+    if audio is None:   # rien dit après le mot d'activation
+        diffuser(type="vocal", etat="fin")
+        return
+    diffuser(type="vocal", etat="transcription")
+    try:
+        texte = _transcrire(audio, CONFIG.get("langue") or "fr")
+    except Exception as e:
+        diffuser(type="vocal", etat="fin")
+        diffuser(type="erreur", texte=f"Transcription impossible : {e}")
+        return
+    diffuser(type="vocal", etat="fin", texte=texte)
+    from .ecoute import RX_NOM
+    texte = RX_NOM.sub("", texte).strip()
+    if len(texte) >= 2:
+        from .ecoute import RX_STOP_SEUL
+        if RX_STOP_SEUL.match(texte) or re.match(r"^(stop|arr[êe]te|annule|tais[- ]toi|chut|silence)\b", texte, re.I):
+            stop_vocal()
+            return
+        VOCAL["ts"] = time.time()
+
+        def lancer():
+            for _ in range(80):   # jusqu'à 8 s : fenêtre réveillée à l'instant, pas encore branchée
+                if _clients:
+                    break
+                time.sleep(0.1)
+            executer(texte)
+        threading.Thread(target=lancer, daemon=True).start()
+
+
+# ---------- synthèse vocale ----------
+@app.get("/api/tts/voix")
+def tts_voix(req: Request):
+    _verifier(req)
+    from . import kyutai
+    return {"kyutai": [{"id": i, "nom": n} for i, n in kyutai.VOIX],
+            "edge": [{"id": i, "nom": n} for i, n in tts.VOIX_EDGE],
+            "piper": [{"id": v, "nom": v.replace("_", " ")} for v in tts.voix_piper()]}
+
+
+@app.post("/api/tts")
+async def tts_synthese(req: Request):
+    _verifier(req)
+    d = await req.json()
+    if not str(d.get("texte", "")).strip():
+        raise HTTPException(400, "Texte vide")
+    try:
+        audio, mime, moteur = await tts.synthese(d["texte"], d.get("moteur", "edge"), d.get("voix", ""),
+                                                 float(d.get("debit", 1.0)))
+    except Exception as e:
+        raise HTTPException(502, f"Synthèse impossible : {e}")
+    return Response(audio, media_type=mime, headers={"x-moteur": moteur, "cache-control": "no-store"})
+
+
+# ---------- sites appris et navigateur de Wesley ----------
+@app.get("/api/sites")
+def lister_sites(req: Request):
+    _verifier(req)
+    from . import navigateur, sites
+    return {"sites": [sites.resume(s) for s in sites.lister()], "navigateur": navigateur.etat(),
+            "exploration": {k: v for k, v in sites.EXPLO.items() if k != "arreter"}}
+
+
+@app.get("/api/sites/{sid}")
+def lire_site(sid: str, req: Request):
+    _verifier(req)
+    from . import sites
+    s = sites.lire(sid)
+    if not s:
+        raise HTTPException(404, "Site introuvable.")
+    return {**s, "procedures": [{**p, "texte": [sites.decrire_etape(e) for e in p["etapes"]]} for p in s.get("procedures", [])]}
+
+
+@app.post("/api/sites")
+async def ajouter_site(req: Request):
+    _verifier(req)
+    from . import sites
+    d = await req.json()
+    if not str(d.get("url", "")).strip():
+        raise HTTPException(400, "Indique l'adresse du site.")
+    return sites.resume(sites.ajouter(d.get("nom", ""), d["url"].strip()))
+
+
+@app.delete("/api/sites/{sid}")
+def supprimer_site(sid: str, req: Request):
+    _verifier(req)
+    from . import sites
+    sites.supprimer(sid)
+    return {"ok": True}
+
+
+@app.post("/api/navigateur_perso/tester")
+async def tester_navigateur_perso(req: Request):
+    """Bouton « Tester » : Wesley lit l'onglet ouvert dans ton navigateur et l'entoure brièvement."""
+    _verifier(req)
+    from . import navigateur_perso as p
+    try:
+        v = await asyncio.to_thread(p.instantane)
+        await asyncio.to_thread(p.js, "(() => { const e = document.querySelector('[data-wesley-ref]') || document.body; "
+                                      f"({p._SURLIGNER})(e); return true; }})()")
+        return {"ok": True, "message": f"{v.get('navigateur')} : je vois « {v.get('titre') or v.get('url')} » ({len(v.get('elements', []))} éléments)."}
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
+
+@app.post("/api/navigateur/installer")
+def installer_navigateur(req: Request):
+    _verifier(req)
+    from . import navigateur
+    navigateur.installer_chrome()
+    return navigateur.etat()
+
+
+@app.post("/api/sites/{sid}/{action}")
+async def agir_site(sid: str, action: str, req: Request):
+    _verifier(req)
+    from . import navigateur, sites
+    d = await req.json() if (req.headers.get("content-length") or "0") != "0" else {}
+    s = sites.lire(sid)
+    if not s and action != "arreter":
+        raise HTTPException(404, "Site introuvable.")
+    try:
+        if action == "ouvrir":   # pour s'y connecter (identifiants, double authentification…)
+            await asyncio.to_thread(navigateur.ouvrir, s["url"])
+            await asyncio.to_thread(navigateur.afficher)
+        elif action == "explorer":
+            sites.explorer(sid, max(5, min(int(d.get("max_pages") or 80), 300)))
+        elif action == "arreter":
+            sites.EXPLO["arreter"] = True
+        elif action == "demo":   # démonstration : l'utilisateur fait la tâche, Wesley enregistre
+            await asyncio.to_thread(navigateur.demarrer_enregistrement, sid)
+            if not ((await asyncio.to_thread(navigateur.instantane)) or {}).get("url", "").startswith("http"):
+                await asyncio.to_thread(navigateur.ouvrir, s["url"])
+        elif action == "demo_fin":
+            etapes = navigateur.arreter_enregistrement()
+            if d.get("garder", True) and etapes:
+                sites.ajouter_procedure(sid, d.get("nom", "") or "Procédure", etapes, d.get("description", ""))
+            return {"etapes": len(etapes), **(await asyncio.to_thread(sites.lire, sid))}
+        elif action == "astuce":
+            sites.noter(sid, d.get("texte", ""))
+        elif action == "identifiants":   # rien n'est renvoyé : les secrets ne repartent jamais vers l'interface
+            try:
+                connexion = sites.definir_identifiants(sid, d.get("identifiant"), d.get("mot_de_passe"), d.get("totp"))
+            except Exception:
+                raise HTTPException(400, "Clé de double authentification invalide : copie la clé secrète (ou l'adresse otpauth://).")
+            return {"connexion": connexion}
+        elif action == "code":
+            c = sites.code_2fa(sid)
+            return {"code": c[0] if c else "", "reste": c[1] if c else 0}
+        elif action == "connecter":
+            r = await asyncio.to_thread(sites.se_connecter, sid, lambda q: demander_texte(q, "Saisis le code affiché par ton appli ou reçu par SMS."))
+            await asyncio.to_thread(navigateur.afficher)
+            return {"resultat": r.split("\n")[0]}
+        elif action == "retirer":
+            sites.retirer(sid, d.get("quoi", "astuces"), d.get("id", ""))
+        else:
+            raise HTTPException(404, "Action inconnue.")
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+# ---------- voix Kyutai (locale, téléchargeable) ----------
+@app.get("/api/kyutai")
+def etat_kyutai(req: Request):
+    _verifier(req)
+    from . import kyutai
+    return kyutai.etat()
+
+
+@app.post("/api/kyutai/{action}")
+async def agir_kyutai(action: str, req: Request):
+    _verifier(req)
+    from . import kyutai
+    try:
+        if action == "installer":
+            kyutai.installer()
+        elif action == "supprimer":
+            await asyncio.to_thread(kyutai.supprimer)
+        elif action == "demarrer":   # charge le modèle à l'avance (choix de la voix Kyutai dans les réglages)
+            threading.Thread(target=kyutai.demarrer_serveur, daemon=True).start()
+        else:
+            raise HTTPException(404, "Action inconnue.")
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    return kyutai.etat()
+
+
+# ---------- modèle en mémoire vidéo ----------
+@app.post("/api/modele/liberer")
+def liberer(req: Request):
+    _verifier(req)
+    if verrou_tache.locked():
+        raise HTTPException(409, "Wesley est occupé")
+    Wesley.liberer()
+    return {"ok": True}
+
+
+@app.post("/api/modele/charger")
+def charger(req: Request):
+    _verifier(req)
+    threading.Thread(target=wesley.prechauffer, daemon=True).start()
+    return {"ok": True}
+
+
+# ---------- conversation ----------
+def _conversation():
+    """Conversation en cours au format de l'interface (pour restaurer après un rechargement)."""
+    if wesley.avec_claude:
+        from . import claude
+        return claude.conversation_ui(wesley.histo_claude)
+    if wesley.avec_openai:
+        from . import openai_cerveau
+        return openai_cerveau.conversation_ui(wesley.histo_openai)
+    out = []
+    for m in wesley.messages[1:]:
+        if m["role"] == "user":
+            out.append({"role": "user", "texte": m["content"]})
+        elif m["role"] == "assistant":
+            if not out or out[-1]["role"] != "wesley":
+                out.append({"role": "wesley", "blocs": []})
+            if m.get("content"):
+                out[-1]["blocs"].append({"type": "texte", "texte": m["content"]})
+            for tc in m.get("tool_calls") or []:
+                out[-1]["blocs"].append({"type": "outil", "nom": tc["function"]["name"],
+                                         "args": {k: str(v)[:200] for k, v in tc["function"]["arguments"].items()},
+                                         "resultat": None})
+        elif m["role"] == "tool" and out and out[-1]["role"] == "wesley":
+            for b in out[-1]["blocs"]:
+                if b["type"] == "outil" and b["resultat"] is None:
+                    b["resultat"] = m["content"][:600]
+                    break
+    return out
+
+
+def _avec_briefing(texte: str) -> str:
+    """Premier échange de la journée (le matin) : Wesley commence par le briefing, puis répond."""
+    if not CONFIG.get("briefing_matin", True):
+        return texte
+    from datetime import datetime
+    from . import config
+    n = datetime.now()
+    f = config.PARTAGE / "briefing.txt"
+    jour = n.strftime("%Y-%m-%d")
+    try:
+        deja = f.read_text(encoding="utf-8").strip() == jour
+    except OSError:
+        deja = False
+    if deja or not 5 <= n.hour < 12 or len(texte) < 2:
+        return texte
+    f.write_text(jour, encoding="utf-8")
+    return ("[Premier échange de la journée : commence par le briefing du matin (outil briefing_du_jour), court, "
+            f"puis réponds à ce qui suit s'il y a une vraie demande]\n{texte}")
+
+
+def executer(texte: str):
+    global _seq
+    if not verrou_tache.acquire(blocking=False):
+        diffuser(type="erreur", texte="Je suis déjà sur une tâche. STOP pour l'interrompre.")
+        return
+    outils.ARRET.clear()   # nouvelle tâche : l'arrêt précédent ne compte plus
+    id_outil = None
+
+    def sur_outil(nom, a, res):
+        nonlocal id_outil
+        global _seq
+        if res is None:
+            _seq += 1
+            id_outil = _seq
+            diffuser(type="outil", id=id_outil, nom=nom, args={k: str(v)[:200] for k, v in a.items()})
+        else:
+            diffuser(type="resultat", id=id_outil, nom=nom, res=res[:600], erreur=res.startswith("Erreur"))
+
+    try:
+        diffuser(type="utilisateur", texte=texte)
+        diffuser(type="etat", occupe=True)
+        demande = _avec_briefing(texte)
+        rep = wesley.demander(demande, sur_texte=lambda t: diffuser(type="texte", t=t),
+                              sur_pensee=lambda t: diffuser(type="pensee", t=t), sur_outil=sur_outil)
+        diffuser(type="fin", texte=rep)
+    except Exception as e:
+        diffuser(type="erreur", texte=f"Erreur : {e}")
+        import traceback as _tb
+        from . import rapport
+        rapport.noter(_tb.format_exc(), contexte=texte[:200])
+    finally:
+        verrou_tache.release()
+        diffuser(type="etat", occupe=False)
+
+
+@app.websocket("/ws")
+async def ws(sock: WebSocket):
+    global _boucle
+    if _hote(sock.headers.get("origin")) not in HOTES_OK or sock.query_params.get("jeton") != JETON:
+        await sock.close(code=4403)
+        return
+    await sock.accept()
+    _boucle = asyncio.get_running_loop()
+    q: asyncio.Queue = asyncio.Queue()
+    _clients.add(q)
+    await sock.send_json({"type": "init", "conversation": _conversation(), "occupe": verrou_tache.locked()})
+
+    async def emetteur():
+        while True:
+            await sock.send_json(await q.get())
+
+    tache = asyncio.create_task(emetteur())
+    try:
+        while True:
+            m = await sock.receive_json()
+            t = m.get("type")
+            if t == "message" and str(m.get("texte", "")).strip():
+                threading.Thread(target=executer, args=(m["texte"].strip(),), daemon=True).start()
+            elif t == "stop":
+                wesley.arreter = True
+                outils.arreter_tout()
+            elif t == "parle":
+                avant = PAROLE["actif"]
+                PAROLE.update(actif=bool(m.get("actif")), depuis=time.time())
+                if avant and not PAROLE["actif"]:
+                    _ecouter_suite_bientot()
+            elif t == "reset":
+                wesley.arreter = True
+                wesley.reset()
+                diffuser(type="reset")
+                threading.Thread(target=wesley.prechauffer, daemon=True).start()
+            elif t == "scan":
+                await asyncio.to_thread(memoire.scanner_systeme)
+                wesley.reset()
+                diffuser(type="reset")
+                diffuser(type="info", texte="PC re-scanné, nouvelle conversation.")
+                threading.Thread(target=wesley.prechauffer, daemon=True).start()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _clients.discard(q)
+        tache.cancel()
+
+
+# ---------- fichiers du front (compilé par Vite) ----------
+if (STATIC / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=STATIC / "assets"), name="assets")
+
+
+@app.get("/{chemin:path}", response_class=HTMLResponse)
+def front(chemin: str):
+    f = (STATIC / chemin).resolve()
+    # Sans « no-cache », la fenêtre (WebKit sur Mac, WebView2 sur Windows) gardait l'ancienne page en cache :
+    # après une mise à jour, l'appli tournait en nouvelle version mais affichait l'ancienne interface.
+    # Les fichiers de assets/ changent de nom à chaque version : eux peuvent rester en cache.
+    if chemin and f.is_file() and STATIC.resolve() in f.parents:
+        return FileResponse(f, headers={"Cache-Control": "no-cache"})
+    index = STATIC / "index.html"
+    if not index.exists():
+        return HTMLResponse("<h1>Interface non compilée</h1><p>Lance <code>npm run build</code> dans le dossier interface.</p>", 503)
+    return FileResponse(index, headers={"Cache-Control": "no-cache"})
+
+
+# ---------- lancement ----------
+def _demarrer_ollama():
+    """Lance Ollama en arrière-plan s'il ne répond pas."""
+    try:
+        ollama.list(); return
+    except Exception:
+        pass
+    exe = shutil.which("ollama")
+    if not exe:
+        print("  ! Ollama introuvable : installe-le depuis ollama.com"); return
+    print("  Démarrage d'Ollama...")
+    if WIN:
+        subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS)
+    else:
+        subprocess.Popen([exe, "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    for _ in range(30):
+        time.sleep(0.5)
+        try:
+            ollama.list(); return
+        except Exception:
+            pass
+
+
+def preparer():
+    global wesley
+    from . import compte
+
+    def apres_synchro(changements):
+        """Un autre appareil a modifié le compte : Wesley tient compte des nouveaux souvenirs dès maintenant."""
+        if wesley is not None and (changements["faits_texte"] or changements["reglages"]):
+            from .agent import prompt_systeme
+            wesley.messages[0]["content"] = prompt_systeme()
+        if changements["connecteurs"]:
+            threading.Thread(target=connecteurs.demarrer_tous, daemon=True).start()
+        diffuser(type="memoire_maj", **changements)
+    compte.ecouteurs.append(apres_synchro)
+    compte.au_demarrage()   # mémoire, connecteurs et profil du compte connecté (cache local + synchro)
+    from . import automatisations, taches
+    automatisations.demarrer()   # surveille tes boîtes mail pour les règles « quand je reçois… »
+    taches.au_demarrage()        # tâches de fond coupées par la fermeture : « interrompues » (bouton Reprendre)
+    from . import agents_code
+    agents_code.surveiller()     # prévient si Claude Code / Codex ne sont plus connectés
+    if CONFIG.get("cerveau") == "ollama":
+        _demarrer_ollama()
+    if not memoire.SYSTEME.exists():
+        print("  Premier lancement : scan du PC...")
+        memoire.scanner_systeme()
+    wesley = Wesley()
+    psutil.cpu_percent(interval=None)
+
+    def prechauffer_tout():
+        t0 = time.time()
+        try:
+            connecteurs.demarrer_tous()
+            print(f"  Connecteurs : {len(connecteurs.INSTANCES)}")
+        except Exception as e:
+            print(f"  ! Connecteurs : {e}")
+        wesley.prechauffer()
+        print(f"  Modèle prêt ({time.time() - t0:.0f} s)")
+        try:
+            with _whisper_verrou:
+                _modele_whisper()
+            print("  Reconnaissance vocale prête")
+        except Exception as e:
+            print(f"  ! Whisper : {e}")
+        tts.precharger_piper()
+    threading.Thread(target=prechauffer_tout, daemon=True).start()
+
+
+def _deja_lance(url):
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{url}/api/session", timeout=2) as r:
+            return r.status == 200
+    except Exception:
+        return False
+
+
+def main(ouvrir=True):
+    import uvicorn
+    url = f"http://{HOTE}:{PORT}"
+    # Un seul Wesley à la fois : deux instances s'écrasent mutuellement le cache d'Ollama
+    # et chaque question doit alors relire tout le prompt (~6-30 s au lieu de 0,2 s).
+    if _deja_lance(url):
+        print(f"\n  Wesley tourne déjà -> {url} (j'ouvre l'interface existante)\n")
+        if ouvrir:
+            webbrowser.open(url)
+        return
+    preparer()
+    print(f"\n  Wesley en ligne -> {url}\n  (Ctrl+C pour arrêter)\n")
+    if ouvrir:
+        threading.Timer(1.2, lambda: webbrowser.open(url)).start()
+    try:
+        uvicorn.run(app, host=HOTE, port=PORT, log_level="warning")
+    finally:
+        print("Je mémorise ce que j'ai appris...")
+        try:
+            for f in wesley.extraire_souvenirs():
+                print(" ", f)
+        except Exception:
+            pass
+        Wesley.liberer()   # rend la VRAM (jeux, etc.)
+
+
+if __name__ == "__main__":
+    import sys
+    main(ouvrir="--sans-navigateur" not in sys.argv)

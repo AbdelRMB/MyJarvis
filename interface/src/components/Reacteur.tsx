@@ -2,12 +2,12 @@ import { useEffect, useRef } from "react";
 import { micro } from "../audio/micro";
 import { impulsionVoix } from "../audio/tts";
 import { useAudio } from "../stores/audio";
-import { useJarvis } from "../stores/jarvis";
+import { useWesley } from "../stores/wesley";
 import { useReglages } from "../stores/reglages";
 
 /**
  * Réacteur arc animé au canvas. Lit l'état directement dans les stores à chaque image
- * (pas de re-rendu React) : réagit au micro, à la voix de Jarvis et à l'exécution d'outils.
+ * (pas de re-rendu React) : réagit au micro, à la voix de Wesley et à l'exécution d'outils.
  */
 export function Reacteur({ className }: { className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -25,9 +25,9 @@ export function Reacteur({ className }: { className?: string }) {
     const image = (t: number) => {
       raf = requestAnimationFrame(image);
       // La carte graphique sert aussi au modèle d'IA : chaque image dessinée lui vole du temps.
-      // On limite donc la cadence, surtout pendant que Jarvis réfléchit (là où le GPU compte le plus).
+      // On limite donc la cadence, surtout pendant que Wesley réfléchit (là où le GPU compte le plus).
       const anim = useReglages.getState().animations;
-      const j0 = useJarvis.getState();
+      const j0 = useWesley.getState();
       const a0 = useAudio.getState();
       const travail = j0.occupe || !!j0.outilEnCours;
       const fps = anim === "aucunes" ? 2 : travail ? (anim === "completes" ? 20 : 8) : a0.enregistre || a0.parle ? 30 : anim === "completes" ? 60 : 24;
@@ -46,7 +46,7 @@ export function Reacteur({ className }: { className?: string }) {
         cv.height = Math.round(r.height * dpr);
       }
       const a = useAudio.getState();
-      const j = useJarvis.getState();
+      const j = useWesley.getState();
       const mode = useReglages.getState().mode;
       const W = cv.width;
       const H = cv.height;

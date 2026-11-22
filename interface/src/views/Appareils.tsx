@@ -4,7 +4,7 @@ import { Badge, Bouton, Champ, EnTetePage, Interrupteur, Panneau, Selecteur, Vid
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { t } from "../lib/i18n";
-import { bus } from "../stores/jarvis";
+import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Appareil = { id: string; nom: string; plateforme: string; version: string; vu: number; en_ligne: boolean; occupe: boolean; accepte: boolean; mode: string; connecte_depuis: number; moi: boolean };
@@ -88,7 +88,7 @@ export function VueAppareils() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Mes appareils")}
-        sousTitre={t("Tous les ordinateurs où Jarvis est connecté à ton compte. Dis par exemple : « sur mon PC, lance Discord » — le Jarvis de l'autre appareil le fait et te répond.")}
+        sousTitre={t("Tous les ordinateurs où Wesley est connecté à ton compte. Dis par exemple : « sur mon PC, lance Discord » — le Wesley de l'autre appareil le fait et te répond.")}
       />
       {e?.erreur && <p className="mb-4 text-sm text-rouge">{e.erreur}</p>}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -97,7 +97,7 @@ export function VueAppareils() {
             <div className="flex flex-wrap items-center gap-2 text-[13px]">
               <span className={cx("inline-flex items-center gap-1.5", a.en_ligne ? "text-vert" : "text-doux")}>
                 <span className={cx("size-2 rounded-full", a.en_ligne ? "bg-vert" : "bg-tres-doux")} />
-                {a.en_ligne ? (a.occupe ? t("Allumé — Jarvis occupé") : t("Allumé — Jarvis disponible")) : t("Hors ligne (éteint ou Jarvis fermé)")}
+                {a.en_ligne ? (a.occupe ? t("Allumé — Wesley occupé") : t("Allumé — Wesley disponible")) : t("Hors ligne (éteint ou Wesley fermé)")}
               </span>
               {a.moi && <Badge ton="hud">{t("cet appareil")}</Badge>}
               {a.version && <Badge ton="doux">v{a.version}</Badge>}
@@ -106,7 +106,7 @@ export function VueAppareils() {
             </div>
             <p className="mt-1.5 text-[12px] text-doux">
               {t("Vu")} : {a.vu ? ilYa(a.vu) : "—"} · {t("connecté depuis")} {a.connecte_depuis ? new Date(a.connecte_depuis * 1000).toLocaleDateString() : "—"}
-              {!a.plateforme && ` · ${t("ancienne version de Jarvis")}`}
+              {!a.plateforme && ` · ${t("ancienne version de Wesley")}`}
             </p>
 
             {a.moi && e && (
@@ -139,7 +139,7 @@ export function VueAppareils() {
                     {t("Mettre à jour {nom} maintenant", { nom: a.nom })}
                   </Bouton>
                 ) : (
-                  <p className="mt-1 text-doux">{a.en_ligne ? t("Cet appareil refuse les ordres à distance.") : t("Allume l'appareil (avec Jarvis) pour le mettre à jour à distance.")}</p>
+                  <p className="mt-1 text-doux">{a.en_ligne ? t("Cet appareil refuse les ordres à distance.") : t("Allume l'appareil (avec Wesley) pour le mettre à jour à distance.")}</p>
                 )}
               </div>
             )}

@@ -30,7 +30,7 @@ function BlocCode({ code, langue }: { code: string; langue: string }) {
 
 export const Markdown = memo(function Markdown({ texte }: { texte: string }) {
   return (
-    <div className="prose-jarvis">
+    <div className="prose-wesley">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{

@@ -1,11 +1,11 @@
-"""Serveur des comptes Jarvis : chaque utilisateur a sa mémoire, son historique, ses réglages et son coffre.
+"""Serveur des comptes Wesley : chaque utilisateur a sa mémoire, son historique, ses réglages et son coffre.
 
 - Connexion : l'appli ne transmet JAMAIS le mot de passe. Elle en dérive deux clés (scrypt) :
     * cle_auth -> envoyée ici, stockée hachée (scrypt + sel) : prouve l'identité ;
     * cle_coffre -> reste sur l'appareil : chiffre le coffre (clé API, mots de passe des connecteurs).
   Le serveur ne stocke donc que du chiffré qu'il ne peut pas lire.
 - Toutes les données sont filtrées par l'utilisateur du jeton de session : personne ne voit celles des autres.
-- Base SQLite (fichier /donnees/jarvis.db, volume Docker).
+- Base SQLite (fichier /donnees/jarvis.db, volume Docker ; nom gardé de l'époque où l'appli s'appelait Jarvis).
 """
 import asyncio
 import hashlib
@@ -23,15 +23,16 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-BASE = os.environ.get("JARVIS_DB", "/donnees/jarvis.db")
-app = FastAPI(title="Jarvis — comptes", docs_url=None, redoc_url=None, openapi_url=None)
+# variables WESLEY_* ; les anciennes JARVIS_* (avant le renommage de l'appli) restent acceptées
+BASE = os.environ.get("WESLEY_DB") or os.environ.get("JARVIS_DB", "/donnees/jarvis.db")
+app = FastAPI(title="Wesley — comptes", docs_url=None, redoc_url=None, openapi_url=None)
 _verrou = threading.Lock()
-CLE_APPLI = os.environ.get("JARVIS_CLE_APPLI", "")   # même valeur que jarvis/compte.py (CLE_APPLI)
+CLE_APPLI = os.environ.get("WESLEY_CLE_APPLI") or os.environ.get("JARVIS_CLE_APPLI", "")   # même valeur que wesley/compte.py (CLE_APPLI)
 
 
 @app.middleware("http")
 async def seulement_l_appli(req: Request, suite):
-    """Tout ce qui n'est pas l'appli Jarvis (navigateur, robots) reçoit un 404 vide (Apache filtre déjà)."""
+    """Tout ce qui n'est pas l'appli Wesley (navigateur, robots) reçoit un 404 vide (Apache filtre déjà)."""
     if req.url.path.startswith("/mobile/") and req.method == "GET":   # l'appli mobile (pages) est publique
         return await suite(req)
     if CLE_APPLI and (not req.url.path.startswith("/v1/") or
@@ -277,7 +278,7 @@ def exporter_mes_donnees(uid: int = Depends(utilisateur)):
         u = c.execute("SELECT email, prenom, cree, admin, politique, politique_acceptee FROM utilisateurs WHERE id = ?",
                       (uid,)).fetchone()
         return {
-            "format": "jarvis-export-1", "exporte_le": time.time(),
+            "format": "wesley-export-1", "exporte_le": time.time(),
             "compte": dict(u),
             "souvenirs": tout("SELECT fid, fait, categorie, date, modifie, appareil FROM faits WHERE utilisateur = ? "
                               "AND supprime = 0 ORDER BY id"),
@@ -783,8 +784,9 @@ def statistiques(jours: int = 30, uid: int = Depends(_admin)):
     t = time.time()
     debut = t - jours * 86400
     jour_debut = time.strftime("%Y-%m-%d", time.localtime(debut))
-    # demande = ligne d'historique qui n'est pas une réponse de Jarvis (« [HH:MM] Jarvis: … »)
-    pas_jarvis = "substr(ligne, 9, 7) != 'Jarvis:'"
+    # demande = ligne d'historique qui n'est pas une réponse de l'assistant (« [HH:MM] Wesley: … », « Jarvis: » avant
+    # le renommage de l'appli)
+    pas_wesley = "substr(ligne, 9, 7) NOT IN ('Wesley:', 'Jarvis:')"
     with db() as c:
         un = lambda sql, *a: c.execute(sql, a).fetchone()[0] or 0   # noqa: E731
         # dernière activité d'un compte : présence d'un appareil ou utilisation d'une session
@@ -800,7 +802,7 @@ def statistiques(jours: int = 30, uid: int = Depends(_admin)):
             "actifs_30j": sum(v > t - 30 * 86400 for v in vus),
             "appareils": un("SELECT COUNT(*) FROM appareils WHERE vu > ?", t - 30 * 86400),
             "en_ligne": un("SELECT COUNT(*) FROM appareils WHERE vu > ?", t - EN_LIGNE),
-            "demandes_periode": un(f"SELECT COUNT(*) FROM historique WHERE jour >= ? AND {pas_jarvis}", jour_debut),
+            "demandes_periode": un(f"SELECT COUNT(*) FROM historique WHERE jour >= ? AND {pas_wesley}", jour_debut),
             "souvenirs": un("SELECT COUNT(*) FROM faits WHERE supprime = 0"),
             "ordres_periode": un("SELECT COUNT(*) FROM ordres WHERE cree > ?", debut),
             "tickets_ouverts": un("SELECT COUNT(*) FROM tickets WHERE statut NOT IN ('resolu', 'ferme')"),
@@ -815,8 +817,8 @@ def statistiques(jours: int = 30, uid: int = Depends(_admin)):
             "inscriptions": serie("SELECT date(cree, 'unixepoch', 'localtime') j, COUNT(*) FROM utilisateurs "
                                   "WHERE cree > ? GROUP BY j", debut),
             "utilisateurs_actifs": serie(f"SELECT jour, COUNT(DISTINCT utilisateur) FROM historique WHERE jour >= ? "
-                                         f"AND {pas_jarvis} GROUP BY jour", jour_debut),
-            "demandes": serie(f"SELECT jour, COUNT(*) FROM historique WHERE jour >= ? AND {pas_jarvis} GROUP BY jour",
+                                         f"AND {pas_wesley} GROUP BY jour", jour_debut),
+            "demandes": serie(f"SELECT jour, COUNT(*) FROM historique WHERE jour >= ? AND {pas_wesley} GROUP BY jour",
                               jour_debut),
             "ordres": serie("SELECT date(cree, 'unixepoch', 'localtime') j, COUNT(*) FROM ordres WHERE cree > ? "
                             "GROUP BY j", debut),
@@ -838,7 +840,7 @@ def statistiques(jours: int = 30, uid: int = Depends(_admin)):
             "(SELECT GROUP_CONCAT(DISTINCT a.plateforme) FROM appareils a WHERE a.utilisateur = u.id AND a.plateforme != '') AS plateformes, "
             "(SELECT a.version FROM appareils a WHERE a.utilisateur = u.id AND a.version != '' ORDER BY a.vu DESC LIMIT 1) AS version, "
             "(SELECT COUNT(*) FROM faits f WHERE f.utilisateur = u.id AND f.supprime = 0) AS souvenirs, "
-            f"(SELECT COUNT(*) FROM historique h WHERE h.utilisateur = u.id AND h.jour >= ? AND {pas_jarvis}) AS demandes "
+            f"(SELECT COUNT(*) FROM historique h WHERE h.utilisateur = u.id AND h.jour >= ? AND {pas_wesley}) AS demandes "
             "FROM utilisateurs u ORDER BY vu DESC LIMIT 1000", (jour_debut,))]
     for u in comptes:
         u["admin"] = bool(u["admin"])
@@ -855,7 +857,7 @@ def sante():
 # ---------- appli mobile (télécommande depuis le téléphone) ----------
 @app.get("/mobile/config.js")
 def config_mobile():
-    return PlainTextResponse(f"window.JARVIS_CLE_APPLI = {json.dumps(CLE_APPLI)};", media_type="application/javascript",
+    return PlainTextResponse(f"window.WESLEY_CLE_APPLI = {json.dumps(CLE_APPLI)};", media_type="application/javascript",
                              headers={"Cache-Control": "no-store"})
 
 

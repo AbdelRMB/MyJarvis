@@ -1,5 +1,5 @@
 /* Garde l'interface en cache pour qu'elle s'ouvre instantanément ; les demandes passent toujours par le réseau. */
-const CACHE = "jarvis-mobile-v2";
+const CACHE = "wesley-mobile-v2";
 const FICHIERS = ["./", "index.html", "style.css", "app.js", "scrypt.js", "manifest.webmanifest", "icone-192.png", "icone-512.png"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FICHIERS))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => {

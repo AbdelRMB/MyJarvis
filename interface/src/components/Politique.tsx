@@ -28,7 +28,7 @@ export function AccordPolitique({ compte, onAccepte }: { compte: Compte; onAccep
           {t("Ta vie privée")}
         </h2>
         <p className="mt-2 text-[14px] leading-relaxed text-doux">
-          {t("La politique de confidentialité de Jarvis explique quelles données ton compte garde, pourquoi, combien de temps, et comment les télécharger ou tout supprimer. Lis-la puis accepte-la pour continuer à utiliser ton compte.")}
+          {t("La politique de confidentialité de Wesley explique quelles données ton compte garde, pourquoi, combien de temps, et comment les télécharger ou tout supprimer. Lis-la puis accepte-la pour continuer à utiliser ton compte.")}
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Bouton variante="primaire" chargement={envoi} onClick={accepter}>
@@ -39,7 +39,7 @@ export function AccordPolitique({ compte, onAccepte }: { compte: Compte; onAccep
           </Bouton>
         </div>
         <p className="mt-4 text-[12px] leading-relaxed text-tres-doux">
-          {t("Tu ne veux pas ? Déconnecte-toi : tu pourras utiliser Jarvis en local, sans compte. Pour faire supprimer ton compte, écris à l'adresse indiquée dans la politique.")}{" "}
+          {t("Tu ne veux pas ? Déconnecte-toi : tu pourras utiliser Wesley en local, sans compte. Pour faire supprimer ton compte, écris à l'adresse indiquée dans la politique.")}{" "}
           <button
             onClick={() => api("/api/compte/deconnexion", { method: "POST" }).then(() => location.reload()).catch((x) => toast((x as Error).message, "erreur"))}
             className="text-doux underline underline-offset-2 hover:text-texte"

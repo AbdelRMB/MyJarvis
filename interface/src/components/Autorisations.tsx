@@ -25,8 +25,8 @@ function useAutorisations() {
     try {
       const r = await api<Reponse>(`/api/autorisations/${action}`, { method: "POST", json: corps });
       setE(r);
-      if (r.resultat === "reglages") toast(t("Réglages Système ouverts : active Jarvis dans la liste, puis reviens ici."), "info");
-      if (r.resultat === "retire") toast(t("Accès retiré. Jarvis le redemandera s'il en a besoin."), "succes");
+      if (r.resultat === "reglages") toast(t("Réglages Système ouverts : active Wesley dans la liste, puis reviens ici."), "info");
+      if (r.resultat === "retire") toast(t("Accès retiré. Wesley le redemandera s'il en a besoin."), "succes");
     } catch (x) {
       toast((x as Error).message, "erreur");
     }
@@ -52,7 +52,7 @@ export function OngletAutorisations() {
     <Panneau titre={t("Autorisations")} icone={<ShieldCheck />}>
       <p className="mb-3 text-[13px] leading-relaxed text-doux">
         {mac
-          ? "macOS ne laisse aucune appli s'accorder ces accès toute seule : c'est toi qui acceptes, une seule fois. Ils restent acquis après les mises à jour de Jarvis."
+          ? "macOS ne laisse aucune appli s'accorder ces accès toute seule : c'est toi qui acceptes, une seule fois. Ils restent acquis après les mises à jour de Wesley."
           : "Sous Windows, les applis de bureau ont déjà accès aux fichiers, à l'écran, au clavier et à la souris. Seul le micro peut être coupé dans les Paramètres."}
       </p>
       <div className="divide-y divide-ligne">
@@ -95,7 +95,7 @@ export function BandeauAutorisations() {
   return (
     <div className="fixed right-4 bottom-4 z-40 w-[min(420px,calc(100vw-32px))] rounded-lg border border-hud/40 bg-surface-2/95 p-4 shadow-glow backdrop-blur">
       <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-hud">
-        <ShieldCheck className="size-4" />{t(" Jarvis a besoin de quelques accès")}
+        <ShieldCheck className="size-4" />{t(" Wesley a besoin de quelques accès")}
       </div>
       <p className="mb-3 text-[12px] text-doux">{t("Une seule fois : ton choix est retenu, tu pourras le changer dans Réglages › Autorisations.")}</p>
       <div className="space-y-2">

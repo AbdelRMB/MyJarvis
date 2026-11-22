@@ -41,7 +41,7 @@ export function Demarrage({ pret, erreur, nbOutils, onDemarrer }: { pret: boolea
     <div className={cx("grille-hud fixed inset-0 z-40 grid place-items-center bg-fond transition-opacity duration-400", sortie && "opacity-0")}>
       <div className="w-[min(520px,calc(100vw-32px))]">
         <h1 className="mb-10 text-center font-display text-[clamp(28px,7vw,48px)] font-black tracking-[0.45em] text-hud [text-shadow:0_0_26px_rgb(60_232_255/.6)]">
-          {t("J.A.R.V.I.S.")}
+          {t("Wesley")}
         </h1>
         <ul className="space-y-1.5 font-mono text-[13px]">
           {ETAPES.slice(0, n).map((e, i) => (
@@ -58,7 +58,7 @@ export function Demarrage({ pret, erreur, nbOutils, onDemarrer }: { pret: boolea
           <p className="mt-8 rounded-md border border-rouge/40 bg-rouge/5 p-4 text-center text-sm text-rouge">
             {erreur}
             <br />
-            <span className="text-doux">{t("Vérifie que jarvis-web.bat tourne, puis recharge la page.")}</span>
+            <span className="text-doux">{t("Vérifie que wesley-web.bat tourne, puis recharge la page.")}</span>
           </p>
         ) : (
           <button

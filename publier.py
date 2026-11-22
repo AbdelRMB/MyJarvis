@@ -1,7 +1,7 @@
 """Publie un installateur dans les GitHub Releases du dépôt.
 
 Utilisé par publier-mac.sh (Mac), publier.bat (Windows) et la CI (.github/workflows/versions.yml) :
-    python publier.py installateur/Jarvis-1.0.5-mac-arm64.dmg
+    python publier.py installateur/Wesley-2.0.0-mac-arm64.dmg [installateur/Jarvis-2.0.0-mac-arm64.dmg]
 Crée la release vX.Y.Z si elle n'existe pas (description = section « ## X.Y.Z » de CHANGELOG.md),
 puis y ajoute le fichier (remplace un fichier du même nom).
 Ensuite, depuis une machine (pas depuis la CI), demande à GitHub de fabriquer l'installateur de L'AUTRE système :
@@ -17,7 +17,7 @@ import requests
 
 ICI = Path(__file__).resolve().parent
 sys.path.insert(0, str(ICI))
-from jarvis.version import DEPOT, VERSION  # noqa: E402
+from wesley.version import DEPOT, VERSION  # noqa: E402
 
 API = f"https://api.github.com/repos/{DEPOT}"
 DEPOT_URL = f"https://github.com/{DEPOT}"
@@ -48,11 +48,13 @@ def notes() -> str:
 
 
 def main():
-    fichier = Path([a for a in sys.argv[1:] if not a.startswith("--")][0])
-    if not fichier.exists():
-        sys.exit(f"Introuvable : {fichier}")
-    if VERSION not in fichier.name:
-        sys.exit(f"{fichier.name} ne correspond pas à la version {VERSION} de jarvis/version.py.")
+    # un ou plusieurs fichiers (ex. : l'installateur et sa copie sous l'ancien nom Jarvis, pour les anciennes versions)
+    fichiers = [Path(a) for a in sys.argv[1:] if not a.startswith("--")]
+    for fichier in fichiers:
+        if not fichier.exists():
+            sys.exit(f"Introuvable : {fichier}")
+        if VERSION not in fichier.name:
+            sys.exit(f"{fichier.name} ne correspond pas à la version {VERSION} de wesley/version.py.")
     git("fetch", "-q", "origin")
     if git("rev-list", "--count", "origin/main..HEAD") not in ("", "0"):
         sys.exit("Des commits ne sont pas encore poussés : fais « git push » avant de publier.")
@@ -63,23 +65,24 @@ def main():
     r = s.get(f"{API}/releases/tags/{tag}")
     if r.status_code == 404:
         r = s.post(f"{API}/releases", json={"tag_name": tag, "target_commitish": git("rev-parse", "HEAD"),
-                                            "name": f"Jarvis {VERSION}", "body": notes()})
+                                            "name": f"Wesley {VERSION}", "body": notes()})
         if r.status_code == 422:   # créée au même moment par l'autre appareil / la CI
             r = s.get(f"{API}/releases/tags/{tag}")
         else:
             print(f"Release {tag} créée.")
     r.raise_for_status()
     rel = r.json()
-    for a in rel.get("assets", []):
-        if a["name"] == fichier.name:
-            s.delete(f"{API}/releases/assets/{a['id']}").raise_for_status()
-            print(f"Ancien {fichier.name} remplacé.")
-    taille = fichier.stat().st_size
-    print(f"Envoi de {fichier.name} ({taille >> 20} Mo)…")
-    with open(fichier, "rb") as f:
-        r = s.post(rel["upload_url"].split("{")[0], params={"name": fichier.name}, data=f,
-                   headers={"Content-Type": "application/octet-stream", "Content-Length": str(taille)}, timeout=3600)
-    r.raise_for_status()
+    for fichier in fichiers:
+        for a in rel.get("assets", []):
+            if a["name"] == fichier.name:
+                s.delete(f"{API}/releases/assets/{a['id']}").raise_for_status()
+                print(f"Ancien {fichier.name} remplacé.")
+        taille = fichier.stat().st_size
+        print(f"Envoi de {fichier.name} ({taille >> 20} Mo)…")
+        with open(fichier, "rb") as f:
+            r = s.post(rel["upload_url"].split("{")[0], params={"name": fichier.name}, data=f,
+                       headers={"Content-Type": "application/octet-stream", "Content-Length": str(taille)}, timeout=3600)
+        r.raise_for_status()
     print(f"Publié : {rel['html_url']}")
 
     import os
@@ -92,7 +95,7 @@ def main():
                   f"il sera ajouté à la même version : {DEPOT_URL}/actions")
         else:
             print(f"! Impossible de lancer la fabrication {autre} sur GitHub ({r.status_code}) : "
-                  f"Actions > Versions de Jarvis > Run workflow, case « {autre} ».")
+                  f"Actions > Versions de Wesley > Run workflow, case « {autre} ».")
 
 
 if __name__ == "__main__":

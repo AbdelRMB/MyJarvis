@@ -5,8 +5,8 @@ body:
   - type: textarea
     id: besoin
     attributes:
-      label: What would you like Jarvis to do? / Que voudrais-tu que Jarvis fasse ?
-      description: "An example sentence you would say to Jarvis helps a lot (\"Jarvis, …\")."
+      label: What would you like Wesley to do? / Que voudrais-tu que Wesley fasse ?
+      description: "An example sentence you would say to Wesley helps a lot (\"Wesley, …\")."
     validations:
       required: true
   - type: textarea

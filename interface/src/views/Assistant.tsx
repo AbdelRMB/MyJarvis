@@ -20,16 +20,16 @@ import { Reacteur } from "../components/Reacteur";
 import { Badge, BoutonIcone, Panneau } from "../components/ui";
 import { VuMetre } from "../components/VuMetre";
 import { cx, heure, nomOutil } from "../lib/format";
-import type { BlocOutil, Message, MessageJarvis } from "../lib/types";
+import type { BlocOutil, Message, MessageWesley } from "../lib/types";
 import { useAudio } from "../stores/audio";
-import { envoyer, nouvelleConversation, useJarvis } from "../stores/jarvis";
+import { envoyer, nouvelleConversation, useWesley } from "../stores/wesley";
 import { useReglages } from "../stores/reglages";
 import { useSysteme } from "../stores/systeme";
 
 /* ---------------- statut global ---------------- */
 export function useStatut(): { libelle: string; detail: string; ton: "hud" | "ambre" | "vert" } {
   const a = useAudio();
-  const { occupe, outilEnCours } = useJarvis();
+  const { occupe, outilEnCours } = useWesley();
   const mode = useReglages((s) => s.mode);
   const [, force] = useState(0);
   useEffect(() => {
@@ -45,10 +45,10 @@ export function useStatut(): { libelle: string; detail: string; ton: "hud" | "am
   if (a.transcrit) return { libelle: t("Transcription"), detail: t("Whisper analyse ta voix…"), ton: "hud" };
   if (outilEnCours) return { libelle: t("Exécution"), detail: nomOutil(outilEnCours), ton: "ambre" };
   if (occupe) return { libelle: t("Analyse"), detail: t("Je réfléchis…"), ton: "hud" };
-  if (a.parle) return { libelle: t("Transmission"), detail: t("Dis « Jarvis, stop » ou Échap pour couper"), ton: "hud" };
+  if (a.parle) return { libelle: t("Transmission"), detail: t("Dis « Wesley, stop » ou Échap pour couper"), ton: "hud" };
   if (a.eveilJusqua > Date.now()) return { libelle: t("À vos ordres"), detail: t("Je t'écoute…"), ton: "vert" };
   if (!a.micActif) return { libelle: t("En veille"), detail: t("Micro coupé — tape ta demande"), ton: "hud" };
-  if (mode === "eveil") return { libelle: t("En attente"), detail: a.ecouteFond ? "Dis « Jarvis, … »" : "Dis « Jarvis, … »", ton: "hud" };
+  if (mode === "eveil") return { libelle: t("En attente"), detail: a.ecouteFond ? "Dis « Wesley, … »" : "Dis « Wesley, … »", ton: "hud" };
   if (mode === "auto") return { libelle: t("À l'écoute"), detail: t("Parle quand tu veux"), ton: "hud" };
   return { libelle: t("En veille"), detail: t("Maintiens Espace pour parler"), ton: "hud" };
 }
@@ -133,7 +133,7 @@ function Pensee({ texte }: { texte: string }) {
 
 function Points() {
   return (
-    <span className="inline-flex gap-1 py-2" aria-label={t("Jarvis écrit")}>
+    <span className="inline-flex gap-1 py-2" aria-label={t("Wesley écrit")}>
       {[0, 1, 2].map((i) => (
         <span key={i} className="size-1.5 animate-pulse rounded-full bg-hud" style={{ animationDelay: `${i * 0.2}s` }} />
       ))}
@@ -141,7 +141,7 @@ function Points() {
   );
 }
 
-function ReponseJarvis({ m }: { m: MessageJarvis }) {
+function ReponseWesley({ m }: { m: MessageWesley }) {
   const dernier = m.blocs[m.blocs.length - 1];
   return (
     <div className="flex animate-entree gap-3">
@@ -150,7 +150,7 @@ function ReponseJarvis({ m }: { m: MessageJarvis }) {
       </div>
       <div className="min-w-0 flex-1 space-y-3">
         <div className="flex items-baseline gap-2">
-          <span className="titre-hud text-[11px] font-bold text-hud">{t("Jarvis")}</span>
+          <span className="titre-hud text-[11px] font-bold text-hud">{t("Wesley")}</span>
           <span className="text-[11px] text-tres-doux">{heure(m.date)}</span>
         </div>
         {m.blocs.map((b, i) =>
@@ -177,7 +177,7 @@ function LigneMessage({ m }: { m: Message }) {
         </div>
       </div>
     );
-  if (m.role === "jarvis") return <ReponseJarvis m={m} />;
+  if (m.role === "wesley") return <ReponseWesley m={m} />;
   return (
     <div className={cx("flex animate-entree items-center justify-center gap-2 text-center text-[13px]", m.role === "erreur" ? "text-rouge" : "text-doux")}>
       {m.role === "erreur" ? <AlertTriangle className="size-4" /> : <Info className="size-4" />}
@@ -220,7 +220,7 @@ function BoutonMicro() {
 
 function Saisie() {
   const [texte, setTexte] = useState("");
-  const occupe = useJarvis((s) => s.occupe);
+  const occupe = useWesley((s) => s.occupe);
   const parle = useAudio((s) => s.parle);
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -235,8 +235,8 @@ function Saisie() {
       setTexte((e as CustomEvent<string>).detail);
       ref.current?.focus();
     };
-    window.addEventListener("jarvis:pre-remplir", f);
-    return () => window.removeEventListener("jarvis:pre-remplir", f);
+    window.addEventListener("wesley:pre-remplir", f);
+    return () => window.removeEventListener("wesley:pre-remplir", f);
   }, []);
 
   const valider = () => {
@@ -281,10 +281,10 @@ function Saisie() {
 
 /* ---------------- panneau latéral ---------------- */
 function Rail() {
-  const messages = useJarvis((s) => s.messages);
+  const messages = useWesley((s) => s.messages);
   const { nomMicro, micActif, derniereTranscription } = useAudio();
   const outils = useMemo(
-    () => messages.flatMap((m) => (m.role === "jarvis" ? m.blocs.filter((b): b is BlocOutil => b.type === "outil") : [])).reverse(),
+    () => messages.flatMap((m) => (m.role === "wesley" ? m.blocs.filter((b): b is BlocOutil => b.type === "outil") : [])).reverse(),
     [messages],
   );
   return (
@@ -340,14 +340,14 @@ function BandeauCle() {
       onClick={() => maj({ vue: "reglages" })}
       className="mb-6 w-full max-w-2xl rounded-md border border-ambre/50 bg-ambre/10 px-4 py-3 text-left text-sm text-ambre hover:bg-ambre/15"
     >
-      <strong>{t("Bienvenue sur ce nouvel ordinateur !")}</strong>{t(" Ajoute ta clé API Claude pour que Jarvis puisse réfléchir : Réglages › Cerveau.")}
+      <strong>{t("Bienvenue sur ce nouvel ordinateur !")}</strong>{t(" Ajoute ta clé API Claude pour que Wesley puisse réfléchir : Réglages › Cerveau.")}
       <span className="mt-1 block text-[13px] text-doux">{t("Ta mémoire et tes connecteurs sont déjà là grâce à ton compte.")}</span>
     </button>
   );
 }
 
 function Accueil() {
-  const nom = useJarvis((s) => s.session?.nom ?? "");
+  const nom = useWesley((s) => s.session?.nom ?? "");
   const h = new Date().getHours();
   return (
     <div className="flex min-h-full flex-col items-center justify-center px-4 py-8">
@@ -391,7 +391,7 @@ function EnTeteConversation({ children }: { children?: ReactNode }) {
 }
 
 export function VueAssistant() {
-  const messages = useJarvis((s) => s.messages);
+  const messages = useWesley((s) => s.messages);
   const fil = useRef<HTMLDivElement>(null);
   const colle = useRef(true);
 

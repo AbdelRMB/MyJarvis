@@ -170,7 +170,7 @@ export function VueStats() {
   if (!s)
     return (
       <div className="h-full overflow-y-auto p-4 md:p-8">
-        <EnTetePage titre={t("Statistiques")} sousTitre={t("Utilisation de Jarvis par tous ses utilisateurs.")} actions={choixPeriode} />
+        <EnTetePage titre={t("Statistiques")} sousTitre={t("Utilisation de Wesley par tous ses utilisateurs.")} actions={choixPeriode} />
         {erreur ? (
           <Vide icone={<ChartColumnBig />} titre={t("Statistiques indisponibles")} texte={erreur} />
         ) : (
@@ -190,7 +190,7 @@ export function VueStats() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Statistiques")}
-        sousTitre={t("Utilisation de Jarvis par tous ses utilisateurs. Aucun contenu (messages, souvenirs) : seulement des comptes, des dates et des nombres.")}
+        sousTitre={t("Utilisation de Wesley par tous ses utilisateurs. Aucun contenu (messages, souvenirs) : seulement des comptes, des dates et des nombres.")}
         actions={choixPeriode}
       />
       {erreur && <p className="mb-4 text-sm text-rouge">{erreur}</p>}
@@ -198,7 +198,7 @@ export function VueStats() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Tuile libelle={t("Comptes")} valeur={r.comptes} detail={t("+{n} sur {p} jours · +{s} cette semaine", { n: r.nouveaux_periode, p: s.periode, s: r.nouveaux_7j })} />
         <Tuile libelle={t("Actifs (7 jours)")} valeur={r.actifs_7j} detail={t("{j} aujourd'hui · {m} sur 30 jours", { j: r.actifs_24h, m: r.actifs_30j })} />
-        <Tuile libelle={t("Demandes à Jarvis")} valeur={r.demandes_periode} detail={t("sur {p} jours", { p: s.periode })} />
+        <Tuile libelle={t("Demandes à Wesley")} valeur={r.demandes_periode} detail={t("sur {p} jours", { p: s.periode })} />
         <Tuile libelle={t("Téléchargements")} valeur={tl.total} detail={tl.erreur || t("toutes versions, Windows + Mac")} />
         <Tuile libelle={t("Appareils actifs")} valeur={r.appareils} detail={t("{n} en ligne maintenant", { n: r.en_ligne })} />
         <Tuile libelle={t("Souvenirs enregistrés")} valeur={r.souvenirs} />
@@ -314,7 +314,7 @@ export function VueStats() {
         </div>
       </Panneau>
       <p className="mt-3 text-[12px] text-tres-doux">
-        {t("Mis à jour {quand}. Une « demande » est un message envoyé à Jarvis ; un utilisateur actif a utilisé Jarvis ce jour-là.", { quand: ilYa(s.genere) })}
+        {t("Mis à jour {quand}. Une « demande » est un message envoyé à Wesley ; un utilisateur actif a utilisé Wesley ce jour-là.", { quand: ilYa(s.genere) })}
       </p>
     </div>
   );
