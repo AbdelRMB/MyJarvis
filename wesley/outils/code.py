@@ -23,7 +23,18 @@ def vscode_ouvrir(chemin: str, ligne: int = 0, nouvelle_fenetre: bool = False):
     else:
         args.append(chemin)
     _code(*args)
-    return f"Ouvert dans VS Code : {chemin}"
+    return f"Ouvert dans VS Code : {chemin}" + _indice_wesley_md(chemin)
+
+
+def _indice_wesley_md(chemin) -> str:
+    """Projet ouvert : signale son WESLEY.md (instructions du projet) pour que Wesley le lise avant d'y travailler."""
+    try:
+        from .. import wesley_md
+        if wesley_md.est_dans_un_projet(chemin) and wesley_md.fichiers(chemin):
+            return " — ce projet a un WESLEY.md : lis-le (lire_wesley_md) avant d'y travailler."
+    except Exception:
+        pass
+    return ""
 
 
 @outil
@@ -67,5 +78,13 @@ def creer_projet(type_projet: str, nom: str, dossier: str = "~/Documents/Perso")
     if type_projet not in cmds:
         return "Type inconnu."
     out = _run(cmds[type_projet], cwd=str(base), timeout=600)
+    md = ""
+    if cible.is_dir():
+        try:
+            from .. import wesley_md
+            f, cree = wesley_md.creer(cible)
+            md = f"\nWESLEY.md créé ({f}) : complète-le et tiens-le à jour." if cree else ""
+        except Exception:
+            pass
     _code(str(cible))
-    return f"{out[-1500:]}\nProjet ouvert dans VS Code : {cible}"
+    return f"{out[-1500:]}\nProjet ouvert dans VS Code : {cible}{md}"
