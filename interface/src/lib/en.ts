@@ -340,6 +340,8 @@ export const EN: Record<string, string> = {
   "Tâches": "Tasks",
   "Le code que Wesley fait en arrière-plan (avec Claude Code ou lui-même), chacun sur sa branche. Continue à lui parler pendant ce temps : il peut changer une tâche en cours.": "Code Wesley writes in the background (with Claude Code or by itself), each on its own branch. Keep talking to it meanwhile: it can change a running task.",
   "Nouvelle tâche": "New task",
+  "Suit": "Follows",
+  "Instructions du projet transmises à l'agent, qui les tient à jour": "Project instructions passed to the agent, which keeps them up to date",
   "Ce qu'il faut coder… (ou demande-le simplement à Wesley)": "What to code… (or just ask Wesley)",
   "Dossier du projet (ex : ~/Desktop/mon-projet)": "Project folder (e.g. ~/Desktop/my-project)",
   "Claude Code, piloté par Wesley": "Claude Code, managed by Wesley",
