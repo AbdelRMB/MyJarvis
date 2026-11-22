@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -19,7 +20,7 @@ import time
 from contextlib import contextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -29,14 +30,75 @@ _verrou = threading.Lock()
 CLE_APPLI = os.environ.get("WESLEY_CLE_APPLI", "")   # même valeur que wesley/compte.py (CLE_APPLI)
 
 
+# ---------- Wesley mobile : réservé aux téléphones ----------
+# L'appli web mobile (/mobile/) ne s'affiche que sur un téléphone. Un navigateur d'ordinateur reçoit une page
+# qui explique de l'ouvrir sur son téléphone. L'appli de bureau n'est pas concernée : elle n'est pas un
+# navigateur (User-Agent « Wesley », sans « Mozilla/ ») et garde l'accès complet à l'API.
+_RX_TELEPHONE = re.compile(r"iPhone|iPod|Android.+Mobile|Mobile.+Android|Windows Phone|IEMobile|Opera Mini|BlackBerry|"
+                           r"webOS|Mobile Safari|\bMobi\b", re.I)
+_RX_ORDINATEUR = re.compile(r"Windows NT|Macintosh|X11|CrOS|Linux x86_64", re.I)
+# pages lisibles partout (obligations légales, icônes, manifeste) : elles ne font rien fonctionner
+_MOBILE_PUBLIC = {"/mobile/confidentialite.html", "/mobile/mentions-legales.html", "/mobile/legal.css",
+                  "/mobile/icone-180.png", "/mobile/icone-192.png", "/mobile/icone-512.png", "/mobile/manifest.webmanifest"}
+
+
+def est_navigateur(req: Request) -> bool:
+    """Requête venant d'un navigateur web (et non de l'appli de bureau Wesley)."""
+    return "mozilla/" in req.headers.get("user-agent", "").lower()
+
+
+def est_telephone(req: Request) -> bool:
+    """Téléphone d'après le navigateur : indice client « mobile » (Chrome, Edge, Samsung) ou User-Agent de téléphone.
+    Une tablette ou un ordinateur, même avec écran tactile, n'est pas un téléphone."""
+    ua = req.headers.get("user-agent", "")
+    if req.headers.get("sec-ch-ua-mobile") == "?1":
+        return True
+    if req.headers.get("sec-ch-ua-mobile") == "?0" and not re.search(r"iPhone|iPod", ua):
+        return False
+    return bool(_RX_TELEPHONE.search(ua)) and not (_RX_ORDINATEUR.search(ua) and not re.search(r"Android|iPhone|iPod", ua))
+
+
+PAGE_REFUS = """<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>Wesley mobile — téléphone uniquement</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#04090f;color:#e3f6ff;font:15px/1.5 system-ui,sans-serif}
+main{max-width:460px;padding:32px;border:1px solid rgb(60 232 255/.3);border-radius:12px;background:#07121b}
+h1{margin:0 0 8px;font-size:20px;letter-spacing:.2em;color:#3ce8ff}p{color:#86a6b8;margin:10px 0}b{color:#e3f6ff}
+code{color:#a8f5ff}hr{border:0;border-top:1px solid rgb(60 232 255/.11);margin:18px 0}</style></head><body><main>
+<h1>WESLEY</h1><p><b>Wesley mobile ne fonctionne que sur un téléphone.</b></p>
+<p>Ouvre <code>{url}</code> sur ton iPhone ou ton téléphone Android, puis ajoute-le à l'écran d'accueil.</p>
+<p>Sur ordinateur, installe l'appli de bureau Wesley (Mac et Windows).</p><hr>
+<p><b>Wesley mobile only works on a phone.</b> Open <code>{url}</code> on your iPhone or Android phone. On a computer, use the
+Wesley desktop app.</p></main></body></html>"""
+
+
+def _refus_ordinateur(req: Request):
+    url = f"{req.url.scheme}://{req.url.netloc}/mobile/"
+    return HTMLResponse(PAGE_REFUS.replace("{url}", url), status_code=403,
+                        headers={"Cache-Control": "no-store", "Vary": "User-Agent, Sec-CH-UA-Mobile"})
+
+
 @app.middleware("http")
 async def seulement_l_appli(req: Request, suite):
     """Tout ce qui n'est pas l'appli Wesley (navigateur, robots) reçoit un 404 vide (Apache filtre déjà)."""
-    if req.url.path.startswith("/mobile/") and req.method == "GET":   # l'appli mobile (pages) est publique
-        return await suite(req)
+    chemin = req.url.path
+    if chemin == "/mobile":
+        chemin = "/mobile/"
+    if chemin.startswith("/mobile/") and req.method == "GET":   # l'appli mobile (pages) : téléphones seulement
+        if chemin in _MOBILE_PUBLIC:
+            return await suite(req)
+        if not est_telephone(req):
+            return _refus_ordinateur(req)
+        r = await suite(req)
+        # pas de cache partagé (Cloudflare) : un ordinateur ne doit pas recevoir la copie servie à un téléphone
+        r.headers["Cache-Control"] = "private, no-cache"
+        r.headers["Vary"] = "User-Agent, Sec-CH-UA-Mobile"
+        return r
     cle = req.headers.get("x-wesley-appli", "")
-    if CLE_APPLI and (not req.url.path.startswith("/v1/") or not hmac.compare_digest(cle, CLE_APPLI)):
+    if CLE_APPLI and (not chemin.startswith("/v1/") or not hmac.compare_digest(cle, CLE_APPLI)):
         return JSONResponse({"detail": "Introuvable"}, status_code=404)
+    # l'API depuis un navigateur = l'appli web mobile : refusée si ce navigateur n'est pas celui d'un téléphone
+    if chemin.startswith("/v1/") and est_navigateur(req) and not est_telephone(req):
+        return JSONResponse({"detail": "Wesley mobile ne fonctionne que sur un téléphone."}, status_code=403)
     return await suite(req)
 
 
