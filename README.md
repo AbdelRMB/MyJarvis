@@ -71,6 +71,8 @@ files, browser and servers, and tells you out loud what it did.
 >
 > "Why is my server slow?" *(over SSH, asks before any sudo command)*
 >
+> "Create the WESLEY.md for this project." *(its instructions for this project, which it keeps up to date)*
+>
 > "Remind me to take out the trash at 8 pm." · "Give me my morning briefing."
 >
 > "From now on, answer in one sentence." *(it remembers your instructions)*
@@ -138,7 +140,7 @@ Wesley can also update itself automatically at the next start.
 | **Vision** | Look at the screen, find an element and click it, analyze an image |
 | **Browser** | Its own browser or **yours** (Safari, Chrome, Edge, Brave, Arc on Mac), highlighting each element before acting |
 | **Learned sites** | Read-only exploration, demonstrations, tips, auto sign-in with 2FA |
-| **Code** | Open in VS Code (file:line), git, scaffold projects (Vite / Next / Node / Python) |
+| **Code** | Open in VS Code (file:line), git, scaffold projects (Vite / Next / Node / Python), background coding tasks (Claude Code / Codex), one **WESLEY.md** per project |
 | **Web** | Search with sources, news, read a page, weather, download |
 | **Memory** | Remembers what it learns about you, your instructions, and lessons from its own mistakes |
 | **Organization** | To-do list, reminders spoken at the right time, morning briefing, routines, automations |
@@ -155,6 +157,24 @@ Wesley can also update itself automatically at the next start.
 | Silence it | **"Wesley, stop"** (even while it's talking), or `Ctrl+Alt+S` / `⌃⌥S`, even with the window hidden. |
 | Close the window | It only hides. To quit: Wesley icon › Quit. |
 | In the window | `Esc` = stop · `Ctrl+K` = type · `Alt+1…9` = screens |
+
+</details>
+
+<details>
+<summary><strong>WESLEY.md: per-project instructions</strong></summary>
+
+Like Claude Code's `CLAUDE.md`, a **`WESLEY.md`** file at the root of a project (and, if needed, in a subfolder)
+holds what Wesley needs to know to work on it: overview, useful commands, conventions, decisions, changelog.
+
+- **Read first.** Before coding in, opening or changing a project, Wesley reads its WESLEY.md (root, then the
+  relevant subfolder) and follows it before its memory and default rules. Only your request and your personal
+  instructions come first.
+- **Passed to coding agents.** Background tasks put it at the top of Claude Code's / Codex's instructions.
+- **Kept up to date, everywhere.** Whenever Wesley codes in a project, it creates the file if missing and records
+  changes, decisions, commands and conventions. A task that forgets is asked once more; otherwise Wesley writes the
+  entry itself before the final commit.
+- **On request.** "Create the WESLEY.md for this project": Wesley drafts it from the project (README,
+  `package.json`, `pyproject.toml`…), then completes it.
 
 </details>
 

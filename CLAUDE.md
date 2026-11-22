@@ -96,6 +96,15 @@ En mode développement, les données (config, `.env`, journaux, cache du compte)
 
 Interface en direct : `cd interface && npm run dev` (http://localhost:5173, branchée sur le serveur Python lancé à côté).
 Vérification avant commit : `cd interface && npx tsc -p .`
+Tests Python du cœur (sans dépendances lourdes) : `python -m pytest tests -q` (seul `pytest` est nécessaire).
+
+### WESLEY.md (instructions par projet)
+
+`wesley/wesley_md.py` gère les fichiers `WESLEY.md` des projets de l'utilisateur (l'équivalent de ce CLAUDE.md pour
+Wesley) : lecture racine + sous-dossiers, modèle, journal. Outils : `wesley/outils/projets_outils.py`
+(`lire_wesley_md`, `creer_wesley_md`, `noter_wesley_md`). Les tâches de code (`wesley/taches.py`) le placent en tête
+de la consigne de Claude Code / Codex et exigent qu'il soit tenu à jour avant le commit final. Ce dépôt a aussi
+son `WESLEY.md` : tiens-le à jour quand tu modifies Wesley.
 
 ### Wesley mobile (téléphone)
 
