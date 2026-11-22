@@ -56,16 +56,13 @@ jobs:
           Push-Location interface; npm ci; npm run build; Pop-Location
           if (-not (Test-Path voix\fr_FR-tom-medium.onnx)) { .venv\Scripts\python -m piper.download_voices fr_FR-tom-medium --data-dir voix }
           # modèles communs d'openWakeWord (servent au détecteur eveil/hey_wesley.onnx s'il existe)
-          .venv\Scripts\python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
+          .venv\Scripts\python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_wesley'])"
           .venv\Scripts\pyinstaller wesley.spec --noconfirm --log-level WARN
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
           & $iscc /Q "/DVersion=${{ needs.version.outputs.version }}" installateur.iss
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          # copie sous l'ancien nom : la mise à jour automatique des PC encore en version Jarvis cherche JarvisSetup-x.y.z.exe
-          $v = "${{ needs.version.outputs.version }}"
-          Copy-Item "installateur\WesleySetup-$v.exe" "installateur\JarvisSetup-$v.exe"
-          .venv\Scripts\python publier.py "installateur\WesleySetup-$v.exe" "installateur\JarvisSetup-$v.exe"
+          .venv\Scripts\python publier.py "installateur\WesleySetup-${{ needs.version.outputs.version }}.exe"
 
   mac:
     needs: version
@@ -106,9 +103,7 @@ jobs:
           APPLE_EQUIPE: ${{ secrets.APPLE_EQUIPE }}
         run: |
           bash construire-mac.sh
-          # + la même appli sous l'ancien nom (Jarvis-…dmg, faite par construire-mac.sh) pour les Mac encore en version Jarvis
-          V="${{ needs.version.outputs.version }}"
-          .venv-mac/bin/python publier.py "installateur/Wesley-$V-mac-$(uname -m).dmg" "installateur/Jarvis-$V-mac-$(uname -m).dmg"
+          .venv-mac/bin/python publier.py "installateur/Wesley-${{ needs.version.outputs.version }}-mac-$(uname -m).dmg"
       - name: Retirer le certificat
         if: always()
         run: security delete-keychain "$RUNNER_TEMP/wesley.keychain-db" 2>/dev/null || true

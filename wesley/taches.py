@@ -40,12 +40,9 @@ def _fichier(tid):
 
 def lire(tid) -> dict | None:
     try:
-        t = json.loads(_fichier(tid).read_text(encoding="utf-8"))
+        return json.loads(_fichier(tid).read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if t.get("outil") == "jarvis":   # tâche créée avant la 2.0.0 (l'appli s'appelait Jarvis)
-        t["outil"] = "wesley"
-    return t
 
 
 def _sauver(t: dict):

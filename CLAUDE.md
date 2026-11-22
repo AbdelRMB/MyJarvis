@@ -73,7 +73,7 @@ python3.12 -m venv .venv-mac
 .venv-mac/bin/python -m pip install --upgrade pip
 .venv-mac/bin/python -m pip install -r requirements-mac.txt
 (cd interface && npm ci && npm run build)          # compile l'interface dans wesley/static
-.venv-mac/bin/python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
+.venv-mac/bin/python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_wesley'])"
 [ -f voix/fr_FR-tom-medium.onnx ] || .venv-mac/bin/python -m piper.download_voices fr_FR-tom-medium --data-dir voix
 .venv-mac/bin/python lanceur.pyw                    # appli de bureau (fenêtre + barre des menus)
 ```
@@ -84,7 +84,7 @@ py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install --upgrade pip
 .venv\Scripts\python -m pip install -r requirements.txt -r requirements-voix.txt
 cd interface; npm ci; npm run build; cd ..
-.venv\Scripts\python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
+.venv\Scripts\python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_wesley'])"
 if (-not (Test-Path voix\fr_FR-tom-medium.onnx)) { .venv\Scripts\python -m piper.download_voices fr_FR-tom-medium --data-dir voix }
 .venv\Scripts\pythonw lanceur.pyw                   # appli de bureau
 ```

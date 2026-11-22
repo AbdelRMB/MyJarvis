@@ -31,7 +31,6 @@ _http_attente = requests.Session()   # connexion dédiée à l'attente des chang
 ecouteurs: list = []   # fonctions appelées quand la synchro rapporte des changements (web.py : prompt + interface)
 from .config import CONFIG, MACHINE, RACINE, ecrire_trousseau, lire_trousseau
 
-# jarvis.abdelrahimriche.com (ancien domaine) reste actif pour les versions installées avant la 2.0.0 : même serveur
 SERVEUR_DEFAUT = "https://wesley.abdelrahimriche.com"
 # Le serveur (Apache + API) ne répond qu'aux requêtes portant cette clé : le navigateur et les robots ne voient
 # qu'un 404. Ce n'est qu'un filtre : la vraie protection, ce sont le mot de passe du compte et le chiffrement.
@@ -68,10 +67,7 @@ def mode() -> str:
 
 
 def connecte() -> bool:
-    # « cle » : session ouverte avec les clés Wesley. Une session d'avant (clés Jarvis) redemande le mot de passe une
-    # fois, pour convertir le compte (voir connecter).
-    e = etat()
-    return mode() == "en_ligne" and bool(e.get("id")) and e.get("cle") == "wesley" and bool(_secret_local("compte:jeton"))
+    return mode() == "en_ligne" and bool(etat().get("id")) and bool(_secret_local("compte:jeton"))
 
 
 def dossier(uid=None) -> Path:
@@ -115,13 +111,10 @@ def _definir_secret_local(nom: str, valeur: str):
 
 # ---------- cryptographie ----------
 SEL, CONTEXTE_COFFRE = b"wesley-compte:", b"wesley-coffre"
-# Clés d'avant le renommage de l'appli (Jarvis) : servent UNE fois, à convertir un compte créé avec elles
-# (voir _convertir_compte). À retirer quand plus aucun compte ne les utilise.
-ANCIEN_SEL, ANCIEN_CONTEXTE_COFFRE = b"jarvis-compte:", b"jarvis-coffre"
 
 
-def _deriver(email: str, mot_de_passe: str, sel: bytes = SEL) -> tuple[str, bytes]:
-    maitre = hashlib.scrypt(mot_de_passe.encode(), salt=sel + email.strip().lower().encode(),
+def _deriver(email: str, mot_de_passe: str) -> tuple[str, bytes]:
+    maitre = hashlib.scrypt(mot_de_passe.encode(), salt=SEL + email.strip().lower().encode(),
                             n=2 ** 15, r=8, p=1, dklen=64, maxmem=128 * 1024 * 1024)
     return maitre[:32].hex(), maitre[32:]
 
@@ -132,12 +125,12 @@ def _chiffrer(donnees: dict, cle: bytes) -> str:
     return base64.b64encode(nonce + AESGCM(cle).encrypt(nonce, json.dumps(donnees).encode(), CONTEXTE_COFFRE)).decode()
 
 
-def _dechiffrer(blob: str, cle: bytes, contexte: bytes = CONTEXTE_COFFRE) -> dict:
+def _dechiffrer(blob: str, cle: bytes) -> dict:
     if not blob:
         return {}
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     brut = base64.b64decode(blob)
-    return json.loads(AESGCM(cle).decrypt(brut[:12], brut[12:], contexte))
+    return json.loads(AESGCM(cle).decrypt(brut[:12], brut[12:], CONTEXTE_COFFRE))
 
 
 # ---------- HTTP ----------
@@ -190,7 +183,7 @@ def _ouvrir(reponse: dict, email: str, cle_coffre: bytes, nouveau: bool) -> dict
     _definir_secret_local("compte:cle_coffre", base64.b64encode(cle_coffre).decode())
     venait_du_local = etat().get("mode_precedent") == "local"
     e = {"mode": "en_ligne", "id": reponse["id"], "email": reponse["email"], "prenom": reponse.get("prenom", ""),
-         "serveur": serveur(), "cle": "wesley", "admin": bool(reponse.get("admin")),   # sans attendre la 1re synchro "politique": reponse.get("politique", ""),
+         "serveur": serveur(), "admin": bool(reponse.get("admin")),   # sans attendre la 1re synchro "politique": reponse.get("politique", ""),
          "politique_actuelle": reponse.get("politique_actuelle", "")}
     importe = [] if venait_du_local else etat().get("importe", [])   # du local vers le compte : tout part
     e["importe"] = importe
@@ -235,27 +228,8 @@ def inscrire(email: str, mot_de_passe: str, prenom: str, politique_acceptee: boo
 
 def connecter(email: str, mot_de_passe: str) -> dict:
     cle_auth, cle_coffre = _deriver(email, mot_de_passe)
-    try:
-        r = _appel("POST", "/v1/connexion", json={"email": email, "cle_auth": cle_auth, "appareil": MACHINE})
-    except ErreurCompte as x:
-        if x.statut != 401:
-            raise
-        r = _convertir_compte(email, mot_de_passe, cle_auth, cle_coffre, x)
+    r = _appel("POST", "/v1/connexion", json={"email": email, "cle_auth": cle_auth, "appareil": MACHINE})
     return _ouvrir(r, email, cle_coffre, nouveau=False)
-
-
-def _convertir_compte(email: str, mot_de_passe: str, cle_auth: str, cle_coffre: bytes, refus: ErreurCompte) -> dict:
-    """Compte créé avant le renommage de l'appli (clés Jarvis) : connexion avec les anciennes clés, coffre rechiffré
-    avec les nouvelles, puis le serveur ne connaît plus que les nouvelles (les autres sessions sont fermées)."""
-    ancienne_auth, ancienne_cle = _deriver(email, mot_de_passe, ANCIEN_SEL)
-    try:
-        r = _appel("POST", "/v1/connexion", json={"email": email, "cle_auth": ancienne_auth, "appareil": MACHINE})
-    except ErreurCompte:
-        raise refus from None   # vraiment le mauvais mot de passe
-    coffre = _dechiffrer(r.get("coffre", ""), ancienne_cle, ANCIEN_CONTEXTE_COFFRE)
-    r["coffre"] = _chiffrer(coffre, cle_coffre)
-    _appel("POST", "/v1/moi/cle", jeton=r["jeton"], json={"cle_auth": cle_auth, "coffre": r["coffre"]})
-    return r
 
 
 def deconnecter():
@@ -777,7 +751,7 @@ def _sources_appareil() -> list[Path]:
     candidats = [RACINE / "comptes" / "local" / "memoire", RACINE / "memoire", RACINE / "partage" / "memoire"]
     od = config._onedrive()
     if od:
-        candidats += [od / "Wesley" / "memoire", od / "Jarvis" / "memoire"]   # Jarvis : ancien nom de l'appli
+        candidats.append(od / "Wesley" / "memoire")
     if CONFIG.get("dossier_partage"):
         candidats.append(Path(CONFIG["dossier_partage"]) / "memoire")
     cache = dossier().resolve()

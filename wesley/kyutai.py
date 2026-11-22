@@ -78,26 +78,7 @@ def compatibilite() -> tuple[bool, str]:
     return False, "Système non pris en charge."
 
 
-def _reparer_chemins():
-    """L'appli s'appelait Jarvis avant la 2.0.0 : son dossier de données a été renommé (…/Jarvis -> …/Wesley).
-    L'environnement Python garde l'ancien chemin en dur (pyvenv.cfg, liens de venv/bin) : on le corrige une fois."""
-    ancien = str(DOSSIER.parent.with_name("Jarvis") / DOSSIER.name)
-    cfg = VENV / "pyvenv.cfg"
-    try:
-        texte = cfg.read_text(encoding="utf-8")
-        if ancien in texte:
-            cfg.write_text(texte.replace(ancien, str(DOSSIER)), encoding="utf-8")
-        for lien in (VENV / "bin").iterdir() if (VENV / "bin").is_dir() else ():
-            if lien.is_symlink() and ancien in (cible := os.readlink(lien)):
-                lien.unlink()
-                lien.symlink_to(cible.replace(ancien, str(DOSSIER)))
-    except OSError:
-        pass
-
-
 def installe() -> bool:
-    if PRET.exists():
-        _reparer_chemins()
     return PRET.exists() and _python_venv().exists()
 
 

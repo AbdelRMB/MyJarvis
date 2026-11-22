@@ -33,13 +33,9 @@ def _fichier():
 
 def lister() -> list:
     try:
-        regles = json.loads(_fichier().read_text(encoding="utf-8"))
+        return json.loads(_fichier().read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
-    for r in regles:   # règles créées du temps où l'appli s'appelait Jarvis (avant la 2.0.0)
-        if isinstance(r.get("action"), dict) and r["action"].get("type") == "jarvis":
-            r["action"]["type"] = "wesley"
-    return regles
 
 
 def _ecrire(regles: list, synchro=True):

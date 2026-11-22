@@ -5,7 +5,7 @@
     * cle_coffre -> reste sur l'appareil : chiffre le coffre (clé API, mots de passe des connecteurs).
   Le serveur ne stocke donc que du chiffré qu'il ne peut pas lire.
 - Toutes les données sont filtrées par l'utilisateur du jeton de session : personne ne voit celles des autres.
-- Base SQLite (fichier /donnees/jarvis.db, volume Docker ; nom gardé de l'époque où l'appli s'appelait Jarvis).
+- Base SQLite (fichier /donnees/wesley.db, volume Docker).
 """
 import asyncio
 import hashlib
@@ -23,11 +23,10 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-# variables WESLEY_* ; les anciennes JARVIS_* (avant le renommage de l'appli) restent acceptées
-BASE = os.environ.get("WESLEY_DB") or os.environ.get("JARVIS_DB", "/donnees/jarvis.db")
+BASE = os.environ.get("WESLEY_DB", "/donnees/wesley.db")
 app = FastAPI(title="Wesley — comptes", docs_url=None, redoc_url=None, openapi_url=None)
 _verrou = threading.Lock()
-CLE_APPLI = os.environ.get("WESLEY_CLE_APPLI") or os.environ.get("JARVIS_CLE_APPLI", "")   # même valeur que wesley/compte.py (CLE_APPLI)
+CLE_APPLI = os.environ.get("WESLEY_CLE_APPLI", "")   # même valeur que wesley/compte.py (CLE_APPLI)
 
 
 @app.middleware("http")
@@ -35,8 +34,7 @@ async def seulement_l_appli(req: Request, suite):
     """Tout ce qui n'est pas l'appli Wesley (navigateur, robots) reçoit un 404 vide (Apache filtre déjà)."""
     if req.url.path.startswith("/mobile/") and req.method == "GET":   # l'appli mobile (pages) est publique
         return await suite(req)
-    # x-jarvis-appli : en-tête des versions d'avant le renommage (1.x), accepté le temps qu'elles passent en 2.0.0
-    cle = req.headers.get("x-wesley-appli") or req.headers.get("x-jarvis-appli") or ""
+    cle = req.headers.get("x-wesley-appli", "")
     if CLE_APPLI and (not req.url.path.startswith("/v1/") or not hmac.compare_digest(cle, CLE_APPLI)):
         return JSONResponse({"detail": "Introuvable"}, status_code=404)
     return await suite(req)
@@ -347,9 +345,8 @@ class NouvelleCle(BaseModel):
 
 @app.post("/v1/moi/cle")
 def changer_cle(d: NouvelleCle, authorization: str = Header(""), uid: int = Depends(utilisateur)):
-    """Nouvelles clés du compte (conversion des clés Jarvis en clés Wesley) : nouvelle preuve du mot de passe et
-    coffre rechiffré par l'appareil, en une fois. Les sessions des autres appareils sont fermées : ils avaient
-    l'ancienne clé du coffre et doivent se reconnecter."""
+    """Nouvelles clés du compte : nouvelle preuve du mot de passe et coffre rechiffré par l'appareil, en une fois.
+    Les sessions des autres appareils sont fermées : ils avaient l'ancienne clé du coffre et doivent se reconnecter."""
     sel = secrets.token_bytes(16)
     with db() as c:
         c.execute("UPDATE utilisateurs SET auth_sel = ?, auth_hash = ?, coffre = ? WHERE id = ?",
@@ -805,9 +802,8 @@ def statistiques(jours: int = 30, uid: int = Depends(_admin)):
     t = time.time()
     debut = t - jours * 86400
     jour_debut = time.strftime("%Y-%m-%d", time.localtime(debut))
-    # demande = ligne d'historique qui n'est pas une réponse de l'assistant (« [HH:MM] Wesley: … », « Jarvis: » avant
-    # le renommage de l'appli)
-    pas_wesley = "substr(ligne, 9, 7) NOT IN ('Wesley:', 'Jarvis:')"
+    # demande = ligne d'historique qui n'est pas une réponse de Wesley (« [HH:MM] Wesley: … »)
+    pas_wesley = "substr(ligne, 9, 7) != 'Wesley:'"
     with db() as c:
         un = lambda sql, *a: c.execute(sql, a).fetchone()[0] or 0   # noqa: E731
         # dernière activité d'un compte : présence d'un appareil ou utilisation d'une session

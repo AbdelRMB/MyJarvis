@@ -247,7 +247,7 @@ def jour(jour: str, req: Request):
         for l in f.read_text(encoding="utf-8").splitlines():
             m = RX_LIGNE.match(l)
             if m:
-                entrees.append({"heure": m.group(1), "role": "wesley" if m.group(2).lower() in ("wesley", "jarvis") else "user",
+                entrees.append({"heure": m.group(1), "role": "wesley" if m.group(2).lower() == "wesley" else "user",
                                 "texte": m.group(3), "pc": pc})
             elif entrees:
                 entrees[-1]["texte"] += "\n" + l
@@ -914,8 +914,6 @@ async def creer_automatisation(req: Request):
         raise HTTPException(400, "Indique l'heure.")
     if typ == "intervalle" and not d.get("minutes"):
         raise HTTPException(400, "Indique l'intervalle en minutes.")
-    if d.get("action") == "jarvis":   # ancien nom de l'appli
-        d["action"] = "wesley"
     if d.get("action") == "wesley" and not d.get("consigne", "").strip():
         raise HTTPException(400, "Indique ce que Wesley doit faire.")
     automatisations.creer(d.get("nom", ""), d.get("expediteur", ""), d.get("sujet", ""), d.get("contient", ""),

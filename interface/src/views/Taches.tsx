@@ -190,8 +190,7 @@ export function VueTaches() {
               </div>
               <div ref={defilement} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
                 {(detail.journal ?? []).map((e, i) => {
-                  // « jarvis » : journal d'une tâche lancée avant la 2.0.0, quand l'appli s'appelait Jarvis
-                  const [qui, Icone] = QUI[(e.genre as string) === "jarvis" ? "wesley" : e.genre] ?? [e.genre, CircleDot];
+                  const [qui, Icone] = QUI[e.genre] ?? [e.genre, CircleDot];
                   return (
                     <div key={i} className={cx("flex gap-2 text-[13px]", e.genre === "outil" && "text-doux")}>
                       <Icone className={cx("mt-0.5 size-4 flex-none", e.genre === "utilisateur" ? "text-ambre" : e.genre === "erreur" ? "text-rouge" : "text-hud")} />

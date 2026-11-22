@@ -1,7 +1,8 @@
 import { LANGUE, t } from "../lib/i18n";
 import { choisirLangue } from "../views/Reglages";
-import { Cloud, HardDrive, LogIn, UserPlus } from "lucide-react";
+import { ArrowLeft, Cloud, Download, HardDrive, LogIn, RotateCw, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { VueMisesAJour } from "../views/MisesAJour";
 import { ouvrirLien } from "../lib/liens";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
@@ -13,8 +14,23 @@ export type Compte = { connecte: boolean; mode: "" | "local" | "en_ligne"; email
   politique_a_accepter?: boolean; url_confidentialite?: string; url_mentions?: string };
 type Reponse = Compte & { import?: { faits: number; lignes: number; erreur?: string } | null };
 
+/** Bas de l'écran de connexion : mettre à jour Wesley ou recharger, sans avoir besoin d'être connecté. */
+function OutilsHorsConnexion({ onMisesAJour }: { onMisesAJour: () => void }) {
+  return (
+    <div className="mt-4 flex justify-center gap-2">
+      <Bouton type="button" taille="sm" variante="fantome" icone={<Download className="size-4" />} onClick={onMisesAJour}>
+        {t("Mises à jour")}
+      </Bouton>
+      <Bouton type="button" taille="sm" variante="fantome" icone={<RotateCw className="size-4" />} onClick={() => location.reload()}>
+        {t("Recharger")}
+      </Bouton>
+    </div>
+  );
+}
+
 /** Écran affiché tant que personne n'est connecté : chaque utilisateur a sa mémoire, sa clé, ses connecteurs. */
 export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => void; choix: boolean }) {
+  const [majs, setMajs] = useState(false);
   const [etape, setEtape] = useState<"choix" | "compte">(choix ? "choix" : "compte");
   const [mode, setMode] = useState<"connexion" | "inscription">(choix ? "inscription" : "connexion");
   const [email, setEmail] = useState("");
@@ -58,6 +74,21 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
     }
   };
 
+  // mises à jour sans être connecté (ex. : une nouvelle version corrige un problème de connexion)
+  if (majs)
+    return (
+      <div className="grille-hud fixed inset-0 z-50 flex flex-col overflow-hidden bg-fond">
+        <div className="flex-none border-b border-ligne px-4 py-2">
+          <Bouton type="button" taille="sm" variante="fantome" icone={<ArrowLeft className="size-4" />} onClick={() => setMajs(false)}>
+            {t("Retour à la connexion")}
+          </Bouton>
+        </div>
+        <div className="min-h-0 flex-1">
+          <VueMisesAJour />
+        </div>
+      </div>
+    );
+
   if (etape === "choix")
     return (
       <div className="grille-hud fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-fond p-4">
@@ -97,6 +128,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
               </p>
             </button>
           </div>
+          <OutilsHorsConnexion onMisesAJour={() => setMajs(true)} />
         </div>
       </div>
     );
@@ -170,6 +202,7 @@ export function Connexion({ onConnecte, choix }: { onConnecte: (c: Compte) => vo
             {t("Mentions légales")}
           </button>
         </div>
+        <OutilsHorsConnexion onMisesAJour={() => setMajs(true)} />
       </form>
     </div>
   );

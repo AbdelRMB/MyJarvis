@@ -8,8 +8,7 @@ Wesley reconnaît son nom de deux façons (voir `wesley/ecoute.py`) :
    par « Wesley » (ou « Hé Wesley », « Ok Wesley »…), c'est pour lui. Ça suffit pour l'appeler, avec un petit
    temps d'analyse en plus.
 
-Du temps de Jarvis, le détecteur 1 utilisait le modèle `hey_jarvis` fourni par openWakeWord. Il n'existe pas de modèle
-tout fait pour « Hey Wesley » : il faut l'entraîner une fois.
+openWakeWord ne fournit pas de modèle tout fait pour « Hey Wesley » : il faut l'entraîner une fois.
 
 ## Entraîner le modèle
 

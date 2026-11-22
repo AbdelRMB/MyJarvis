@@ -23,7 +23,7 @@ echo "[3/5] Voix et détecteur (téléchargés une fois)..."
 mkdir -p voix
 [ -f voix/fr_FR-tom-medium.onnx ] || python -m piper.download_voices fr_FR-tom-medium --data-dir voix
 # modèles communs d'openWakeWord (spectrogramme, empreintes) : servent au détecteur eveil/hey_wesley.onnx s'il existe
-python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_jarvis'])"
+python -c "from openwakeword.utils import download_models; download_models(model_names=['hey_wesley'])"
 
 echo "[4/5] Application (PyInstaller, quelques minutes)..."
 # Construction HORS du Bureau : s'il est synchronisé par iCloud, iCloud ajoute des attributs aux fichiers pendant
@@ -34,9 +34,6 @@ rm -rf "$SORTIE/build" "$SORTIE/dist" dist/Wesley dist/Wesley.app
 pyinstaller wesley-mac.spec --noconfirm --log-level WARN --distpath "$SORTIE/dist" --workpath "$SORTIE/build"
 mkdir -p dist && ln -sfn "$SORTIE/dist/Wesley.app" dist/Wesley.app   # dist/Wesley.app reste utilisable
 xattr -cr "$SORTIE/dist/Wesley.app"   # retire les attributs Finder (sinon codesign refuse)
-# Pont pour les Mac où l'appli s'appelle encore Jarvis (avant la 2.0.0) : leur outil de mise à jour vérifie
-# Contents/MacOS/Jarvis. Ce lien (signé avec le reste) le satisfait ; l'exécutable réel reste Wesley.
-ln -sfn Wesley "$SORTIE/dist/Wesley.app/Contents/MacOS/Jarvis"
 # Signature STABLE : macOS rattache les autorisations (micro, écran, accessibilité…) à la signature.
 # Avec une signature « ad hoc », elle change à chaque version et macOS oublie tout ; avec un certificat
 # Apple (Developer ID ou Apple Development), les autorisations restent acquises après chaque mise à jour.
@@ -74,13 +71,6 @@ codesign --verify --deep --strict "$TMP/Wesley.app"
 ln -s /Applications "$TMP/Applications"
 rm -f "$DMG"
 hdiutil create -volname "Wesley" -srcfolder "$TMP" -ov -format UDZO "$DMG" >/dev/null
-# Même appli sous l'ancien nom de fichier, pour les Mac encore en version Jarvis : leur mise à jour automatique
-# cherche « Jarvis-<version>-mac-<puce>.dmg » contenant « Jarvis.app ». Une fois installé, Wesley se renomme en
-# Wesley.app à la mise à jour suivante. (Renommer le dossier .app ne touche pas à la signature.)
-mv "$TMP/Wesley.app" "$TMP/Jarvis.app"
-codesign --verify --deep --strict "$TMP/Jarvis.app"
-rm -f "installateur/Jarvis-${VERSION}-mac-${PUCE}.dmg"
-hdiutil create -volname "Jarvis" -srcfolder "$TMP" -ov -format UDZO "installateur/Jarvis-${VERSION}-mac-${PUCE}.dmg" >/dev/null
 rm -rf "$TMP"
 
 # Notarisation Apple (seulement avec un certificat Developer ID et les identifiants Apple) : le .dmg s'ouvre

@@ -24,6 +24,7 @@ import {
   LifeBuoy,
   ChartColumnBig,
   ChevronDown,
+  RotateCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { micro } from "../audio/micro";
@@ -251,6 +252,14 @@ export function BarreHaut() {
       </button>
 
       <div className="ml-auto flex items-center gap-5">
+        <button
+          onClick={() => location.reload()}
+          title={t("Recharger l'application")}
+          aria-label={t("Recharger l'application")}
+          className="grid size-9 place-items-center rounded-md border border-ligne text-doux transition-colors hover:border-hud hover:text-hud"
+        >
+          <RotateCw className="size-4" />
+        </button>
         <Cloche />
         {modele && (
           <span className="hidden items-center gap-2 rounded-md border border-ligne px-2.5 py-1 font-mono text-xs text-doux lg:flex">

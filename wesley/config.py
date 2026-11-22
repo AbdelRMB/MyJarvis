@@ -18,23 +18,9 @@ GELE = getattr(sys, "frozen", False)          # True dans l'appli .exe (PyInstal
 RESSOURCES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
 
 
-def _donnees_appli() -> Path:
-    """Dossier des données de l'appli sur cet appareil (~/Library/Application Support/Wesley ou
-    %LOCALAPPDATA%\\Wesley). L'appli s'appelait Jarvis avant la 2.0.0 : l'ancien dossier est renommé une fois
-    (renommage instantané, rien n'est copié). S'il est encore utilisé (ancienne version pas tout à fait fermée),
-    on s'en sert tel quel et on réessaie au prochain lancement."""
-    base = Path.home() / "Library" / "Application Support" if sys.platform == "darwin" \
-        else Path(os.environ.get("LOCALAPPDATA", Path.home()))
-    neuf, ancien = base / "Wesley", base / "Jarvis"
-    if ancien.is_dir() and not neuf.exists():
-        try:
-            ancien.rename(neuf)
-        except OSError:
-            return ancien
-    return neuf
-
-
-DONNEES_APPLI = _donnees_appli()
+# données de l'appli sur cet appareil : ~/Library/Application Support/Wesley ou %LOCALAPPDATA%\\Wesley
+DONNEES_APPLI = (Path.home() / "Library" / "Application Support" if sys.platform == "darwin"
+                 else Path(os.environ.get("LOCALAPPDATA", Path.home()))) / "Wesley"
 RACINE = DONNEES_APPLI if GELE else Path(__file__).resolve().parents[1]
 RACINE.mkdir(parents=True, exist_ok=True)
 FICHIER_CONFIG = RACINE / "config.json"
@@ -82,7 +68,7 @@ DEFAUT = {
     "ecoute_fond": True,          # appli de bureau : écoute « Hey Wesley » même fenêtre cachée
     "seuil_eveil": 0.5,           # sensibilité du mot d'activation (0-1, plus bas = plus sensible)
     "silence_fin": 2.5,           # s de silence avant d'envoyer ta demande (il écoute en continu jusque-là)
-    "raccourci": "<ctrl>+<alt>+w",   # W comme Wesley (Ctrl+Alt+J du temps de Jarvis)
+    "raccourci": "<ctrl>+<alt>+w",   # W comme Wesley
     "briefing_matin": True,       # au premier échange de la journée (5 h-12 h), Wesley commence par le briefing
     "conversation_suivie": True,  # après une réponse à l'oral, il écoute la suite quelques secondes sans « Wesley »
     "maj_auto": True,             # télécharge les mises à jour en fond et les installe au prochain démarrage
@@ -95,60 +81,23 @@ if not CONFIG["nom_utilisateur"]:
     CONFIG["nom_utilisateur"] = os.environ.get("USERNAME", "").capitalize() or "toi"
 
 
-def _migrer_depuis_jarvis():
-    """Réglages enregistrés du temps où l'appli s'appelait Jarvis (avant la 2.0.0)."""
-    if not FICHIER_CONFIG.exists():
-        return
-    brut = json.loads(FICHIER_CONFIG.read_text(encoding="utf-8"))
-    changes = []
-    if brut.get("raccourci") == "<ctrl>+<alt>+j":   # l'ancien raccourci par défaut devient Ctrl+Alt+W
-        CONFIG["raccourci"] = "<ctrl>+<alt>+w"
-        changes.append("raccourci")
-    if brut.get("depot_jarvis") and not brut.get("depot_wesley"):
-        CONFIG["depot_wesley"] = brut["depot_jarvis"]
-        changes.append("depot_wesley")
-    if sys.platform == "darwin" and GELE and brut.get("autorisations_demandees") and not brut.get("autorisations_wesley"):
-        # nouvel identifiant d'appli (com.abdel.wesley) : macOS a oublié les accès donnés à Jarvis, on les redemande
-        CONFIG.update(autorisations_demandees=[], autorisation_automatisation="", autorisations_wesley=True)
-        changes += ["autorisations_demandees", "autorisation_automatisation", "autorisations_wesley"]
-    if changes:
-        actuel = {**brut, **{k: CONFIG[k] for k in changes}}
-        FICHIER_CONFIG.write_text(json.dumps(actuel, ensure_ascii=False, indent=2), encoding="utf-8")
-
-
-try:
-    _migrer_depuis_jarvis()
-except (OSError, ValueError):
-    pass
-
-
 # ---------- trousseau de l'appareil (mots de passe, jetons) ----------
 SERVICE_TROUSSEAU = "Wesley"
-ANCIEN_SERVICE_TROUSSEAU = "Jarvis"   # nom du trousseau avant la 2.0.0
 
 
 def lire_trousseau(nom: str) -> str:
-    """Lit un secret du trousseau ; s'il n'existe que sous l'ancien nom (Jarvis), il est recopié sous le nouveau."""
     import keyring
-    valeur = keyring.get_password(SERVICE_TROUSSEAU, nom)
-    if valeur is None:
-        valeur = keyring.get_password(ANCIEN_SERVICE_TROUSSEAU, nom)
-        if valeur:
-            try:
-                keyring.set_password(SERVICE_TROUSSEAU, nom, valeur)
-            except Exception:
-                pass
-    return valeur or ""
+    return keyring.get_password(SERVICE_TROUSSEAU, nom) or ""
 
 
 def ecrire_trousseau(nom: str, valeur: str):
-    """Enregistre (ou efface si vide) un secret ; l'éventuelle copie sous l'ancien nom est effacée aussi."""
+    """Enregistre un secret, ou l'efface si la valeur est vide."""
     import keyring
     if valeur:
         keyring.set_password(SERVICE_TROUSSEAU, nom, valeur)
-    for service in ((ANCIEN_SERVICE_TROUSSEAU,) if valeur else (SERVICE_TROUSSEAU, ANCIEN_SERVICE_TROUSSEAU)):
+    else:
         try:
-            keyring.delete_password(service, nom)
+            keyring.delete_password(SERVICE_TROUSSEAU, nom)
         except Exception:
             pass
 

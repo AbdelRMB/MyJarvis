@@ -125,14 +125,11 @@ def main():
     if mises_a_jour.installer_au_demarrage(cache):   # version téléchargée en fond : installée, Wesley se relance
         __import__("os")._exit(0)   # (« os » est importé plus bas dans main : variable locale)
 
-    try:   # l'appli s'appelait Jarvis avant la 2.0.0 : lancement automatique et ancienne installation
+    try:
         from . import demarrage
-        demarrage.migrer_ancien_nom()
-        menage = threading.Timer(120, demarrage.nettoyer_ancienne_appli_windows)
-        menage.daemon = True
-        menage.start()
+        demarrage.actualiser()   # lancement automatique : vers l'exécutable actuel
     except Exception as e:
-        print(f"  ! Passage de Jarvis à Wesley : {e}")
+        print(f"  ! Lancement automatique : {e}")
 
     if GELE and sys.platform == "darwin" and sys.executable.startswith("/Applications/") \
             and not CONFIG.get("demarrage_auto_initialise"):

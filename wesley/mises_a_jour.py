@@ -175,8 +175,7 @@ def _remplacer_mac(dmg: Path, version: str, cache: bool = False):
     """Script détaché : attend que Wesley soit fermé (en le forçant au bout de 20 s), copie la nouvelle appli à côté,
     vérifie qu'elle est complète et dans la bonne version, puis échange les deux d'un coup (rien à moitié copié dans
     /Applications), relance Wesley et le vérifie. Un verrou empêche deux installations en même temps.
-    L'appli s'installe toujours sous le nom Wesley.app : une appli encore nommée Jarvis.app (avant la 2.0.0) est
-    remplacée par Wesley.app, puis retirée."""
+    L'appli s'installe toujours sous le nom Wesley.app (installée sous un autre nom, elle est remplacée puis retirée)."""
     import os
     import shlex
     actuelle = _bundle_mac()
@@ -333,7 +332,6 @@ def creer_raccourci_mac():
     if not str(appli).startswith("/Applications/"):
         return   # lancé depuis le .dmg : on attend qu'il soit installé
     import shutil
-    shutil.rmtree(Path.home() / "Applications" / "Mettre à jour Jarvis.app", ignore_errors=True)   # ancien nom
     raccourci = Path.home() / "Applications" / "Mettre à jour Wesley.app"
     marque = raccourci / "Contents" / "Resources" / "wesley-cible.txt"
     if marque.exists() and marque.read_text() == str(appli):

@@ -240,7 +240,7 @@ class EcouteFond:
         except Exception:
             # modèles communs d'openWakeWord (spectrogramme, empreintes), 1er lancement sur un PC : ~6 Mo
             from openwakeword.utils import download_models
-            download_models(model_names=["hey_jarvis"])
+            download_models(model_names=[MODELE_EVEIL.stem])
             return Model(wakeword_models=[str(MODELE_EVEIL)], inference_framework="onnx")
 
     def _boucle(self):

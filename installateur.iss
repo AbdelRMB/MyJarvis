@@ -17,9 +17,6 @@ VersionInfoCompany=Abdelrahim Riche
 VersionInfoDescription=Installation de Wesley
 VersionInfoVersion={#Version}
 DefaultDirName={localappdata}\Programs\Wesley
-; même AppId que du temps de Jarvis (avant la 2.0.0) : la mise à jour remplace l'ancienne installation, mais
-; dans le nouveau dossier (l'ancien, …\Programs\Jarvis, est supprimé par Wesley après son premier démarrage)
-UsePreviousAppDir=no
 DefaultGroupName=Wesley
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -45,12 +42,6 @@ Name: "bureau"; Description: "Créer une icône sur le bureau"; GroupDescription
 [Files]
 Source: "dist\Wesley\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-[InstallDelete]
-; raccourcis de l'ancien nom (Jarvis, avant la 2.0.0)
-Type: files; Name: "{userprograms}\Jarvis.lnk"
-Type: files; Name: "{userprograms}\Mettre à jour Jarvis.lnk"
-Type: files; Name: "{userdesktop}\Jarvis.lnk"
-
 [Icons]
 Name: "{userprograms}\Wesley"; Filename: "{app}\Wesley.exe"; Comment: "Ton assistant personnel"
 Name: "{userprograms}\Mettre à jour Wesley"; Filename: "{app}\Wesley.exe"; Parameters: "--maj"; Comment: "Voir et installer les mises à jour de Wesley"
@@ -58,12 +49,8 @@ Name: "{userdesktop}\Wesley"; Filename: "{app}\Wesley.exe"; Tasks: bureau
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "Wesley"; ValueData: """{app}\Wesley.exe"" --cache"; Tasks: demarrage; Flags: uninsdeletevalue
-; lancement au démarrage enregistré sous l'ancien nom (Jarvis)
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "Jarvis"; Flags: deletevalue
 
 [Run]
-; mise à jour depuis une version nommée Jarvis : elle doit être fermée avant le premier lancement de Wesley
-Filename: "{sys}\taskkill.exe"; Parameters: "/IM Jarvis.exe /F"; Flags: runhidden
 Filename: "{app}\Wesley.exe"; Description: "Lancer Wesley maintenant"; Flags: nowait postinstall skipifsilent
 ; mise à jour depuis l'appli (installation silencieuse) : Wesley redémarre tout seul
 Filename: "{app}\Wesley.exe"; Flags: nowait skipifnotsilent

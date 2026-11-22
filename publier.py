@@ -1,7 +1,7 @@
 """Publie un installateur dans les GitHub Releases du dépôt.
 
 Utilisé par publier-mac.sh (Mac), publier.bat (Windows) et la CI (.github/workflows/versions.yml) :
-    python publier.py installateur/Wesley-2.0.0-mac-arm64.dmg [installateur/Jarvis-2.0.0-mac-arm64.dmg]
+    python publier.py installateur/Wesley-2.0.1-mac-arm64.dmg
 Crée la release vX.Y.Z si elle n'existe pas (description = section « ## X.Y.Z » de CHANGELOG.md),
 puis y ajoute le fichier (remplace un fichier du même nom).
 Ensuite, depuis une machine (pas depuis la CI), demande à GitHub de fabriquer l'installateur de L'AUTRE système :
@@ -48,7 +48,7 @@ def notes() -> str:
 
 
 def main():
-    # un ou plusieurs fichiers (ex. : l'installateur et sa copie sous l'ancien nom Jarvis, pour les anciennes versions)
+    # un ou plusieurs fichiers
     fichiers = [Path(a) for a in sys.argv[1:] if not a.startswith("--")]
     for fichier in fichiers:
         if not fichier.exists():
