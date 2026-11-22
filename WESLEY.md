@@ -27,3 +27,4 @@ Le guide complet (installation, construction, règles du dépôt) est dans `CLAU
 
 ## Journal des changements
 - 2026-11-22 : version 2.2.0, prise en charge des WESLEY.md (lecture en priorité, transmission à Claude Code / Codex, mise à jour obligatoire à chaque modification, création à la demande, PC, Mac et mobile). Ajout de ce fichier et des tests `tests/test_wesley_md.py`.
+- 2026-11-22 : tests Python du cœur (`tests/`) lancés dans le job « version » du workflow `.github/workflows/versions.yml` : ils bloquent la construction des installateurs s'ils échouent.
