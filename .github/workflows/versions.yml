@@ -33,14 +33,14 @@ jobs:
           V=$(grep -E '^VERSION = ' wesley/version.py | cut -d'"' -f2)
           grep -qE "^## $V\b" CHANGELOG.md || { echo "::error::CHANGELOG.md n'a pas de section « ## $V » (description obligatoire)"; exit 1; }
           echo "version=$V" >> "$GITHUB_OUTPUT"
-      # tests du cœur Python (WESLEY.md, tâches de code) : quelques secondes, bloquent la construction s'ils échouent
+      # tests du cœur Python (WESLEY.md, tâches de code, transcription) : quelques secondes, bloquent la construction s'ils échouent
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Tests Python du cœur
         run: |
           git config --global user.name "CI Wesley"
           git config --global user.email "ci@example.invalid"
-          python -m pip install -q pytest
+          python -m pip install -q pytest numpy
           python -m pytest tests -q
 
   windows:

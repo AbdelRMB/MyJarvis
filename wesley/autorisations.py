@@ -23,9 +23,9 @@ REGLAGES_MAC = "x-apple.systempreferences:com.apple.preference.security?Privacy_
 
 # id -> (nom, à quoi ça sert, panneau des Réglages Système, service TCC pour « retirer »)
 LISTE_MAC = {
-    "micro": ("Micro", "T'entendre quand tu dis « Wesley » et transcrire ta voix.", "Microphone", "Microphone"),
+    "micro": ("Micro", "T'entendre quand tu dis « Wesley », transcrire ta voix et tes réunions.", "Microphone", "Microphone"),
     "accessibilite": ("Accessibilité", "Raccourcis clavier globaux, souris et clavier pilotés par Wesley.", "Accessibility", "Accessibility"),
-    "ecran": ("Enregistrement de l'écran", "Regarder ton écran quand tu lui demandes ce qui s'y trouve.", "ScreenCapture", "ScreenCapture"),
+    "ecran": ("Enregistrement de l'écran", "Regarder ton écran quand tu lui demandes ce qui s'y trouve, et capter le son du Mac pour transcrire tes réunions en ligne.", "ScreenCapture", "ScreenCapture"),
     "fichiers": ("Accès complet au disque", "Lire et ranger tes fichiers partout (Bureau, Documents, Téléchargements…) sans autre question.", "AllFiles", "SystemPolicyAllFiles"),
     "automatisation": ("Contrôle des applications", "Ouvrir, fermer et piloter tes applis (Finder, Musique, navigateur…).", "Automation", "AppleEvents"),
 }
@@ -115,7 +115,7 @@ def etat() -> dict:
         _surveiller_accessibilite(next(a["etat"] for a in liste if a["id"] == "accessibilite"))
     else:
         liste = [
-            {"id": "micro", "nom": "Micro", "role": "T'entendre quand tu dis « Wesley ».", "etat": _micro_windows(),
+            {"id": "micro", "nom": "Micro", "role": "T'entendre quand tu dis « Wesley » et transcrire tes réunions.", "etat": _micro_windows(),
              "demande_faite": True},
             {"id": "systeme", "nom": "Fichiers, écran, clavier et souris",
              "role": "Accordés d'office aux applis de bureau sous Windows.", "etat": "accorde", "demande_faite": True},

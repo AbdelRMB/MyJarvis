@@ -96,7 +96,7 @@ En mode développement, les données (config, `.env`, journaux, cache du compte)
 
 Interface en direct : `cd interface && npm run dev` (http://localhost:5173, branchée sur le serveur Python lancé à côté).
 Vérification avant commit : `cd interface && npx tsc -p .`
-Tests Python du cœur (sans dépendances lourdes) : `python -m pytest tests -q` (seul `pytest` est nécessaire).
+Tests Python du cœur (sans dépendances lourdes) : `python -m pytest tests -q` (`pytest` et `numpy` suffisent).
 
 ### WESLEY.md (instructions par projet)
 

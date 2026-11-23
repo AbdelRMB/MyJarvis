@@ -29,7 +29,8 @@ hiddenimports = (collect_submodules("wesley") + collect_submodules("uvicorn") + 
 # paquets avec des fichiers de données ou des DLL (modèles, espeak, WebView2, PortAudio…)
 for paquet in ["webview", "openwakeword", "faster_whisper", "ctranslate2", "onnxruntime", "piper", "pywinauto",
                "comtypes", "edge_tts", "sounddevice", "_sounddevice_data", "clr_loader", "pythonnet", "mcp",
-               "recurring_ical_events", "icalendar", "tokenizers", "certifi", "ddgs", "pyttsx3", "websockets"]:
+               "recurring_ical_events", "icalendar", "tokenizers", "certifi", "ddgs", "pyttsx3", "websockets",
+               "sherpa_onnx", "pyaudiowpatch", "av"]:
     try:
         d, b, h = collect_all(paquet)
         datas += d

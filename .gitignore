@@ -3,6 +3,8 @@
 memoire/
 config.json
 captures/
+transcriptions/
+modeles/
 logs/
 webview/
 partage/

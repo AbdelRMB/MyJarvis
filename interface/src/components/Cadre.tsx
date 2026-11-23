@@ -25,6 +25,7 @@ import {
   ChartColumnBig,
   ChevronDown,
   RotateCw,
+  AudioLines,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { micro } from "../audio/micro";
@@ -41,6 +42,7 @@ import { Pastille } from "./ui";
 const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
   { id: "assistant", libelle: t("Assistant"), icone: MessageSquare },
   { id: "afaire", libelle: t("À faire"), icone: ListChecks },
+  { id: "transcription", libelle: t("Transcription"), icone: AudioLines },
   { id: "historique", libelle: t("Historique"), icone: History },
   { id: "memoire", libelle: t("Mémoire"), icone: Brain },
   { id: "connecteurs", libelle: t("Connecteurs"), icone: Plug },
@@ -59,7 +61,7 @@ const NAV: { id: Vue; libelle: string; icone: typeof Activity }[] = [
 
 /** Sections de la barre latérale (la première n'a pas de titre). */
 const GROUPES: { id: string; libelle: string; vues: Vue[]; admin?: boolean }[] = [
-  { id: "principal", libelle: "", vues: ["assistant", "afaire"] },
+  { id: "principal", libelle: "", vues: ["assistant", "afaire", "transcription"] },
   { id: "memoire", libelle: t("Ma mémoire"), vues: ["historique", "memoire"] },
   { id: "automatiser", libelle: t("Automatiser"), vues: ["taches", "automatisations", "sites", "connecteurs"] },
   { id: "machines", libelle: t("Mes machines"), vues: ["appareils", "systeme", "activite", "arsenal"] },

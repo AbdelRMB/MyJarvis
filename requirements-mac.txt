@@ -24,6 +24,9 @@ recurring-ical-events
 requests
 rich
 send2trash
+sherpa-onnx
+pyobjc-framework-ScreenCaptureKit
+pyobjc-framework-CoreMedia
 sounddevice
 uvicorn[standard]
 cryptography

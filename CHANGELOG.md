@@ -3,6 +3,15 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 2.3.0
+- **Nouvel onglet « Transcription » : Wesley écrit tes réunions** : lance une transcription et Wesley écrit tout ce qui se dit dans un fichier, avec l'heure de chaque prise de parole. Tout se passe sur ton ordinateur : la reconnaissance de la parole (Whisper) et celle des voix tournent en local, rien n'est envoyé sur Internet. / **New "Transcription" tab: Wesley writes down your meetings**, fully on your computer.
+  - **Deux sources au choix** : le **son de l'ordinateur** pour une réunion en ligne (Teams, Zoom, Meet…), avec ton micro en plus pour que ta voix soit aussi écrite, ou le **micro** pour une réunion autour d'une table. Tu peux aussi **importer un enregistrement** (mp3, m4a, wav, vidéo…). / Computer sound (online meetings, plus your mic), microphone (in-person meetings) or an imported recording.
+  - **Qui parle ?** Wesley reconnaît les changements de voix et passe à « Locuteur 1 », « Locuteur 2 »… quand ce n'est plus la même personne qui parle. Si tu connais le nombre de participants, indique-le : la répartition est plus juste. / Speaker changes are detected (Speaker 1, Speaker 2…).
+  - **À la fin, tu ranges** : donne un nom à chaque locuteur, réunis deux locuteurs qui sont la même personne, change la personne d'une phrase, corrige un mot, ou refais la répartition avec un autre nombre de personnes. Puis exporte en Markdown ou en texte. / Name, merge and fix speakers, then export to Markdown or text.
+  - **Le fichier s'écrit au fil de l'eau** dans Documents › Wesley › Transcriptions : rien n'est perdu si l'ordinateur s'éteint. / The file is written live to Documents › Wesley › Transcriptions.
+  - **À la voix aussi** : « Wesley, transcris la réunion », « arrête la transcription », « fais-moi le compte rendu de la réunion ». Pendant une réunion au micro, Wesley ne réagit pas quand quelqu'un prononce son nom. / Voice commands to start, stop and summarize.
+  - **Sur Mac**, le son de l'ordinateur passe par l'autorisation « Enregistrement de l'écran » (aucun pilote à installer). Au premier usage, Wesley télécharge un petit modèle de reconnaissance des voix (~28 Mo). / On Mac, computer sound uses the Screen Recording permission.
+
 ## 2.2.1
 - **Clore un ticket marche à nouveau** : pour un administrateur, « marque le ticket 1 résolu », répondre à un ticket, changer son statut ou le supprimer (sur l'ordinateur comme sur le téléphone) échouait avec « Erreur du serveur (404) ». C'est corrigé, et l'auteur du ticket reçoit bien la réponse. / **Closing a ticket works again**: resolving, answering or deleting a ticket no longer fails with "Server error (404)".
 
