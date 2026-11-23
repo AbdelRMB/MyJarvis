@@ -602,40 +602,59 @@ class Decoupeur:
     """Accumule le son et rend des blocs (début en s, audio) coupés à une pause, pour que Whisper ait des
     phrases entières et qu'un changement de locuteur tombe le plus souvent entre deux blocs."""
 
+    GARDE = 1.0                 # s de silence gardées avant une reprise de parole (début de phrase faible)
+
     def __init__(self, duree_min=3.0, duree_max=20.0, pause=0.5):
         self.duree_min, self.duree_max, self.pause = duree_min, duree_max, pause
         self.morceaux: list = []
         self.taille = 0
         self.debut = 0.0            # position (s) du début du bloc en cours dans l'enregistrement
-        self.silence = 0.0          # s de silence à la fin du bloc en cours
-        self.voix = False           # le bloc contient de la voix
-        self.bruit = 0.0015         # niveau du silence ambiant (moyenne glissante)
+        self.silence = 0.0          # s de calme à la fin du bloc en cours (pour couper aux pauses)
+        self.voix = False           # le bloc contient autre chose que du silence : il ira à Whisper
+        self.bruit = 0.001          # plancher de bruit ambiant (suit les creux, remonte lentement)
+        self.parole = 0.0           # niveau moyen de la voix entendue (moyenne glissante)
+        self.ecarte = 0.0           # s de silence non envoyées à Whisper (diagnostic)
 
     def seuil(self):
-        # bas exprès : en réunion physique, une voix à l'autre bout de la table arrive faible dans le micro
-        # (le filtre de voix de Whisper écarte ensuite le bruit seul)
-        return max(self.bruit * 2.5, 0.003)
+        """Seuil des pauses (où couper un bloc) : bas exprès, une voix lointaine arrive faible. Jamais plus de la
+        moitié du niveau de la voix : sinon une voix très faible serait « en pause » en permanence et coupée
+        toutes les 3 s au milieu des mots."""
+        s = max(self.bruit * 2.5, 0.003)
+        if self.parole:
+            s = min(s, self.parole * 0.5)
+        return max(s, self.seuil_voix())
+
+    def seuil_voix(self):
+        """En dessous : silence, jamais envoyé à Whisper. Juste au-dessus du plancher de bruit : une voix
+        faible (fond de salle, visio à bas volume) part toujours à Whisper, dont le VAD trie ensuite."""
+        return max(self.bruit * 1.6, 0.0004)
 
     def ajouter(self, x) -> tuple[float, object] | None:
         import numpy as np
         if not len(x):
             return None
         rms = float(np.sqrt(np.mean(np.square(x, dtype=np.float32))))
+        # plancher de bruit : descend vite dans les creux, monte lentement (+3 %/s). Avant, il suivait la
+        # moyenne des morceaux « calmes » : une voix faible le faisait grimper, le seuil montait avec, et toute
+        # la parole faible était prise pour du silence et jetée avant Whisper.
+        self.bruit = 0.5 * (self.bruit + rms) if rms < self.bruit else min(rms, self.bruit * 1.003)
         if rms < self.seuil():
-            self.bruit = 0.95 * self.bruit + 0.05 * rms
             self.silence += len(x) / SR
         else:
             self.silence = 0.0
+        if rms >= self.seuil_voix():
             self.voix = True
+            self.parole = rms if not self.parole else 0.95 * self.parole + 0.05 * rms
         self.morceaux.append(x)
         self.taille += len(x)
         duree = self.taille / SR
-        if not self.voix and duree > 2 * self.pause:
+        if not self.voix and duree > self.GARDE + self.pause:
             # que du silence : on avance sans rien transcrire (on garde la fin, au cas où une phrase commence)
-            garde = int(self.pause * SR)
+            garde = int(self.GARDE * SR)
             tout = np.concatenate(self.morceaux)
             self.debut += (len(tout) - garde) / SR
-            self.morceaux, self.taille, self.silence = [tout[-garde:]], garde, min(self.silence, self.pause)
+            self.ecarte += (len(tout) - garde) / SR
+            self.morceaux, self.taille, self.silence = [tout[-garde:]], garde, min(self.silence, self.GARDE)
             return None
         if duree >= self.duree_min and self.silence >= self.pause:
             return self.vider()
@@ -671,6 +690,8 @@ class Decoupeur:
         bloc, debut, voix = np.concatenate(self.morceaux), self.debut, self.voix
         self.debut += len(bloc) / SR
         self.morceaux, self.taille, self.silence, self.voix = [], 0, 0.0, False
+        if not voix:
+            self.ecarte += len(bloc) / SR
         return (debut, bloc) if voix else None
 
 

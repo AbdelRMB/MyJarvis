@@ -387,7 +387,8 @@ def test_decoupeur_coupe_aux_pauses_et_saute_le_silence():
         blocs.append(fin)
     assert len(blocs) == 2
     (d1, b1), (d2, b2) = blocs
-    assert 4.0 <= d1 <= 5.0 and len(b1) / SR >= 4.0      # le silence du début n'est pas transcrit
+    # le silence du début n'est pas transcrit (sauf ~1 s gardée avant la voix : début de phrase faible)
+    assert 3.5 <= d1 <= 5.0 and len(b1) / SR >= 4.0
     assert abs((d2 - (d1 + len(b1) / SR))) < 1e-6         # les blocs se suivent sans trou
     assert d2 + len(b2) / SR <= 14.6
 
