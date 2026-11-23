@@ -797,7 +797,7 @@ export const EN: Record<string, string> = {
   "Titre (facultatif)": "Title (optional)",
   "Modèle de reconnaissance (plus gros = plus précis, plus lent)": "Recognition model (bigger = more accurate, slower)",
   "Nombre de personnes, s'il est connu": "Number of people, if known",
-  "Personnes : auto": "People: auto",
+  "Personnes : détection automatique": "People: automatic detection",
   "{n} personne(s)": "{n} people",
   "Choisir un fichier…": "Choose a file…",
   "Lancer la transcription": "Start transcription",

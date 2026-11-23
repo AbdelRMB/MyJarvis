@@ -427,3 +427,23 @@ def test_identifiants_invalides(dossiers):
     with pytest.raises(ValueError):
         tr.modifier("../x", "noms", {})
     assert not tr.regroupable("../x")
+
+
+def test_decoupeur_entend_une_voix_lointaine():
+    """Réunion physique : quelqu'un parle loin du micro (voix ~5 fois au-dessus d'un bruit de fond faible)."""
+    r = np.random.default_rng(1)
+    bruit = lambda s: (r.normal(size=int(s * SR)) * 0.001).astype(np.float32)
+    t = np.arange(int(2.0 * SR)) / SR
+    voix = (0.006 * np.sin(2 * np.pi * 180 * t) * (1 + 0.3 * np.sin(2 * np.pi * 4 * t))).astype(np.float32)
+    flux = np.concatenate([bruit(3.0), voix + bruit(2.0), bruit(1.5)])
+    d, blocs = tr.Decoupeur(), []
+    for i in range(0, len(flux), SR // 10):
+        b = d.ajouter(flux[i:i + SR // 10])
+        if b:
+            blocs.append(b)
+    if (b := d.vider()):
+        blocs.append(b)
+    assert len(blocs) == 1
+    debut, audio = blocs[0]
+    assert debut <= 3.0 and debut + len(audio) / SR >= 5.0
+

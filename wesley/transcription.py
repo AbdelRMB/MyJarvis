@@ -385,10 +385,12 @@ class Decoupeur:
         self.debut = 0.0            # position (s) du début du bloc en cours dans l'enregistrement
         self.silence = 0.0          # s de silence à la fin du bloc en cours
         self.voix = False           # le bloc contient de la voix
-        self.bruit = 0.003          # niveau du silence ambiant (moyenne glissante)
+        self.bruit = 0.0015         # niveau du silence ambiant (moyenne glissante)
 
     def seuil(self):
-        return max(self.bruit * 3.0, 0.006)
+        # bas exprès : en réunion physique, une voix à l'autre bout de la table arrive faible dans le micro
+        # (le filtre de voix de Whisper écarte ensuite le bruit seul)
+        return max(self.bruit * 2.5, 0.003)
 
     def ajouter(self, x) -> tuple[float, object] | None:
         import numpy as np
@@ -1000,10 +1002,14 @@ class Transcription:
 
     # --- pipeline
     def _preparer(self):
+        import numpy as np
         if self._transcrire is None:
             modele = _whisper(self.session["modele"])
 
             def transcrire(audio, langue, contexte=""):
+                crete = float(np.abs(audio).max()) if len(audio) else 0.0
+                if 1e-4 < crete < 0.3:      # voix lointaine : volume remonté (jusqu'à x20) pour Whisper
+                    audio = audio * min(20.0, 0.5 / crete)
                 segs, _ = modele.transcribe(audio, language=langue or None, beam_size=1, vad_filter=True,
                                             condition_on_previous_text=False, initial_prompt=contexte or None,
                                             vad_parameters={"min_silence_duration_ms": 400})

@@ -121,7 +121,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
     const niveau = Math.min(1, Math.sqrt((enCours.niveau ?? 0) / 0.25));
     const fichierEnCours = enCours.source === "fichier";
     return (
-      <Panneau titre={t("Transcription en cours")} icone={<AudioLines />}>
+      <Panneau titre={t("Transcription en cours")} icone={<AudioLines className="size-4" />}>
         <div className="truncate text-sm font-medium">{enCours.titre}</div>
         <div className="mt-1 flex items-center gap-2 text-[12px] text-doux">
           {enCours.etat === "en_cours" ? <span className="size-2 animate-pulse rounded-full bg-rouge shadow-[0_0_8px] shadow-rouge" /> : <Loader2 className="size-3.5 animate-spin" />}
@@ -142,7 +142,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
           {!!enCours.retard && enCours.retard > 5 && <> {t("({s} s de retard : le modèle est un peu lent pour cet ordinateur)", { s: Math.round(enCours.retard) })}</>}
         </p>
         {enCours.etat !== "finalisation" && (
-          <Bouton className="mt-3 w-full" variante="danger" icone={<Square />} onClick={arreter}>
+          <Bouton className="mt-3 w-full" variante="danger" icone={<Square className="size-4" />} onClick={arreter}>
             {fichierEnCours ? t("Annuler") : t("Arrêter la transcription")}
           </Bouton>
         )}
@@ -156,7 +156,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
     { id: "fichier", libelle: t("Fichier audio"), aide: t("Un enregistrement (mp3, m4a, wav, vidéo…)"), icone: FileAudio },
   ];
   return (
-    <Panneau titre={t("Nouvelle transcription")} icone={<Play />}>
+    <Panneau titre={t("Nouvelle transcription")} icone={<Play className="size-4" />}>
       <div className="grid gap-1.5">
         {SOURCES.map(({ id, libelle, aide, icone: I }) => (
           <button
@@ -182,7 +182,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
         <p className="mt-1 text-[11px] text-tres-doux">{t("Sur Mac, Wesley a besoin de l'autorisation « Enregistrement de l'écran » pour entendre le son de l'ordinateur.")}</p>
       )}
       {source !== "fichier" && <Champ className="mt-2" placeholder={t("Titre (facultatif)")} value={titre} onChange={(e) => setTitre(e.target.value)} />}
-      <div className="mt-2 grid grid-cols-3 gap-2">
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <select value={langue} onChange={(e) => setLangue(e.target.value)} title={t("Langue parlée")} className="h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px]">
           <option value="fr">{t("Français")}</option>
           <option value="en">{t("Anglais")}</option>
@@ -195,8 +195,8 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
             </option>
           ))}
         </select>
-        <select value={nombre} onChange={(e) => setNombre(+e.target.value)} title={t("Nombre de personnes, s'il est connu")} className="h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px]">
-          <option value={0}>{t("Personnes : auto")}</option>
+        <select value={nombre} onChange={(e) => setNombre(+e.target.value)} title={t("Nombre de personnes, s'il est connu")} className="col-span-2 h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px]">
+          <option value={0}>{t("Personnes : détection automatique")}</option>
           {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
             <option key={n} value={n}>
               {t("{n} personne(s)", { n })}
@@ -207,12 +207,12 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
       {source === "fichier" ? (
         <>
           <input ref={fichier} type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.ogg,.opus,.flac,.webm,.mp4,.mov" className="hidden" onChange={(e) => e.target.files?.[0] && importer(e.target.files[0])} />
-          <Bouton className="mt-3 w-full" variante="primaire" icone={<Upload />} chargement={envoi} onClick={() => fichier.current?.click()}>
+          <Bouton className="mt-3 w-full" variante="primaire" icone={<Upload className="size-4" />} chargement={envoi} onClick={() => fichier.current?.click()}>
             {t("Choisir un fichier…")}
           </Bouton>
         </>
       ) : (
-        <Bouton className="mt-3 w-full" variante="primaire" icone={<Play />} chargement={envoi} onClick={lancer}>
+        <Bouton className="mt-3 w-full" variante="primaire" icone={<Play className="size-4" />} chargement={envoi} onClick={lancer}>
           {t("Lancer la transcription")}
         </Bouton>
       )}
@@ -278,7 +278,7 @@ function PanneauLocuteurs({ s, agir }: { s: Session; agir: (action: string, corp
       )}
       {!bloque && locs.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Bouton taille="sm" variante={modifie ? "primaire" : "contour"} icone={<Check />} disabled={!modifie} onClick={() => agir("noms", { noms })}>
+          <Bouton taille="sm" variante={modifie ? "primaire" : "contour"} icone={<Check className="size-4" />} disabled={!modifie} onClick={() => agir("noms", { noms })}>
             {t("Enregistrer les noms")}
           </Bouton>
           {s.regroupable && (
@@ -294,7 +294,7 @@ function PanneauLocuteurs({ s, agir }: { s: Session; agir: (action: string, corp
               <Bouton
                 taille="sm"
                 variante="fantome"
-                icone={<Merge />}
+                icone={<Merge className="size-4" />}
                 title={t("Refait la répartition des voix ; les noms donnés sont effacés")}
                 onClick={() => confirm(t("Refaire la répartition des voix ? Les noms donnés aux locuteurs seront effacés.")) && agir("regrouper", { nombre })}
               >
@@ -465,20 +465,20 @@ function Detail({ s, recharger, supprime }: { s: Session; recharger: (x?: Sessio
         {s.erreur && <p className="mt-1 px-1 text-[12px] text-rouge">{s.erreur}</p>}
         {s.fichier && <p className="mt-1 truncate px-1 font-mono text-[11px] text-tres-doux" title={s.fichier}>{s.fichier}</p>}
         <div className="mt-3 flex flex-wrap gap-2">
-          <Bouton taille="sm" icone={<FileText />} disabled={bloque} onClick={() => exporter("md", true)}>
+          <Bouton taille="sm" icone={<FileText className="size-4" />} disabled={bloque} onClick={() => exporter("md", true)}>
             {t("Exporter en Markdown")}
           </Bouton>
-          <Bouton taille="sm" icone={<FileText />} disabled={bloque} onClick={() => exporter("txt", true)}>
+          <Bouton taille="sm" icone={<FileText className="size-4" />} disabled={bloque} onClick={() => exporter("txt", true)}>
             {t("Exporter en texte")}
           </Bouton>
-          <Bouton taille="sm" variante="fantome" icone={<Copy />} onClick={copier}>
+          <Bouton taille="sm" variante="fantome" icone={<Copy className="size-4" />} onClick={copier}>
             {t("Copier")}
           </Bouton>
-          <Bouton taille="sm" variante="fantome" icone={<FolderOpen />} onClick={() => agir("ouvrir", {})}>
+          <Bouton taille="sm" variante="fantome" icone={<FolderOpen className="size-4" />} onClick={() => agir("ouvrir", {})}>
             {t("Ouvrir le fichier")}
           </Bouton>
           {!bloque && (
-            <Bouton taille="sm" variante="fantome" icone={<Trash2 />} onClick={supprimer}>
+            <Bouton taille="sm" variante="fantome" icone={<Trash2 className="size-4" />} onClick={supprimer}>
               {t("Supprimer")}
             </Bouton>
           )}
@@ -562,7 +562,7 @@ export function VueTranscription() {
           <PanneauLancement infos={infos} enCours={enCours} onLance={(id) => { setChoisie(id); charger(); }} />
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
             {liste.length === 0 ? (
-              <Vide icone={<AudioLines />} titre={t("Aucune transcription")} texte={t("Lance-en une, ou dis à Wesley : « transcris la réunion »")} />
+              <Vide icone={<AudioLines className="size-4" />} titre={t("Aucune transcription")} texte={t("Lance-en une, ou dis à Wesley : « transcris la réunion »")} />
             ) : (
               liste.map((x) => (
                 <button
