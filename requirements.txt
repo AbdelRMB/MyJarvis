@@ -26,6 +26,8 @@ recurring-ical-events
 requests
 rich
 send2trash
+sherpa-onnx
+PyAudioWPatch
 sounddevice
 uvicorn[standard]
 cryptography

@@ -155,4 +155,4 @@ def _appeler(nom: str, args: dict) -> str:
 
 
 def charger_tous():
-    from . import systeme, fichiers, controle, ecran, web, code, memoire_outils, divers, automatisations_outils, taches_outils, appareils_outils, afaire_outils, sites_outils, projets_outils  # noqa: F401
+    from . import systeme, fichiers, controle, ecran, web, code, memoire_outils, divers, automatisations_outils, taches_outils, appareils_outils, afaire_outils, sites_outils, projets_outils, transcription_outils  # noqa: F401

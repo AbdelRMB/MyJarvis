@@ -15,7 +15,8 @@ hiddenimports = (collect_submodules("wesley") + collect_submodules("uvicorn") + 
 
 for paquet in ["webview", "openwakeword", "faster_whisper", "ctranslate2", "onnxruntime", "piper", "edge_tts",
                "sounddevice", "_sounddevice_data", "recurring_ical_events", "icalendar", "tokenizers", "certifi",
-               "ddgs", "objc", "Foundation", "AppKit", "WebKit", "Quartz", "ApplicationServices", "websockets"]:
+               "ddgs", "objc", "Foundation", "AppKit", "WebKit", "Quartz", "ApplicationServices", "websockets",
+               "sherpa_onnx", "ScreenCaptureKit", "CoreMedia", "av"]:
     try:
         d, b, h = collect_all(paquet)
         datas += d
@@ -58,8 +59,8 @@ app = BUNDLE(
         "LSUIElement": True,                     # icône dans la barre des menus, pas dans le Dock
         "LSMinimumSystemVersion": "12.0",
         "NSHighResolutionCapable": True,
-        "NSMicrophoneUsageDescription": "Wesley écoute quand tu l'appelles (« Wesley, … ») et transcrit ta voix sur ton Mac.",
+        "NSMicrophoneUsageDescription": "Wesley écoute quand tu l'appelles (« Wesley, … ») et transcrit ta voix ou tes réunions sur ton Mac.",
         "NSAppleEventsUsageDescription": "Wesley pilote tes applications (ouvrir, fermer, régler le volume) quand tu le lui demandes.",
-        "NSScreenCaptureUsageDescription": "Wesley regarde ton écran quand tu lui demandes ce qui s'y trouve.",
+        "NSScreenCaptureUsageDescription": "Wesley regarde ton écran quand tu lui demandes ce qui s'y trouve, et capte le son du Mac pour transcrire tes réunions en ligne.",
     },
 )
