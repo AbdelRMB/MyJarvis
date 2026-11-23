@@ -287,6 +287,46 @@ def test_numeros_sans_trou_apres_fusion_en_direct():
     assert len(d.centres) == 1 and (2, 1) in d.fusions and d.dernier == 1 and set(d.etiquettes) == {1}
 
 
+def _contigus(etiquettes):
+    """Numéros 1..N sans trou, dans l'ordre de première apparition."""
+    ordre = list(dict.fromkeys(etiquettes))
+    return ordre == list(range(1, len(ordre) + 1))
+
+
+def test_renumerotation_apres_12_locuteurs_crees_puis_fusionnes(dossiers):
+    """Non-régression (« Locuteur 8, 9, 11, 12 » pour 2-3 personnes) : 12 locuteurs créés en direct puis
+    fusionnés ; à chaque étape et après le regroupement final, numéros 1..N contigus par ordre d'apparition."""
+    r = np.random.default_rng(22)
+    P = [_unite(r.normal(0, 1, D)) for _ in range(3)]          # 3 vraies personnes
+    variantes = [_unite(P[k % 3] + 1.6 * _unite(r.normal(0, 1, D))) for k in range(12)]   # phrases très déformées
+    nettes = [_unite(P[(i // 5) % 3] + 0.3 * _unite(r.normal(0, 1, D))) for i in range(60)]
+    d = tr.Diariseur(0.5)
+    vus = []
+    for e in variantes + nettes:
+        d.attribuer(e, True, 4)
+        assert _contigus(d.etiquettes), d.etiquettes
+        vus.append(max(d.etiquettes))
+    assert max(vus) == 12 and len(d.fusions) >= 5                   # 12 créés, puis fusionnés
+    assert sorted(set(d.etiquettes)) == [1, 2, 3]
+    emb = variantes + nettes
+    final = tr.regrouper_complet(emb, 0.5, 0, [True] * len(emb), [4] * len(emb))
+    assert _contigus(final) and len(set(final)) == 3
+    # même chose sur une transcription enregistrée avec des numéros troués (8, 9, 11, 12) et une empreinte manquante
+    segs = [{"debut": 4 * i, "fin": 4 * i + 3.5, "locuteur": [8, 9, 11, 12][i % 4], "texte": f"P{i}"}
+            for i in range(len(emb))]
+    s = _session(id="20261123-120000-c0de", segments=segs)
+    tr.sauver(s)
+    tr.sauver_empreintes(s["id"], [None] + emb[1:], [True] * len(emb), [4] * len(emb))
+    res = [x["locuteur"] for x in tr.modifier(s["id"], "regrouper", {"nombre": 0})["segments"]]
+    assert _contigus(res) and len(set(res)) == 3
+    res = [x["locuteur"] for x in tr.modifier(s["id"], "regrouper", {"nombre": 2})["segments"]]
+    assert _contigus(res) and len(set(res)) == 2
+    # et une transcription interrompue (Wesley fermé) est renumérotée au redémarrage
+    tr.sauver(_session(id="20261123-120500-c0de", etat="en_cours", segments=segs[:8]))
+    tr.au_demarrage()
+    assert [x["locuteur"] for x in tr.lire("20261123-120500-c0de")["segments"]] == [1, 2, 3, 4] * 2
+
+
 def test_phrases_sans_empreinte_jamais_perdues():
     """Une empreinte impossible à calculer ne doit plus empêcher le regroupement final (numéros 8, 12…)."""
     r = np.random.default_rng(4)
@@ -579,6 +619,48 @@ def _mot(debut, fin, mot):
 
 def _seg(debut, fin, texte, mots=None, lp=-0.3, ns=0.05, cr=1.4):
     return _NS(start=debut, end=fin, text=texte, words=mots, avg_logprob=lp, no_speech_prob=ns, compression_ratio=cr)
+
+
+def _machine(monkeypatch, ram_go, coeurs):
+    import os
+    import types
+    monkeypatch.setitem(sys.modules, "psutil", types.SimpleNamespace(
+        virtual_memory=lambda: types.SimpleNamespace(total=ram_go * 2 ** 30)))
+    monkeypatch.setattr(os, "cpu_count", lambda: coeurs)
+
+
+def test_modele_auto_selon_la_machine(monkeypatch):
+    _machine(monkeypatch, 16, 10)
+    assert tr.modele_auto() == "large-v3-turbo" and tr.modele_auto("fichier") == "large-v3-turbo"
+    _machine(monkeypatch, 8, 4)           # machine moyenne : pas de large-v3-turbo en direct
+    assert tr.modele_auto("micro") == "small" and tr.modele_auto("systeme") == "small"
+    assert tr.modele_auto("fichier") == "large-v3-turbo"   # un fichier importé n'a pas à suivre le direct
+    _machine(monkeypatch, 4, 2)           # machine faible
+    assert tr.modele_auto() == "base" and tr.modele_auto("fichier") == "base"
+    for ram, coeurs in [(16, 10), (8, 4), (4, 2), (6, 8)]:
+        _machine(monkeypatch, ram, coeurs)
+        assert tr.modele_auto() in ("large-v3-turbo", "small", "base")
+
+
+def test_ancien_reglage_de_modele_ne_bloque_pas_le_mode_auto(monkeypatch, dossiers):
+    # réglage d'avant 2.4.0 : « small » enregistré d'office à chaque lancement, sans choix réel
+    monkeypatch.setitem(CONFIG, "transcription_modele", "small")
+    monkeypatch.delitem(CONFIG, "transcription_modele_choisi", raising=False)
+    assert tr.modele_par_defaut() == "auto"
+    _machine(monkeypatch, 16, 10)
+    t = tr.Transcription("micro")
+    assert t.session["modele"] == "large-v3-turbo"            # auto résolu selon la machine
+    _machine(monkeypatch, 4, 2)
+    assert tr.Transcription("micro").session["modele"] == "base"
+    # choix explicite de l'utilisateur (2.4.0 et après) : respecté
+    monkeypatch.setitem(CONFIG, "transcription_modele_choisi", True)
+    assert tr.modele_par_defaut() == "small" and tr.Transcription("micro").session["modele"] == "small"
+    monkeypatch.setitem(CONFIG, "transcription_modele", "auto")
+    assert tr.Transcription("micro").session["modele"] == "base"
+    monkeypatch.setitem(CONFIG, "transcription_modele", "modele-inconnu")
+    assert tr.modele_par_defaut() == "auto"
+    # un modèle demandé pour cette transcription passe avant le réglage
+    assert tr.Transcription("micro", modele="medium").session["modele"] == "medium"
 
 
 def test_options_whisper_fideles():

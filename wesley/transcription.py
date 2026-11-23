@@ -1220,7 +1220,7 @@ class Transcription:
             "titre": titre.strip()[:120] or ("Réunion du " + datetime.fromtimestamp(maintenant).strftime("%d/%m/%Y à %H:%M")),
             "debut": maintenant, "duree": 0.0, "source": source,
             "avec_micro": bool(avec_micro) and source == "systeme", "langue": langue or "",
-            "modele": modele or CONFIG.get("transcription_modele") or "auto",
+            "modele": modele or modele_par_defaut(),
             "vocabulaire": re.sub(r"\s+", " ", str(vocabulaire or CONFIG.get("transcription_vocabulaire") or ""))[:500],
             "nb_locuteurs": max(0, int(nb_locuteurs or 0)), "etat": "preparation", "erreur": "",
             "segments": [], "noms": {}, "fichier": "", "empreinte": "",
@@ -1502,6 +1502,14 @@ def modele_auto(source: str = "micro") -> str:
     if ram >= 6 and coeurs >= 4:
         return "small"
     return "base"
+
+
+def modele_par_defaut() -> str:
+    """Modèle retenu : celui que l'utilisateur a choisi lui-même (marqué depuis 2.4.0), sinon « auto ».
+    Avant 2.4.0, l'interface enregistrait le modèle affiché (souvent « small ») à chaque lancement, même sans
+    choix : ces anciens réglages ne bloquent pas le mode auto."""
+    m = str(CONFIG.get("transcription_modele") or "")
+    return m if m in MODELES_WHISPER and CONFIG.get("transcription_modele_choisi") else "auto"
 
 
 def options_whisper(langue: str, consigne: str = "") -> dict:

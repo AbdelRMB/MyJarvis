@@ -1038,7 +1038,7 @@ def lister_transcriptions(req: Request):
     t = transcription.en_cours()
     return {"liste": transcription.lister(), "en_cours": t.instantane() if t else None,
             "modeles": transcription.MODELES_WHISPER,
-            "modele": CONFIG.get("transcription_modele") or "auto", "modele_auto": transcription.modele_auto(),
+            "modele": transcription.modele_par_defaut(), "modele_auto": transcription.modele_auto(),
             "dossier": str(transcription.dossier_export()), "plateforme": "mac" if MAC else "windows" if WIN else "linux"}
 
 
@@ -1061,7 +1061,8 @@ async def demarrer_transcription(req: Request):
     d = await req.json()
     if d.get("modele"):
         CONFIG["transcription_modele"] = d["modele"]   # retenu pour la prochaine fois
-        sauver_config(["transcription_modele"])
+        CONFIG["transcription_modele_choisi"] = True   # choix réel (les réglages d'avant 2.4.0 repassent en « auto »)
+        sauver_config(["transcription_modele", "transcription_modele_choisi"])
     return await asyncio.to_thread(
         _lancer_transcription, source=d.get("source", "micro"), avec_micro=bool(d.get("avec_micro")),
         langue=d.get("langue", CONFIG.get("langue", "fr")), modele=d.get("modele", ""), titre=d.get("titre", ""),
