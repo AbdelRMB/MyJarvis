@@ -35,7 +35,7 @@ type Session = Resume & {
   niveau?: number;
   retard?: number;
 };
-type Liste = { liste: Resume[]; en_cours: Session | null; modeles: string[]; modele: string; dossier: string; plateforme: string };
+type Liste = { liste: Resume[]; en_cours: Session | null; modeles: string[]; modele: string; modele_auto?: string; dossier: string; plateforme: string };
 
 const COULEURS = ["#3ce8ff", "#ffb547", "#5ef38c", "#ff6b9d", "#b18cff", "#ff8a4c", "#4cc3ff", "#e8e35a", "#7cf0d0", "#ff5c5c"];
 const couleur = (l: number) => COULEURS[(l - 1) % COULEURS.length];
@@ -77,6 +77,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
   const [titre, setTitre] = useState("");
   const [langue, setLangue] = useState(LANGUE === "en" ? "en" : "fr");
   const [modele, setModele] = useState("");
+  const [vocabulaire, setVocabulaire] = useState("");
   const [nombre, setNombre] = useState(0);
   const [envoi, setEnvoi] = useState(false);
   const fichier = useRef<HTMLInputElement>(null);
@@ -87,7 +88,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
   const lancer = async () => {
     setEnvoi(true);
     try {
-      const s = await api<Session>("/api/transcriptions/demarrer", { method: "POST", json: { source, avec_micro: avecMicro, titre, langue, modele, nb_locuteurs: nombre } });
+      const s = await api<Session>("/api/transcriptions/demarrer", { method: "POST", json: { source, avec_micro: avecMicro, titre, langue, modele, nb_locuteurs: nombre, vocabulaire } });
       setTitre("");
       onLance(s.id);
     } catch (x) {
@@ -99,7 +100,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
   const importer = async (f: File) => {
     setEnvoi(true);
     try {
-      const q = new URLSearchParams({ nom: f.name, langue, modele, nb_locuteurs: String(nombre) });
+      const q = new URLSearchParams({ nom: f.name, langue, modele, nb_locuteurs: String(nombre), vocabulaire });
       const s = await api<Session>(`/api/transcriptions/importer?${q}`, { method: "POST", body: f, headers: { "content-type": "application/octet-stream" } });
       onLance(s.id);
     } catch (x) {
@@ -182,6 +183,13 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
         <p className="mt-1 text-[11px] text-tres-doux">{t("Sur Mac, Wesley a besoin de l'autorisation « Enregistrement de l'écran » pour entendre le son de l'ordinateur.")}</p>
       )}
       {source !== "fichier" && <Champ className="mt-2" placeholder={t("Titre (facultatif)")} value={titre} onChange={(e) => setTitre(e.target.value)} />}
+      <Champ
+        className="mt-2"
+        placeholder={t("Mots techniques à bien écrire (facultatif) : PHP, getter, $this…")}
+        title={t("Noms propres et jargon de la réunion, séparés par des virgules : Wesley les orthographie correctement.")}
+        value={vocabulaire}
+        onChange={(e) => setVocabulaire(e.target.value)}
+      />
       <div className="mt-2 grid grid-cols-2 gap-2">
         <select value={langue} onChange={(e) => setLangue(e.target.value)} title={t("Langue parlée")} className="h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px]">
           <option value="fr">{t("Français")}</option>
@@ -191,7 +199,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
         <select value={modele} onChange={(e) => setModele(e.target.value)} title={t("Modèle de reconnaissance (plus gros = plus précis, plus lent)")} className="h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px]">
           {(infos?.modeles ?? ["small"]).map((m) => (
             <option key={m} value={m}>
-              {m}
+              {m === "auto" ? t("Modèle auto ({m})", { m: infos?.modele_auto ?? "" }) : m}
             </option>
           ))}
         </select>

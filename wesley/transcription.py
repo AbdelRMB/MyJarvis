@@ -37,8 +37,10 @@ DOSSIER_MODELES = RACINE / "modeles"
 MODELE_LOCUTEURS = "wespeaker_en_voxceleb_CAM++.onnx"   # ~28 Mo, reconnaissance du locuteur (indépendant de la langue)
 URL_MODELE_LOCUTEURS = ("https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/"
                         + MODELE_LOCUTEURS.replace("+", "%2B"))
-MODELES_WHISPER = ["base", "small", "medium", "large-v3-turbo"]
+MODELES_WHISPER = ["auto", "base", "small", "medium", "large-v3-turbo", "large-v3"]   # auto : selon la machine
 DUREE_FIABLE = 1.0          # s : en dessous, l'empreinte d'une phrase est trop courte pour être sûre
+PAUSE_TOUR = 2.0            # s : au-delà, une nouvelle prise de parole commence (nouvel horodatage)
+DUREE_TOUR_MAX = 30.0       # s : un tour de parole affiché ne dépasse pas ~30 s (quelques phrases)
 ecouteurs: list = []        # fonctions appelées à chaque changement (web.py : diffusion vers l'interface)
 
 
@@ -71,13 +73,15 @@ def locuteurs(session: dict) -> list[dict]:
 
 
 def tours_de_parole(session: dict) -> list[dict]:
-    """Phrases consécutives d'un même locuteur réunies en un seul tour de parole."""
+    """Phrases consécutives d'un même locuteur réunies en un tour de parole, coupé à chaque pause
+    (PAUSE_TOUR) et au plus ~DUREE_TOUR_MAX s : horodatage fidèle, jamais un bloc de 15 minutes."""
     tours: list[dict] = []
     for s in session.get("segments", []):
         texte = s["texte"].strip()
         if not texte:
             continue
-        if tours and tours[-1]["locuteur"] == s["locuteur"] and s["debut"] - tours[-1]["fin"] < 30:
+        if tours and tours[-1]["locuteur"] == s["locuteur"] and s["debut"] - tours[-1]["fin"] < PAUSE_TOUR \
+                and s["fin"] - tours[-1]["debut"] <= DUREE_TOUR_MAX:
             tours[-1]["texte"] += " " + texte
             tours[-1]["fin"] = s["fin"]
         else:
@@ -105,11 +109,43 @@ def exporter(session: dict, format: str = "md") -> str:
               f"- **Durée** : {duree}",
               f"- **Source** : {source}",
               f"- **Participants** : {noms}", "", "---", ""]
-    for t in tours:
-        lignes += [f"**{nom_locuteur(session, t['locuteur'])}** · `{horodatage(t['debut'])}`", "", t["texte"], ""]
+    for i, t in enumerate(tours):
+        if i and tours[i - 1]["locuteur"] == t["locuteur"]:     # même personne qui continue : l'heure suffit
+            lignes += [f"`{horodatage(t['debut'])}` {t['texte']}", ""]
+        else:
+            lignes += [f"**{nom_locuteur(session, t['locuteur'])}** · `{horodatage(t['debut'])}`", "", t["texte"], ""]
     if not tours:
         lignes.append("_(rien n'a encore été transcrit)_")
     return "\n".join(lignes).rstrip() + "\n"
+
+
+def extrait(session: dict, debut: float = 0, fin: float = 0, partie: int = 1, taille: int = 9000) -> str:
+    """Transcription en texte, par parties de ~taille caractères (jamais une ligne coupée, rien de perdu) :
+    debut / fin en minutes (fin 0 = jusqu'au bout), partie = 1, 2… L'en-tête dit s'il reste une suite."""
+    debut_s, fin_s = max(0.0, float(debut or 0)) * 60, float(fin or 0) * 60
+    tours = [t for t in tours_de_parole(session) if t["fin"] > debut_s and (fin_s <= 0 or t["debut"] < fin_s)]
+    lignes = [f"[{horodatage(t['debut'])}] {nom_locuteur(session, t['locuteur'])} : {t['texte']}" for t in tours]
+    parties: list[list[str]] = [[]]
+    longueur = 0
+    for l in lignes:
+        if parties[-1] and longueur + len(l) + 1 > taille:
+            parties.append([])
+            longueur = 0
+        parties[-1].append(l)
+        longueur += len(l) + 1
+    total = len(parties)
+    partie = min(max(1, int(partie or 1)), total)
+    date = datetime.fromtimestamp(session.get("debut") or time.time()).strftime("%d/%m/%Y %H:%M")
+    noms = ", ".join(l["nom"] for l in locuteurs(session)) or "—"
+    tete = [f"{session.get('titre') or 'Transcription'} · {date} · durée {horodatage(session.get('duree', 0))}",
+            f"Participants : {noms}"]
+    if debut_s or fin_s > 0:
+        tete.append(f"Passage de {horodatage(debut_s)} à {horodatage(fin_s) if fin_s > 0 else 'la fin'}")
+    if total > 1:
+        tete.append(f"Partie {partie}/{total} ({len(lignes)} prises de parole au total)")
+    corps = parties[partie - 1] or ["(rien de transcrit sur ce passage)"]
+    pied = [f"[Suite : partie={partie + 1} (sur {total}). Lis toutes les parties avant de résumer.]"] if partie < total else []
+    return "\n".join(tete + [""] + corps + ([""] + pied if pied else [])) + "\n"
 
 
 def renommer(session: dict, noms: dict) -> dict:
@@ -172,6 +208,11 @@ def nom_de_fichier(texte: str) -> str:
 # ====================================================================================================
 # Diarisation : qui parle ? (numpy)
 # ====================================================================================================
+DUREE_SOLIDE = 3.0          # s : il faut au moins ça de parole (phrase ou phrases consécutives) pour créer un locuteur
+DUREE_FENETRE = 12.0        # s : phrases consécutives d'une même voix réunies en une fenêtre avant le regroupement final
+POIDS_MAX = 10.0            # s : poids maximal d'une phrase dans la voix moyenne d'un locuteur
+
+
 def _normer(v):
     import numpy as np
     v = np.nan_to_num(np.asarray(v, dtype=np.float32).ravel())
@@ -179,15 +220,45 @@ def _normer(v):
     return v / n if n > 1e-9 else v
 
 
-class Diariseur:
-    """Regroupement en direct : chaque phrase va au locuteur dont la voix ressemble le plus à la sienne
-    (similarité cosinus des empreintes), ou crée un nouveau locuteur si personne n'est assez proche."""
+def _assoupli(seuil: float, facteur: float) -> float:
+    """Seuil de similarité « facteur » fois plus tolérant, mesuré en distance (1 - cosinus) : même effet pour
+    les deux extracteurs, dont les échelles diffèrent (CAM++ : 0,5 ; spectral : 0,95)."""
+    return 1.0 - facteur * (1.0 - seuil)
 
-    def __init__(self, seuil: float = 0.5):
-        self.seuil = seuil
-        self.centres: list = []     # somme des empreintes normées de chaque locuteur
+
+def _poids(duree: float, fiable: bool = True) -> float:
+    """Poids d'une phrase dans une voix moyenne : sa durée (bornée). Une phrase longue donne une empreinte
+    plus sûre ; une phrase trop courte (pas fiable) ne compte presque pas."""
+    return min(max(float(duree), 0.3), POIDS_MAX) if fiable else 0.1
+
+
+def appliquer_fusion(etiquettes: list[int], source: int, cible: int) -> list[int]:
+    """Le locuteur « source » rejoint « cible » ; les numéros au-dessus de source descendent d'un cran
+    (pas de trou : Locuteur 1, 2, 3…)."""
+    out = []
+    for l in etiquettes:
+        l = cible if l == source else l
+        out.append(l - 1 if l > source else l)
+    return out
+
+
+class Diariseur:
+    """Regroupement en direct : chaque phrase va au locuteur dont la voix moyenne (pondérée par la durée)
+    ressemble le plus à la sienne. Un nouveau locuteur n'est créé que sur une phrase longue (≥ DUREE_SOLIDE)
+    vraiment différente ; une phrase courte incertaine reste au locuteur précédent (on ne change pas de voix
+    toutes les 2 s). Deux locuteurs dont les voix moyennes se rejoignent sont fusionnés, et régulièrement
+    toutes les phrases sont regroupées à nouveau (comme à l'arrêt) : self.etiquettes donne alors le locuteur
+    à jour de chaque phrase déjà écrite (numéros 1, 2, 3… sans trou)."""
+
+    def __init__(self, seuil: float = 0.5, nombre: int = 0):
+        self.seuil, self.nombre = seuil, max(0, int(nombre or 0))
+        self.centres: list = []     # somme des empreintes normées × durée, par locuteur
         self.poids: list[float] = []
         self.dernier = 0
+        self.fusions: list[tuple[int, int]] = []    # (source, cible) : deux locuteurs reconnus comme un seul
+        self.historique: list = []                  # (empreinte normée ou None, fiable, durée) par phrase
+        self.etiquettes: list[int] = []             # locuteur actuel de chaque phrase
+        self._regroupe = 0                          # nombre de phrases au dernier regroupement complet
 
     def similarites(self, e):
         import numpy as np
@@ -196,89 +267,242 @@ class Diariseur:
         c = np.stack([_normer(x) for x in self.centres])
         return c @ _normer(e)
 
-    def attribuer(self, empreinte, fiable: bool = True) -> int:
-        """Renvoie le numéro du locuteur (1, 2…). Phrase trop courte (pas fiable) : locuteur le plus proche
-        s'il est clairement reconnu, sinon le précédent, sans modifier les voix connues."""
-        e = _normer(empreinte)
-        sims = self.similarites(e)
-        meilleur = int(sims.argmax()) if len(sims) else -1
-        if not fiable:
-            if meilleur >= 0 and sims[meilleur] >= self.seuil + 0.1:
-                self.dernier = meilleur + 1
-            elif not self.dernier:
-                self.centres.append(e)
-                self.poids.append(0.0)
-                self.dernier = len(self.centres)
+    def attribuer(self, empreinte, fiable: bool = True, duree: float | None = None) -> int:
+        """Renvoie le numéro du locuteur (1, 2…). duree : longueur de la phrase en s (None : phrase longue).
+        empreinte None (calcul impossible) : la phrase reste au locuteur précédent."""
+        duree = DUREE_SOLIDE if duree is None else float(duree)
+        if empreinte is None:
+            self.historique.append((None, False, duree))
+            self.etiquettes.append(self.dernier or 1)
+            self.dernier = self.dernier or 1
             return self.dernier
-        if meilleur >= 0 and sims[meilleur] >= self.seuil:
-            self.centres[meilleur] = self.centres[meilleur] + e
-            self.poids[meilleur] += 1
+        e = _normer(empreinte)
+        sims = self.similarites(e).astype(float)
+        if len(sims) and self.dernier:
+            sims[self.dernier - 1] += 0.1 * (1.0 - self.seuil)     # continuité : le locuteur précédent est favorisé
+        meilleur = int(sims.argmax()) if len(sims) else -1
+        if meilleur >= 0 and sims[meilleur] >= _assoupli(self.seuil, 1.2):
+            if fiable:
+                self.centres[meilleur] = self.centres[meilleur] + e * _poids(duree)
+                self.poids[meilleur] += _poids(duree)
             self.dernier = meilleur + 1
-        else:
-            self.centres.append(e)
-            self.poids.append(1.0)
+        elif not self.centres or (fiable and duree >= DUREE_SOLIDE):
+            self.centres.append(e * _poids(duree, fiable))
+            self.poids.append(_poids(duree, fiable))
             self.dernier = len(self.centres)
+        # sinon : phrase courte d'une voix incertaine, elle reste au locuteur précédent
+        self.historique.append((e, fiable, duree))
+        self.etiquettes.append(self.dernier)
+        self._fusionner_proches()
+        n = len(self.historique)
+        if n - self._regroupe >= max(10, n // 20):    # régulièrement (de plus en plus espacé) : tout regrouper
+            self.regrouper_tout()
         return self.dernier
+
+    def _fusionner_proches(self):
+        """Deux locuteurs du direct dont les voix moyennes sont devenues semblables = une seule personne."""
+        import numpy as np
+        while len(self.centres) > 1:
+            c = np.stack([_normer(x) for x in self.centres])
+            s = c @ c.T
+            np.fill_diagonal(s, -np.inf)
+            k = int(np.argmax(s))
+            i, j = sorted((k // len(c), k % len(c)))
+            if s[i, j] < self.seuil:
+                return
+            self.centres[i] = self.centres[i] + self.centres[j]
+            self.poids[i] += self.poids[j]
+            del self.centres[j], self.poids[j]
+            self.fusions.append((j + 1, i + 1))
+            self.dernier = appliquer_fusion([self.dernier], j + 1, i + 1)[0]
+            self.etiquettes = appliquer_fusion(self.etiquettes, j + 1, i + 1)
+
+    def regrouper_tout(self):
+        """Regroupement complet des phrases déjà entendues ; les voix moyennes repartent de ce résultat."""
+        self._regroupe = len(self.historique)
+        e, f, d = zip(*self.historique)
+        self.etiquettes = regrouper_complet(list(e), self.seuil, self.nombre, list(f), list(d))
+        nb = max(self.etiquettes)
+        self.centres = []
+        self.poids = []
+        for l in range(1, nb + 1):
+            somme, poids = None, 0.0
+            for (x, fi, du), et in zip(self.historique, self.etiquettes):
+                if et == l and x is not None:
+                    p = _poids(du, fi)
+                    somme = x * p if somme is None else somme + x * p
+                    poids += p
+            self.centres.append(somme)
+            self.poids.append(poids)
+        self.dernier = self.etiquettes[-1]
+
+
+def regrouper_complet(empreintes: list, seuil: float = 0.5, nombre: int = 0, fiables: list | None = None,
+                      durees: list | None = None) -> list[int]:
+    """regrouper() qui accepte des phrases sans empreinte (None) : elles prennent le locuteur de la phrase
+    précédente (ou suivante). Aucune phrase n'est laissée de côté ; numéros 1, 2, 3… sans trou."""
+    n = len(empreintes)
+    fiables = list(fiables) if fiables is not None else [True] * n
+    durees = list(durees) if durees is not None else [1.0] * n
+    valides = [i for i in range(n) if empreintes[i] is not None]
+    if not valides:
+        return [1] * n
+    res = regrouper([empreintes[i] for i in valides], seuil, nombre, [fiables[i] for i in valides],
+                    [durees[i] for i in valides])
+    et = [0] * n
+    for i, l in zip(valides, res):
+        et[i] = l
+    for i in range(n):              # sans empreinte : locuteur précédent
+        if not et[i] and i:
+            et[i] = et[i - 1]
+    for i in range(n - 1, -1, -1):  # au tout début : locuteur suivant
+        if not et[i]:
+            et[i] = et[i + 1] if i + 1 < n else 1
+    return renumeroter(et)
 
 
 def regrouper(empreintes: list, seuil: float = 0.5, nombre: int = 0, fiables: list[bool] | None = None,
               durees: list[float] | None = None) -> list[int]:
-    """Regroupement final de toutes les phrases (classification hiérarchique, lien moyen, cosinus).
-    nombre > 0 : exactement ce nombre de locuteurs (si l'utilisateur l'a indiqué). Les phrases courtes
-    (fiables[i] False) rejoignent ensuite le groupe le plus proche. Renvoie 1, 2… par ordre d'apparition."""
+    """Regroupement final de toutes les phrases. Renvoie 1, 2… par ordre d'apparition, sans trou.
+    1. Fenêtres : phrases consécutives d'une même voix réunies (jusqu'à DUREE_FENETRE s) ; l'empreinte d'une
+       fenêtre (moyenne pondérée par la durée) est bien plus sûre que celle d'une phrase de 2 s.
+    2. Seules les fenêtres d'au moins DUREE_SOLIDE s créent des locuteurs : classification hiérarchique sur
+       les voix moyennes (centroïdes pondérés par la durée, qui se précisent à chaque fusion, contrairement à
+       la moyenne des similarités entre phrases). nombre > 0 : exactement ce nombre de locuteurs.
+    3. Les fenêtres courtes rejoignent la voix la plus proche.
+    4. Locuteurs marginaux (très peu de temps de parole, voix pas nettement différente) fusionnés.
+    5. Lissage : un passage court entouré d'un même locuteur, sans voix nettement différente, lui revient."""
     import numpy as np
     n = len(empreintes)
     if n == 0:
         return []
-    fiables = list(fiables) if fiables is not None else [True] * n
-    durees = list(durees) if durees is not None else [1.0] * n
-    X = np.stack([_normer(e) for e in empreintes])
-    idx = [i for i in range(n) if fiables[i]] or list(range(n))
-    groupes = [[i] for i in idx]
-    S = X[idx] @ X[idx].T            # similarités entre phrases fiables
-    # similarité moyenne entre groupes (lien moyen), mise à jour à chaque fusion
-    M = S.astype(np.float64).copy()
-    np.fill_diagonal(M, -np.inf)
-    taille = [1] * len(groupes)
-    actifs = list(range(len(groupes)))
-    while len(actifs) > 1:
-        sous = M[np.ix_(actifs, actifs)]
-        k = int(np.argmax(sous))
-        a, b = actifs[k // len(actifs)], actifs[k % len(actifs)]
-        meilleure = sous.flat[k]
+    fiables = [bool(f) for f in fiables] if fiables is not None else [True] * n
+    durees_l = [max(0.0, float(d)) for d in durees] if durees is not None else [1.0] * n
+    duree = np.array(durees_l)
+    X = np.stack([_normer(e) for e in empreintes]).astype(np.float64)
+    w = np.array([_poids(d, f) for d, f in zip(durees_l, fiables)])
+    parole = np.where(fiables, duree, 0.0)          # durée qui compte comme preuve d'une voix
+    WX = w[:, None] * X
+
+    def unites(M):
+        nm = np.linalg.norm(M, axis=-1, keepdims=True)
+        return M / np.maximum(nm, 1e-12)
+
+    # 1. fenêtres de phrases consécutives d'une même voix
+    fenetre = np.zeros(n, dtype=int)
+    courant, duree_c = WX[0].copy(), duree[0]
+    for i in range(1, n):
+        if float(unites(courant) @ X[i]) >= seuil and duree_c + duree[i] <= DUREE_FENETRE:
+            fenetre[i] = fenetre[i - 1]
+            courant += WX[i]
+            duree_c += duree[i]
+        else:
+            fenetre[i] = fenetre[i - 1] + 1
+            courant, duree_c = WX[i].copy(), duree[i]
+    nf = int(fenetre[-1]) + 1
+    V = np.zeros((nf, X.shape[1]))
+    np.add.at(V, fenetre, WX)
+    duree_f = np.bincount(fenetre, parole, minlength=nf)
+
+    # 2. classification hiérarchique des fenêtres assez longues
+    solides = np.where(duree_f >= DUREE_SOLIDE)[0]
+    if duree_f[solides].sum() < 0.5 * duree_f.sum() or len(solides) < max(1, nombre):
+        solides = np.where(duree_f > 0)[0]
+        if len(solides) < max(1, nombre):
+            solides = np.arange(nf)
+    k = len(solides)
+    C = V[solides].copy()                   # somme pondérée des empreintes de chaque groupe
+    U = unites(C)
+    groupe = np.arange(k)                   # groupe de chaque fenêtre solide
+    actif = np.ones(k, dtype=bool)
+    S = (U @ U.T).astype(np.float32)
+    np.fill_diagonal(S, -np.inf)
+    meilleur = S.argmax(1) if k > 1 else np.zeros(k, dtype=int)
+    valeur = S[np.arange(k), meilleur] if k > 1 else np.full(k, -np.inf)
+    limite = _assoupli(seuil, 1.1)
+    nb = k
+    while nb > 1:
+        ia = int(np.argmax(np.where(actif, valeur, -np.inf)))
         if nombre > 0:
-            if len(actifs) <= nombre:
+            if nb <= nombre:
                 break
-        elif meilleure < seuil:
+        elif valeur[ia] < limite:
             break
-        # fusion de b dans a
-        for c in actifs:
-            if c not in (a, b):
-                M[a, c] = M[c, a] = (M[a, c] * taille[a] + M[b, c] * taille[b]) / (taille[a] + taille[b])
-        groupes[a] += groupes[b]
-        taille[a] += taille[b]
-        actifs.remove(b)
-    etiquette = [-1] * n
-    for g in actifs:
-        for i in groupes[g]:
-            etiquette[i] = g
-    # tout petits groupes (une seule phrase très courte) : rattachés au groupe le plus proche
-    centres = {g: _normer(X[groupes[g]].sum(0)) for g in actifs}
-    if nombre <= 0 and len(actifs) > 1:
-        for g in list(actifs):
-            if len(groupes[g]) == 1 and durees[groupes[g][0]] < 2.0 and len(actifs) > 1:
-                autres = [h for h in actifs if h != g]
-                proche = max(autres, key=lambda h: float(centres[h] @ X[groupes[g][0]]))
-                for i in groupes[g]:
-                    etiquette[i] = proche
-                groupes[proche] += groupes[g]
-                actifs.remove(g)
-                centres[proche] = _normer(X[groupes[proche]].sum(0))
-    # phrases courtes : groupe le plus proche
-    for i in range(n):
-        if etiquette[i] < 0:
-            etiquette[i] = max(actifs, key=lambda h: float(centres[h] @ X[i]))
-    return renumeroter(etiquette)
+        a, b = sorted((ia, int(meilleur[ia])))
+        C[a] += C[b]
+        U[a] = unites(C[a])
+        groupe[groupe == b] = a
+        actif[b] = False
+        nb -= 1
+        S[b, :] = S[:, b] = -np.inf
+        ligne = (U @ U[a]).astype(np.float32)
+        ligne[~actif] = -np.inf
+        ligne[a] = -np.inf
+        S[a, :] = S[:, a] = ligne
+        meilleur[a] = int(ligne.argmax())
+        valeur[a] = ligne[meilleur[a]]
+        for j in np.where(actif & ((meilleur == a) | (meilleur == b)))[0]:
+            if j != a:
+                meilleur[j] = int(S[j].argmax())
+                valeur[j] = S[j, meilleur[j]]
+        mieux = actif & (ligne > valeur)
+        meilleur[mieux], valeur[mieux] = a, ligne[mieux]
+    groupes = np.where(actif)[0]
+
+    # 3. toutes les fenêtres : groupe trouvé, ou voix la plus proche pour les fenêtres courtes
+    etiquette_f = np.full(nf, -1)
+    etiquette_f[solides] = groupe
+    reste = np.where(etiquette_f < 0)[0]
+    if len(reste):
+        proches = (unites(V[reste]) @ unites(C[groupes]).T).argmax(1)
+        etiquette_f[reste] = groupes[proches]
+    et = etiquette_f[fenetre]
+
+    def voix(et):
+        G = np.zeros((int(et.max()) + 1, X.shape[1]))
+        np.add.at(G, et, WX)
+        return unites(G)
+
+    # 4. locuteurs marginaux : rattachés à la voix la plus proche si elle n'est pas nettement différente
+    if nombre <= 0:
+        total = float(parole.sum()) or float(duree.sum())
+        petit = min(15.0, 0.03 * total)                 # peu de temps de parole : fusionné si la voix est proche
+        infime = min(2 * DUREE_SOLIDE, 0.01 * total)    # quasi rien (une phrase sur une longue réunion) : fusionné
+        garde: set = set()
+        while True:
+            presents = np.unique(et)
+            temps = np.bincount(et, parole)
+            candidats = [g for g in presents if temps[g] < petit and g not in garde]
+            if len(presents) < 2 or not candidats:
+                break
+            g = min(candidats, key=lambda h: temps[h])
+            G = voix(et)
+            autres = [h for h in presents if h != g]
+            sims = G[autres] @ G[g]
+            h = autres[int(sims.argmax())]
+            if temps[g] < infime or float(sims.max()) >= _assoupli(seuil, 1.6):
+                et[et == g] = h
+            else:
+                garde.add(g)
+
+    # 5. lissage temporel
+    G = voix(et)
+    cumul = np.vstack([np.zeros(X.shape[1]), np.cumsum(WX, 0)])
+    marge = 0.5 * (1.0 - seuil)
+    debuts = [0] + [i for i in range(1, n) if et[i] != et[i - 1]]
+    passages = [[d, f, int(et[d])] for d, f in zip(debuts, debuts[1:] + [n])]
+    for p in range(1, len(passages) - 1):
+        d, f, l = passages[p]
+        voisin = passages[p - 1][2]
+        if voisin != passages[p + 1][2] or voisin == l or duree[d:f].sum() >= DUREE_SOLIDE:
+            continue
+        if nombre > 0 and int((et == l).sum()) == f - d:
+            continue        # nombre imposé : on ne fait pas disparaître un locuteur
+        v = unites(cumul[f] - cumul[d])
+        if float(G[voisin] @ v) >= float(G[l] @ v) - marge:
+            et[d:f] = voisin
+            passages[p][2] = voisin
+    return renumeroter([int(x) for x in et])
 
 
 # ====================================================================================================
@@ -413,9 +637,32 @@ class Decoupeur:
             self.debut += (len(tout) - garde) / SR
             self.morceaux, self.taille, self.silence = [tout[-garde:]], garde, min(self.silence, self.pause)
             return None
-        if (duree >= self.duree_min and self.silence >= self.pause) or duree >= self.duree_max:
+        if duree >= self.duree_min and self.silence >= self.pause:
             return self.vider()
+        if duree >= self.duree_max:
+            return self._couper_au_creux()
         return None
+
+    def _couper_au_creux(self):
+        """Bloc trop long sans pause nette : coupé au moment le plus calme des 3 dernières secondes (entre deux
+        mots), pas au milieu d'un mot ; la suite commence le bloc suivant."""
+        import numpy as np
+        tout = np.concatenate(self.morceaux)
+        trame = SR // 20
+        zone = tout[max(0, len(tout) - 3 * SR):]
+        n = len(zone) // trame
+        coupe = len(tout)
+        if n >= 4:
+            rms = np.sqrt(np.mean(np.square(zone[:n * trame].reshape(n, trame), dtype=np.float32), axis=1))
+            k = int(np.argmin(rms))
+            if rms[k] < 0.5 * float(np.median(rms)):     # vrai creux (sinon : coupe à la fin, comme avant)
+                coupe = len(tout) - len(zone) + (k + 1) * trame
+        debut = self.debut
+        bloc, reste = tout[:coupe], tout[coupe:]
+        self.debut += len(bloc) / SR
+        self.morceaux, self.taille = ([reste], len(reste)) if len(reste) else ([], 0)
+        self.silence, self.voix = 0.0, bool(len(reste))
+        return debut, bloc
 
     def vider(self):
         import numpy as np
@@ -840,12 +1087,18 @@ def _chemin_empreintes(tid: str) -> Path:
 
 
 def sauver_empreintes(tid: str, empreintes: list, fiables: list, durees: list):
-    """Empreintes vocales de chaque phrase (pas le son) : servent à regrouper à nouveau les locuteurs."""
+    """Empreintes vocales de chaque phrase (pas le son) : servent à regrouper à nouveau les locuteurs.
+    Une phrase sans empreinte (calcul impossible) est gardée, marquée non valide."""
     import numpy as np
+    exemple = next((e for e in empreintes if e is not None), None)
+    if exemple is None:
+        return
+    vide = np.zeros_like(_normer(exemple))
     DOSSIER_DONNEES.mkdir(parents=True, exist_ok=True)
     with open(_chemin_empreintes(tid), "wb") as f:
-        np.savez_compressed(f, empreintes=np.stack([_normer(e) for e in empreintes]).astype(np.float32),
-                            fiables=np.array(fiables, dtype=bool), durees=np.array(durees, dtype=np.float32))
+        np.savez_compressed(f, empreintes=np.stack([vide if e is None else _normer(e) for e in empreintes]).astype(np.float32),
+                            fiables=np.array(fiables, dtype=bool), durees=np.array(durees, dtype=np.float32),
+                            valides=np.array([e is not None for e in empreintes], dtype=bool))
 
 
 def regroupable(tid: str) -> bool:
@@ -881,12 +1134,14 @@ def regrouper_session(session: dict, nombre: int = 0) -> dict:
     try:
         with np.load(_chemin_empreintes(session["id"])) as z:
             emb, fiables, durees = list(z["empreintes"]), list(z["fiables"]), list(z["durees"])
+            valides = list(z["valides"]) if "valides" in z.files else [True] * len(emb)
+            emb = [e if v else None for e, v in zip(emb, valides)]
     except (OSError, KeyError, ValueError):
         raise ValueError("Les empreintes vocales de cette transcription ne sont pas disponibles.")
     segs = session.get("segments", [])
     if len(emb) != len(segs):
         raise ValueError("Les empreintes vocales ne correspondent plus aux phrases de cette transcription.")
-    etiquettes = regrouper(emb, float(session.get("seuil") or 0.5), max(0, nombre), fiables, durees)
+    etiquettes = regrouper_complet(emb, float(session.get("seuil") or 0.5), max(0, nombre), fiables, durees)
     for s, l in zip(segs, etiquettes):
         s["locuteur"] = l
     session["noms"] = {}
@@ -937,7 +1192,8 @@ def _whisper(nom: str):
     if nom not in _whisper_cache:
         from .modeles import charger_whisper
         _whisper_cache.clear()          # un seul modèle de transcription en mémoire à la fois
-        _whisper_cache[nom] = charger_whisper(nom, cpu_threads=4)
+        import os
+        _whisper_cache[nom] = charger_whisper(nom, cpu_threads=max(2, min(8, (os.cpu_count() or 4) - 1)))
     return _whisper_cache[nom]
 
 
@@ -951,9 +1207,11 @@ class Transcription:
     """Une transcription en cours : capture, découpage, Whisper et diarisation dans un fil de fond."""
 
     def __init__(self, source="micro", avec_micro=False, langue="fr", modele="", titre="", nb_locuteurs=0,
-                 fichier_audio="", transcrire=None, empreinte=None, captures=None):
+                 fichier_audio="", transcrire=None, empreinte=None, captures=None, vocabulaire=""):
         """source : « micro », « systeme » ou « fichier » (fichier_audio : enregistrement à transcrire).
-        transcrire(audio, langue, contexte) -> [(debut, fin, texte)], empreinte(audio) -> vecteur et
+        modele : « auto » (ou vide) = le plus précis que la machine fait tourner ; vocabulaire : mots techniques
+        à bien orthographier (séparés par des virgules).
+        transcrire(audio, langue, consigne) -> [(debut, fin, texte)], empreinte(audio) -> vecteur et
         captures [(objet avec demarrer/arreter, Tampon)] : remplaçables pour les tests (sans micro ni modèle)."""
         maintenant = time.time()
         source = source if source in ("micro", "systeme", "fichier") else "micro"
@@ -962,7 +1220,8 @@ class Transcription:
             "titre": titre.strip()[:120] or ("Réunion du " + datetime.fromtimestamp(maintenant).strftime("%d/%m/%Y à %H:%M")),
             "debut": maintenant, "duree": 0.0, "source": source,
             "avec_micro": bool(avec_micro) and source == "systeme", "langue": langue or "",
-            "modele": modele or CONFIG.get("transcription_modele") or CONFIG.get("whisper_modele", "small"),
+            "modele": modele or CONFIG.get("transcription_modele") or "auto",
+            "vocabulaire": re.sub(r"\s+", " ", str(vocabulaire or CONFIG.get("transcription_vocabulaire") or ""))[:500],
             "nb_locuteurs": max(0, int(nb_locuteurs or 0)), "etat": "preparation", "erreur": "",
             "segments": [], "noms": {}, "fichier": "", "empreinte": "",
         }
@@ -976,6 +1235,8 @@ class Transcription:
         self.retard = 0.0                   # s d'audio en attente de transcription
         self.diariseur: Diariseur | None = None
         self._blocs: queue.Queue = queue.Queue()
+        if self.session["modele"] not in MODELES_WHISPER or self.session["modele"] == "auto":
+            self.session["modele"] = modele_auto(source)
         self._fichier_audio = fichier_audio
         self.position = 0.0                 # s d'audio déjà lues (avancement d'un fichier importé)
 
@@ -1006,20 +1267,27 @@ class Transcription:
         if self._transcrire is None:
             modele = _whisper(self.session["modele"])
 
-            def transcrire(audio, langue, contexte=""):
+            import inspect
+            try:
+                acceptes = set(inspect.signature(modele.transcribe).parameters)
+            except (TypeError, ValueError):
+                acceptes = None
+
+            def transcrire(audio, langue, consigne=""):
                 crete = float(np.abs(audio).max()) if len(audio) else 0.0
                 if 1e-4 < crete < 0.3:      # voix lointaine : volume remonté (jusqu'à x20) pour Whisper
                     audio = audio * min(20.0, 0.5 / crete)
-                segs, _ = modele.transcribe(audio, language=langue or None, beam_size=1, vad_filter=True,
-                                            condition_on_previous_text=False, initial_prompt=contexte or None,
-                                            vad_parameters={"min_silence_duration_ms": 400})
-                return [(s.start, s.end, s.text) for s in segs]
+                options = options_whisper(langue, consigne)
+                if acceptes is not None:        # anciennes versions de faster-whisper : options inconnues retirées
+                    options = {k: v for k, v in options.items() if k in acceptes}
+                segs, _ = modele.transcribe(audio, **options)
+                return decouper_phrases(segs)
             self._transcrire = transcrire
         if self._empreinte_fn is None:
             self._empreinte_fn = _empreinte()
         nom = getattr(self._empreinte_fn, "nom", "")
         seuil = float(CONFIG.get("transcription_seuil") or getattr(self._empreinte_fn, "seuil", 0.5))
-        self.diariseur = Diariseur(seuil)
+        self.diariseur = Diariseur(seuil, self.session["nb_locuteurs"])
         self.session["empreinte"] = nom
         if self.session["source"] == "fichier":
             self._audio_fichier = lire_fichier_audio(self._fichier_audio)
@@ -1103,17 +1371,25 @@ class Transcription:
         travailleur.join()
         self._finaliser()
 
+    def _consigne(self) -> str:
+        """Amorce de Whisper : titre + vocabulaire (donné, déjà entendu, du sujet). Jamais le texte précédent :
+        une erreur ou une boucle s'y propagerait."""
+        with _verrou:
+            textes = [x["texte"] for x in self.session["segments"][-300:]]
+        return consigne_whisper(self.session["titre"],
+                                vocabulaire(self.session["titre"], textes, self.session.get("vocabulaire", "")))
+
     def _travailler(self):
         """Fil Whisper : transcrit les blocs dans l'ordre, sans bloquer la capture."""
-        contexte = ""
         while True:
             bloc = self._blocs.get()
             if bloc is None:
                 return
             debut, audio = bloc
             self.retard = sum(len(b[1]) for b in list(self._blocs.queue) if b) / SR
+            consigne = self._consigne()
             try:
-                phrases = self._transcrire(audio, self.session["langue"], contexte)
+                phrases = self._transcrire(audio, self.session["langue"], consigne)
             except Exception as e:
                 traceback.print_exc()
                 self.session["erreur"] = f"Transcription : {e}"
@@ -1121,55 +1397,58 @@ class Transcription:
             nouveaux = []
             for d, f, texte in phrases:
                 texte = (texte or "").strip()
-                if not texte or _hallucination(texte):
+                if not texte or _hallucination(texte) or recopie_consigne(texte, consigne):
                     continue
                 d, f = max(0.0, float(d)), min(len(audio) / SR, float(f))
-                morceau = audio[int(d * SR): max(int(f * SR), int(d * SR) + 1)]
-                fiable = len(morceau) / SR >= DUREE_FIABLE
+                if f <= d:
+                    f = min(len(audio) / SR, d + 0.01)
+                fiable = f - d >= DUREE_FIABLE
+                # empreinte sur au moins 1,5 s (élargie dans le bloc, coupé aux pauses : même voix le plus souvent)
+                manque = max(0.0, 1.5 - (f - d)) / 2
+                i0, i1 = int(max(0.0, d - manque) * SR), int(min(len(audio) / SR, f + manque) * SR)
                 try:
-                    e = self._empreinte_fn(morceau if len(morceau) >= SR // 2 else
-                                           audio[max(0, int(d * SR) - SR // 4): int(f * SR) + SR // 4])
-                    loc = self.diariseur.attribuer(e, fiable)
+                    e = self._empreinte_fn(audio[i0: max(i1, i0 + 1)])
                 except Exception:
                     traceback.print_exc()
-                    e, loc = None, self.diariseur.dernier or 1
+                    e = None
+                self.diariseur.attribuer(e, fiable, f - d)
                 self._empreintes.append((e, fiable, f - d))
-                nouveaux.append({"debut": round(debut + d, 2), "fin": round(debut + f, 2), "locuteur": loc,
+                nouveaux.append({"debut": round(debut + d, 2), "fin": round(debut + f, 2), "locuteur": 1,
                                  "texte": texte})
-                contexte = texte[-200:]
             if nouveaux:
                 with _verrou:
-                    self.session["segments"].extend(nouveaux)
+                    segs = self.session["segments"]
+                    segs.extend(nouveaux)
+                    # locuteurs à jour de toutes les phrases (fusions et regroupements réguliers du direct)
+                    for x, l in zip(segs, self.diariseur.etiquettes):
+                        x["locuteur"] = l
                 sauver(self.session)
                 _signaler(self.session["id"])
             self.retard = sum(len(b[1]) for b in list(self._blocs.queue) if b) / SR
 
     def _finaliser(self):
-        """Regroupement final des voix sur toute la réunion, puis fichiers définitifs."""
+        """Regroupement final des voix sur toute la réunion (aucune phrase laissée de côté, numéros 1, 2, 3…
+        sans trou), puis fichiers définitifs. Le texte du direct est gardé tel quel."""
         segs = self.session["segments"]
-        valides = [i for i, (e, _, _) in enumerate(self._empreintes) if e is not None]
         self.session["seuil"] = self.diariseur.seuil
-        if len(valides) == len(segs) and segs:
+        if segs and len(self._empreintes) == len(segs):
             try:
                 sauver_empreintes(self.session["id"], [e for e, _, _ in self._empreintes],
                                   [f for _, f, _ in self._empreintes], [d for _, _, d in self._empreintes])
             except Exception:
                 traceback.print_exc()
-        if len(valides) >= 2 and len(valides) == len(segs):
             try:
-                etiquettes = regrouper([self._empreintes[i][0] for i in valides], self.diariseur.seuil,
-                                       self.session["nb_locuteurs"], [self._empreintes[i][1] for i in valides],
-                                       [self._empreintes[i][2] for i in valides])
-                with _verrou:
-                    for i, l in zip(valides, etiquettes):
-                        segs[i]["locuteur"] = l
+                etiquettes = regrouper_complet([e for e, _, _ in self._empreintes], self.diariseur.seuil,
+                                               self.session["nb_locuteurs"], [f for _, f, _ in self._empreintes],
+                                               [d for _, _, d in self._empreintes])
             except Exception:
                 traceback.print_exc()
+                etiquettes = renumeroter([x["locuteur"] for x in segs])
         else:
-            with _verrou:
-                for s, l in zip(segs, renumeroter([s["locuteur"] for s in segs])):
-                    s["locuteur"] = l
+            etiquettes = renumeroter([x["locuteur"] for x in segs])
         with _verrou:
+            for x, l in zip(segs, etiquettes):
+                x["locuteur"] = l
             self.session["etat"] = "terminee"
         sauver(self.session)
         _liberer(self)
@@ -1188,13 +1467,165 @@ class Transcription:
         _signaler(self.session["id"])
 
 
-# Phrases que Whisper invente sur du silence ou de la musique
-_HALLUCINATIONS = re.compile(r"^(sous-titr|sous titr|merci d'avoir regardé|abonnez-vous|thanks for watching|"
-                             r"subtitles by|amara\.org|\[musique\]|\(musique\)|♪)", re.I)
+# ====================================================================================================
+# Fidélité du texte : réglages de Whisper, phrases douteuses écartées, découpage aux pauses, vocabulaire
+# (le texte n'est jamais reformulé ni résumé : on écarte ce que Whisper invente, on ne réécrit rien)
+# ====================================================================================================
+# Phrases que Whisper invente sur du silence, du bruit ou de la musique (apprises de sous-titres de vidéos)
+_HALLUCINATIONS = re.compile(
+    r"(sous-?titr|sous titr|merci d'avoir regardé|merci de nous avoir regardé|abonnez-vous|"
+    r"n'oubliez pas de vous abonner|thanks for watching|thank you for watching|subtitles by|"
+    r"amara\.org|radio-canada|^\W*\[?\(?musique\)?\]?\W*$|^\W*♪|^[\s.…!?,-]*$)", re.I)
+# Courtes phrases plausibles que Whisper invente aussi sur du silence : écartées seulement si le son est douteux
+_HALLUCINATIONS_COURTES = re.compile(r"^\W*(merci( beaucoup)?|au revoir|bonne journée|à bientôt|"
+                                     r"thank you|bye|you)\W*$", re.I)
+PAUSE_DECOUPE = 0.8         # s de silence entre deux mots : nouvelle phrase (nouvel horodatage, nouvelle empreinte)
+DUREE_PHRASE_MAX = 30.0     # s : une phrase plus longue est coupée en fin de phrase (ou entre deux mots)
 
 
 def _hallucination(texte: str) -> bool:
     return bool(_HALLUCINATIONS.search(texte.strip()))
+
+
+def modele_auto(source: str = "micro") -> str:
+    """Le modèle Whisper le plus précis que la machine fait tourner assez vite. large-v3-turbo : précision
+    proche de large-v3, bien plus rapide (pas de distil-large-v3 : il ne connaît que l'anglais)."""
+    import os
+    try:
+        import psutil
+        ram = psutil.virtual_memory().total / 2 ** 30
+    except Exception:
+        ram = 8.0
+    coeurs = os.cpu_count() or 4
+    if ram >= 8 and (coeurs >= 8 or source == "fichier"):     # un fichier importé n'a pas à suivre le direct
+        return "large-v3-turbo"
+    if ram >= 6 and coeurs >= 4:
+        return "small"
+    return "base"
+
+
+def options_whisper(langue: str, consigne: str = "") -> dict:
+    """Réglages pour un texte fidèle : décodage déterministe (température 0, recherche en faisceau), sans
+    reprise du texte précédent (évite les boucles), segments douteux signalés, voix détectée par le VAD."""
+    return {"language": langue or None, "task": "transcribe", "beam_size": 5, "best_of": 5, "temperature": 0.0,
+            "condition_on_previous_text": False, "initial_prompt": consigne or None,
+            "compression_ratio_threshold": 2.4, "log_prob_threshold": -1.0, "no_speech_threshold": 0.6,
+            "vad_filter": True, "vad_parameters": {"min_silence_duration_ms": 500, "speech_pad_ms": 300},
+            "word_timestamps": True, "hallucination_silence_threshold": 2.0}
+
+
+def segment_douteux(s) -> bool:
+    """Segment Whisper à écarter : texte qui boucle (taux de compression élevé), très incertain, ou
+    probablement du silence (no_speech élevé et texte peu sûr)."""
+    lp = getattr(s, "avg_logprob", 0.0) or 0.0
+    ns = getattr(s, "no_speech_prob", 0.0) or 0.0
+    if (getattr(s, "compression_ratio", 0.0) or 0.0) > 2.4 or lp < -1.4 or (ns > 0.6 and lp < -1.0):
+        return True
+    return bool(_HALLUCINATIONS_COURTES.match(getattr(s, "text", "") or "")) and (ns > 0.3 or lp < -0.7)
+
+
+def sans_boucles(texte: str) -> str:
+    """Retire les répétitions parasites de Whisper (même groupe de mots répété en boucle : 4 fois et plus
+    pour 2 à 8 mots, 5 fois et plus pour un mot). Les répétitions naturelles (« non, non ») restent."""
+    mots = texte.split()
+    if len(mots) < 4:
+        return texte
+    norm = [re.sub(r"[^\w$']", "", m.lower()) for m in mots]
+    for n in range(8, 0, -1):
+        mini = 5 if n == 1 else 4
+        i = 0
+        while i + n * mini <= len(mots):
+            motif = norm[i:i + n]
+            k = 1
+            while norm[i + k * n: i + (k + 1) * n] == motif:
+                k += 1
+            if k >= mini and any(motif):
+                del mots[i + n: i + k * n], norm[i + n: i + k * n]
+            i += 1
+    return " ".join(mots)
+
+
+def decouper_phrases(segments, pause: float = PAUSE_DECOUPE, duree_max: float = DUREE_PHRASE_MAX) -> list:
+    """Segments Whisper -> [(début, fin, texte)] : segments douteux écartés, coupés à chaque pause entre deux
+    mots (horodatage fidèle, et une empreinte vocale par prise de parole) et au plus ~30 s par phrase."""
+    phrases = []
+    for s in segments:
+        if segment_douteux(s):
+            continue
+        mots = [m for m in (getattr(s, "words", None) or []) if (m.word or "").strip()]
+        if not mots:
+            morceaux = [(float(s.start), float(s.end), s.text)]
+        else:
+            morceaux, courant = [], [mots[0]]
+            for m in mots[1:]:
+                duree = float(m.end) - float(courant[0].start)
+                fin_phrase = courant[-1].word.strip()[-1:] in ".?!…"
+                if float(m.start) - float(courant[-1].end) >= pause or duree > duree_max or \
+                        (duree > duree_max * 0.6 and fin_phrase):
+                    morceaux.append(courant)
+                    courant = [m]
+                else:
+                    courant.append(m)
+            morceaux.append(courant)
+            morceaux = [(float(c[0].start), float(c[-1].end), "".join(m.word for m in c)) for c in morceaux]
+        for d, f, texte in morceaux:
+            texte = sans_boucles(re.sub(r"\s+", " ", texte or "").strip())
+            if not texte or _hallucination(texte):
+                continue
+            if phrases and len(texte) > 15 and texte == phrases[-1][2]:
+                continue        # même phrase rendue deux fois par Whisper
+            phrases.append((d, max(f, d + 0.01), texte))
+    return phrases
+
+
+# Vocabulaire de quelques sujets (repéré dans le titre) : aide Whisper à écrire le jargon correctement
+VOCABULAIRE_THEMES = {
+    r"\bphp\b": ["PHP", "$this", "getter", "setter", "constructeur", "__construct", "trigger_error", "ucfirst",
+                 "PDO", "echo", "public", "private", "protected", "static", "extends", "namespace", "var_dump"],
+    r"\b(objet|poo|oop)\b": ["classe", "objet", "méthode", "attribut", "instance", "héritage", "encapsulation",
+                             "interface", "getter", "setter", "constructeur"],
+    r"\bpython\b": ["Python", "self", "def", "__init__", "import", "pip", "liste", "dictionnaire", "None"],
+    r"\b(javascript|js|react|node)\b": ["JavaScript", "const", "let", "async", "await", "fetch", "useState",
+                                        "React", "npm", "JSON"],
+    r"\b(sql|mysql|base de donn[ée]es|bdd)\b": ["SQL", "SELECT", "INSERT", "UPDATE", "JOIN", "WHERE", "MySQL",
+                                               "clé primaire", "clé étrangère"],
+    r"\bjava\b": ["Java", "public static void main", "extends", "implements", "new", "String"],
+    r"\b(html|css|web)\b": ["HTML", "CSS", "div", "class", "id", "flexbox", "balise"],
+}
+_MOT_TECHNIQUE = re.compile(r"\$\w+|\b\w+_\w+\b|\b\w+\(\)|\b[a-z]+[A-Z]\w*\b|\b[A-Z]{2,}[a-z]?\b")
+
+
+def vocabulaire(titre: str = "", textes: list[str] | None = None, mots: str | list = "") -> list[str]:
+    """Mots à bien orthographier : ceux donnés par l'utilisateur, les mots techniques déjà entendus dans la
+    réunion (au moins deux fois), puis ceux du sujet (d'après le titre)."""
+    from collections import Counter
+    if isinstance(mots, str):
+        mots = [m.strip() for m in re.split(r"[,;\n]", mots)]
+    vus = Counter(m for t in (textes or []) for m in _MOT_TECHNIQUE.findall(t))
+    theme = [m for motif, liste in VOCABULAIRE_THEMES.items() if re.search(motif, titre or "", re.I) for m in liste]
+    res: list[str] = []
+    for m in list(mots) + [m for m, n in vus.most_common(15) if n >= 2] + theme:
+        if m and m.lower() not in {x.lower() for x in res}:
+            res.append(m)
+    return res[:40]
+
+
+def consigne_whisper(titre: str = "", vocab: list[str] | None = None) -> str:
+    """Texte d'amorce de Whisper (initial_prompt) : le sujet et le vocabulaire, pour orthographier le jargon.
+    Court (Whisper n'en garde qu'environ 220 jetons) ; ne change pas le sens de ce qui est transcrit."""
+    morceaux = []
+    if titre and not titre.startswith("Réunion du "):
+        morceaux.append(titre.strip().rstrip(".") + ".")
+    if vocab:
+        morceaux.append("Vocabulaire : " + ", ".join(vocab) + ".")
+    return " ".join(morceaux)[:600]
+
+
+def recopie_consigne(texte: str, consigne: str) -> bool:
+    """Whisper recopie parfois son amorce quand le son est inaudible : cette « phrase » est écartée."""
+    norme = lambda x: re.sub(r"\W+", " ", x.lower()).strip()
+    t = norme(texte)
+    return bool(consigne) and len(t) >= 8 and (t in norme(consigne) or norme(texte).startswith("vocabulaire"))
 
 
 def _liberer(t: Transcription):
@@ -1204,17 +1635,18 @@ def _liberer(t: Transcription):
             _en_cours = None
 
 
-def demarrer(source="micro", avec_micro=False, langue="", modele="", titre="", nb_locuteurs=0, fichier_audio="",
-             **tests) -> dict:
-    """Lance une transcription (une seule à la fois) ; renvoie son état."""
+def demarrer(source="micro", avec_micro=False, langue=None, modele="", titre="", nb_locuteurs=0, fichier_audio="",
+             vocabulaire="", **tests) -> dict:
+    """Lance une transcription (une seule à la fois) ; renvoie son état. langue : None = celle de Wesley
+    (français par défaut), « » = détection automatique."""
     global _en_cours
     with _verrou:
         if _en_cours is not None:
             raise ValueError("Une transcription est déjà en cours : arrête-la d'abord.")
         if modele and modele not in MODELES_WHISPER:
             raise ValueError("Modèle de transcription inconnu.")
-        t = Transcription(source, avec_micro, langue if langue is not None else CONFIG.get("langue", "fr"),
-                          modele, titre, nb_locuteurs, fichier_audio, **tests)
+        t = Transcription(source, avec_micro, langue if langue is not None else (CONFIG.get("langue") or "fr"),
+                          modele, titre, nb_locuteurs, fichier_audio, vocabulaire=vocabulaire, **tests)
         _en_cours = t
     t.demarrer()
     return t.instantane()

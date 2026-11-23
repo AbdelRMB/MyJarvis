@@ -1038,7 +1038,7 @@ def lister_transcriptions(req: Request):
     t = transcription.en_cours()
     return {"liste": transcription.lister(), "en_cours": t.instantane() if t else None,
             "modeles": transcription.MODELES_WHISPER,
-            "modele": CONFIG.get("transcription_modele") or CONFIG.get("whisper_modele", "small"),
+            "modele": CONFIG.get("transcription_modele") or "auto", "modele_auto": transcription.modele_auto(),
             "dossier": str(transcription.dossier_export()), "plateforme": "mac" if MAC else "windows" if WIN else "linux"}
 
 
@@ -1065,11 +1065,12 @@ async def demarrer_transcription(req: Request):
     return await asyncio.to_thread(
         _lancer_transcription, source=d.get("source", "micro"), avec_micro=bool(d.get("avec_micro")),
         langue=d.get("langue", CONFIG.get("langue", "fr")), modele=d.get("modele", ""), titre=d.get("titre", ""),
-        nb_locuteurs=int(d.get("nb_locuteurs") or 0))
+        nb_locuteurs=int(d.get("nb_locuteurs") or 0), vocabulaire=str(d.get("vocabulaire") or ""))
 
 
 @app.post("/api/transcriptions/importer")
-async def importer_transcription(req: Request, nom: str = "", langue: str = "fr", modele: str = "", nb_locuteurs: int = 0):
+async def importer_transcription(req: Request, nom: str = "", langue: str = "fr", modele: str = "", nb_locuteurs: int = 0,
+                                 vocabulaire: str = ""):
     """Corps : le fichier audio ou vidéo brut (mp3, m4a, wav, mp4…), transcrit puis effacé."""
     _verifier(req)
     from . import transcription
@@ -1090,7 +1091,8 @@ async def importer_transcription(req: Request, nom: str = "", langue: str = "fr"
         f.unlink(missing_ok=True)
         raise HTTPException(400, "Fichier vide.")
     return await asyncio.to_thread(_lancer_transcription, f, source="fichier", fichier_audio=str(f), langue=langue,
-                                   modele=modele, titre=Path(nom).stem[:120], nb_locuteurs=nb_locuteurs)
+                                   modele=modele, titre=Path(nom).stem[:120], nb_locuteurs=nb_locuteurs,
+                                   vocabulaire=vocabulaire)
 
 
 @app.post("/api/transcriptions/arreter")
