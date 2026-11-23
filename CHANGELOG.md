@@ -3,6 +3,9 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 2.2.1
+- **Clore un ticket marche à nouveau** : pour un administrateur, « marque le ticket 1 résolu », répondre à un ticket, changer son statut ou le supprimer (sur l'ordinateur comme sur le téléphone) échouait avec « Erreur du serveur (404) ». C'est corrigé, et l'auteur du ticket reçoit bien la réponse. / **Closing a ticket works again**: resolving, answering or deleting a ticket no longer fails with "Server error (404)".
+
 ## 2.2.0
 - **Un WESLEY.md pour chacun de tes projets** : comme le CLAUDE.md de Claude Code, un fichier `WESLEY.md` à la racine d'un projet (et si besoin dans un sous-dossier) contient ses instructions : à quoi il sert, les commandes utiles, les conventions, les décisions prises et le journal des changements. Avant de coder, d'ouvrir ou de modifier un projet, Wesley le lit en premier et le suit avant sa mémoire et ses habitudes (ta demande et tes consignes passent toujours avant). / **A WESLEY.md for each of your projects**, like Claude Code's CLAUDE.md: Wesley reads it first and follows it.
   - **Transmis à Claude Code et Codex** : les tâches de code reçoivent le WESLEY.md du projet en tête de leur consigne. Le détail d'une tâche (onglet Tâches) indique lesquels elle suit. / Coding tasks get the project's WESLEY.md first.
