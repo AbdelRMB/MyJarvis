@@ -239,7 +239,8 @@ function PanneauLocuteurs({ s, agir }: { s: Session; agir: (action: string, corp
   const bloque = actif(s.etat);
 
   return (
-    <div className="border-b border-ligne p-4">
+    // nombreux locuteurs : le panneau défile seul (au plus 35 % de la hauteur), le texte garde sa place
+    <div className="max-h-[35%] flex-none overflow-y-auto overscroll-contain border-b border-ligne p-4">
       <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-tres-doux uppercase">
         <Users className="size-3.5" /> {t("Locuteurs")}
       </div>
@@ -453,7 +454,7 @@ function Detail({ s, recharger, supprime }: { s: Session; recharger: (x?: Sessio
 
   return (
     <>
-      <div className="border-b border-ligne p-4">
+      <div className="flex-none border-b border-ligne p-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={titre}
@@ -499,7 +500,7 @@ function Detail({ s, recharger, supprime }: { s: Session; recharger: (x?: Sessio
           const d = e.currentTarget;
           suivre.current = d.scrollHeight - d.scrollTop - d.clientHeight < 80;
         }}
-        className="min-h-0 flex-1 overflow-y-auto p-4"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
       >
         {s.segments.length === 0 ? (
           <div className="grid h-full place-items-center text-sm text-doux">
@@ -565,10 +566,15 @@ export function VueTranscription() {
         titre={t("Transcription")}
         sousTitre={t("Wesley écrit tout ce qui se dit pendant une réunion, reconnaît les voix (Locuteur 1, Locuteur 2…) et horodate chaque phrase. Tu nommes ensuite chaque personne et tu exportes le texte.")}
       />
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[340px_1fr]">
-        <div className="flex min-h-0 flex-col gap-3">
-          <PanneauLancement infos={infos} enCours={enCours} onLance={(id) => { setChoisie(id); charger(); }} />
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+      {/* grand écran : une rangée bornée à la hauteur de la page (sinon la grille prend la hauteur du contenu
+          et rien ne défile) ; chaque colonne défile seule. Petit écran : la page défile, et chaque bloc a une
+          hauteur maximale avec son propre défilement. */}
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+        <div className="flex min-h-0 flex-col gap-3 lg:overflow-hidden">
+          <div className="flex-none">
+            <PanneauLancement infos={infos} enCours={enCours} onLance={(id) => { setChoisie(id); charger(); }} />
+          </div>
+          <div className="max-h-[45vh] min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none">
             {liste.length === 0 ? (
               <Vide icone={<AudioLines className="size-4" />} titre={t("Aucune transcription")} texte={t("Lance-en une, ou dis à Wesley : « transcris la réunion »")} />
             ) : (
@@ -598,7 +604,7 @@ export function VueTranscription() {
           )}
         </div>
 
-        <div className="flex min-h-[420px] flex-col rounded-md border border-ligne bg-surface/40 lg:min-h-0">
+        <div className="flex h-[80vh] min-h-[420px] flex-col overflow-hidden rounded-md border border-ligne bg-surface/40 lg:h-auto lg:min-h-0">
           {!detail ? (
             <div className="grid flex-1 place-items-center text-sm text-doux">{t("Choisis une transcription pour la relire.")}</div>
           ) : (
