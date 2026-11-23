@@ -91,6 +91,7 @@ type Evt =
   | { type: "confirmation"; id: string; titre: string; detail: string; saisie?: boolean }
   | { type: "confirmation_fin"; id: string }
   | { type: "tache_maj"; id: string }
+  | { type: "transcription_maj"; id: string }
   | { type: "notifications"; non_lues: number }
   | { type: "appareils_maj" }
   | { type: "afaire_maj" }
@@ -228,6 +229,9 @@ function recevoir(e: Evt) {
       break;
     case "tache_maj":
       emettre("tache_maj", e.id);
+      break;
+    case "transcription_maj":
+      emettre("transcription_maj", e.id);
       break;
     case "notifications":
       emettre("notifications", e.non_lues);
