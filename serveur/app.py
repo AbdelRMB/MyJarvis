@@ -832,6 +832,9 @@ def tous_les_tickets(uid: int = Depends(_admin)):
             "ORDER BY t.modifie DESC LIMIT 2000")]
 
 
+# Le proxy Apache devant le serveur ne laisse passer que GET, POST et PUT (les autres méthodes reçoivent un 404
+# HTML d'Apache) : l'appli utilise donc POST. PATCH et DELETE restent acceptés pour un serveur sans ce filtre.
+@app.post("/v1/admin/tickets/{tid}")
 @app.patch("/v1/admin/tickets/{tid}")
 def traiter_ticket(tid: int, d: ReponseTicket, uid: int = Depends(_admin)):
     if d.statut and d.statut not in STATUTS_TICKET:
@@ -849,6 +852,7 @@ def traiter_ticket(tid: int, d: ReponseTicket, uid: int = Depends(_admin)):
     return {"ok": True}
 
 
+@app.post("/v1/admin/tickets/{tid}/supprimer")
 @app.delete("/v1/admin/tickets/{tid}")
 def supprimer_ticket(tid: int, uid: int = Depends(_admin)):
     with db() as c:
