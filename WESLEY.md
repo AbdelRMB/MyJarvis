@@ -19,6 +19,7 @@ Le guide complet (installation, construction, règles du dépôt) est dans `CLAU
 - Messages, commits, CHANGELOG et textes de l'interface en français ; traductions anglaises dans `interface/src/lib/en.ts` (mobile : `en-mobile.ts`).
 - Un changement de l'appli = nouvelle version dans `wesley/version.py` + section `## x.y.z` en haut de `CHANGELOG.md`, écrite pour l'utilisateur.
 - Jamais de données personnelles ni de secrets dans git (`.env`, `config.json`, `memoire/`, `logs/`, `comptes/`, fichiers de déploiement du serveur).
+- Serveur de comptes : n'utiliser que **GET, POST et PUT** (`compte._appel` côté bureau, `api()` dans `interface/mobile/src`). Le proxy Apache devant l'API renvoie un 404 HTML à toute autre méthode (PATCH, DELETE…), vu dans Wesley comme « Erreur du serveur (404) sur … ». Pour modifier ou supprimer : `POST /v1/…/{id}` ou `POST /v1/…/{id}/supprimer`. Vérifié par `tests/test_methodes_serveur.py`.
 - Un outil de Wesley = une fonction décorée `@outil` dans `wesley/outils/` (docstring : 1re ligne = description, puis `param: description`), module ajouté à `charger_tous()`.
 
 ## Décisions
@@ -33,3 +34,4 @@ Le guide complet (installation, construction, règles du dépôt) est dans `CLAU
 - 2026-11-22 : version 2.2.0, prise en charge des WESLEY.md (lecture en priorité, transmission à Claude Code / Codex, mise à jour obligatoire à chaque modification, création à la demande, PC, Mac et mobile). Ajout de ce fichier et des tests `tests/test_wesley_md.py`.
 - 2026-11-22 : tests Python du cœur (`tests/`) lancés dans le job « version » du workflow `.github/workflows/versions.yml` : ils bloquent la construction des installateurs s'ils échouent.
 - 2026-11-23 : version 2.3.0, onglet Transcription (réunions en ligne ou au micro, fichier importé, diarisation locale, renommage/fusion/réattribution des locuteurs, export .md/.txt), outils `demarrer_transcription`, `arreter_transcription`, `lister_transcriptions`, `lire_transcription`, tests `tests/test_transcription.py` ; la CI installe numpy pour les tests.
+- 2026-11-23 : version 2.2.1, tickets (ticket n°1) : `traiter_ticket` / `resoudre_ticket` renvoyaient « Erreur du serveur (404) » car le proxy Apache bloque PATCH et DELETE. Le serveur accepte maintenant `POST /v1/admin/tickets/{id}` et `POST /v1/admin/tickets/{id}/supprimer` (PATCH/DELETE gardés), le bureau et le mobile les utilisent, le message d'erreur sans détail indique la requête. Tests : `serveur/tests/test_tickets.py`, `tests/test_methodes_serveur.py`.

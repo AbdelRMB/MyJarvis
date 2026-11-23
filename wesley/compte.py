@@ -158,7 +158,9 @@ def _appel(methode, chemin, jeton=None, http=None, **kw):
             msg = r.json().get("detail")
         except ValueError:
             msg = None
-        raise ErreurCompte(msg if isinstance(msg, str) else f"Erreur du serveur ({r.status_code}).", r.status_code)
+        # pas de « detail » JSON : la réponse vient du proxy (Apache, Cloudflare), pas de l'API → on dit quelle requête
+        raise ErreurCompte(msg if isinstance(msg, str) else f"Erreur du serveur ({r.status_code}) sur {methode} {chemin}.",
+                           r.status_code)
     return r.json()
 
 
@@ -613,7 +615,8 @@ def traiter_ticket(tid: int, statut: str = "", reponse=None):
     corps = {"statut": statut}
     if reponse is not None:
         corps["reponse"] = reponse
-    return _appel("PATCH", f"/v1/admin/tickets/{int(tid)}", json=corps)
+    # POST et non PATCH : le proxy du serveur de comptes ne laisse passer que GET, POST et PUT (sinon 404)
+    return _appel("POST", f"/v1/admin/tickets/{int(tid)}", json=corps)
 
 
 def statistiques(jours: int = 30) -> dict:
@@ -649,7 +652,7 @@ def corriger_ticket(tid: int, projet: str = "", outil: str = "claude_code") -> d
 
 
 def supprimer_ticket(tid: int):
-    return _appel("DELETE", f"/v1/admin/tickets/{int(tid)}")
+    return _appel("POST", f"/v1/admin/tickets/{int(tid)}/supprimer")
 
 
 def _surveiller_tickets(admin: bool):

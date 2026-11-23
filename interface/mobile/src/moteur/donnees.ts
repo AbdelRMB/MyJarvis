@@ -365,7 +365,8 @@ export async function envoyerTicket(genre: string, titre: string, description = 
   return r.id;
 }
 export async function traiterTicket(id: number, statut: string, reponse?: string) {
-  await api("PATCH", `/admin/tickets/${id}`, { statut, ...(reponse !== undefined ? { reponse } : {}) });
+  // POST et non PATCH : le proxy du serveur de comptes ne laisse passer que GET, POST et PUT
+  await api("POST", `/admin/tickets/${id}`, { statut, ...(reponse !== undefined ? { reponse } : {}) });
   await chargerTickets();
 }
 
