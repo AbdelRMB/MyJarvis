@@ -18,17 +18,21 @@ def _lancer(**options):
 
 
 @outil
-def demarrer_transcription(source: str = "micro", avec_micro: bool = True, titre: str = "", nb_locuteurs: int = 0):
+def demarrer_transcription(source: str = "micro", avec_micro: bool = True, titre: str = "", nb_locuteurs: int = 0,
+                           langue: str = "", vocabulaire: str = ""):
     """Lance la transcription d'une réunion ou d'une conversation dans un fichier, avec reconnaissance des voix (Locuteur 1, Locuteur 2…) et horodatage. Tout reste sur l'ordinateur. À utiliser quand on te demande de transcrire, d'écrire ou de prendre en note une réunion / un appel / une conversation.
     source: « systeme » pour une réunion en ligne (Teams, Zoom, Meet… : le son de l'ordinateur) ou « micro » pour une réunion physique (Wesley écoute la pièce)
     avec_micro: source « systeme » seulement : ajouter le micro pour transcrire aussi la voix de l'utilisateur (oui par défaut)
     titre: titre de la réunion (facultatif)
-    nb_locuteurs: nombre de personnes s'il est connu (0 = détection automatique)"""
+    nb_locuteurs: nombre de personnes s'il est connu (0 = détection automatique)
+    langue: langue parlée (« fr », « en »…) ; vide = celle de Wesley
+    vocabulaire: mots techniques ou noms propres à bien orthographier, séparés par des virgules (ex. « PHP, getter, setter, $this ») ; facultatif"""
     from .. import transcription
     from ..config import CONFIG
     try:
         s = _lancer(source="systeme" if source == "systeme" else "micro", avec_micro=avec_micro, titre=titre,
-                    nb_locuteurs=nb_locuteurs, langue=CONFIG.get("langue", "fr"))
+                    nb_locuteurs=nb_locuteurs, langue=(langue or CONFIG.get("langue") or "fr").strip().lower()[:5],
+                    vocabulaire=vocabulaire)
     except ValueError as e:
         return f"Impossible : {e}"
     quoi = "le son de l'ordinateur" + (" et ton micro" if avec_micro else "") if source == "systeme" else "le micro"
@@ -60,9 +64,12 @@ def lister_transcriptions():
 
 
 @outil
-def lire_transcription(identifiant: str = ""):
-    """Renvoie le texte complet d'une transcription de réunion (pour la résumer, en faire un compte rendu, retrouver qui a dit quoi…).
-    identifiant: code de la transcription (lister_transcriptions) ; vide = la plus récente"""
+def lire_transcription(identifiant: str = "", debut: float = 0, fin: float = 0, partie: int = 1):
+    """Renvoie le texte exact d'une transcription de réunion, mot pour mot avec l'heure et le locuteur de chaque prise de parole (pour la résumer, en faire un compte rendu, retrouver qui a dit quoi…). Une longue réunion est renvoyée par parties : si la réponse indique « Suite : partie=2 », rappelle l'outil avec partie=2, et ainsi de suite, avant de résumer.
+    identifiant: code de la transcription (lister_transcriptions) ; vide = la plus récente
+    debut: ne renvoyer qu'à partir de cette minute (0 = depuis le début)
+    fin: ne renvoyer que jusqu'à cette minute (0 = jusqu'à la fin)
+    partie: numéro de la partie à lire (1, 2…) quand le texte est long"""
     from .. import transcription
     tid = identifiant.strip("[] ")
     if not tid:
@@ -76,4 +83,4 @@ def lire_transcription(identifiant: str = ""):
         s = None
     if s is None:
         return "Transcription introuvable."
-    return transcription.exporter(s, "txt")
+    return transcription.extrait(s, debut, fin, partie)
