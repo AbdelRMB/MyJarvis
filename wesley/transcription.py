@@ -112,9 +112,13 @@ def exporter(session: dict, format: str = "md") -> str:
                 res.append(f"Reprise le {datetime.fromtimestamp(r.get('date') or 0).strftime('%d/%m/%Y à %H:%M')}"
                            f" ({horodatage(p)})")
         return res
+    from .resume_transcription import en_markdown
+    bloc_resume = en_markdown(session.get("resume") or {})
     if format == "txt":
         lignes = [titre, debut.strftime("%d/%m/%Y %H:%M") + f" · durée {duree} · source : {source}",
                   f"Participants : {noms}", ""]
+        if bloc_resume:
+            lignes += [bloc_resume.replace("## ", "").replace("### ", "").strip(), "", "Transcription :", ""]
         for i, t in enumerate(tours):
             lignes += [f"— {r} —" for r in reprise_avant(i)]
             lignes.append(f"[{horodatage(t['debut'])}] {nom_locuteur(session, t['locuteur'])} : {t['texte']}")
@@ -124,6 +128,8 @@ def exporter(session: dict, format: str = "md") -> str:
               f"- **Durée** : {duree}",
               f"- **Source** : {source}",
               f"- **Participants** : {noms}", "", "---", ""]
+    if bloc_resume:
+        lignes += [bloc_resume, "---", "", "## Transcription", ""]
     for i, t in enumerate(tours):
         marques = reprise_avant(i)
         lignes += [x for r in marques for x in (f"_— {r} —_", "")]
@@ -1125,9 +1131,25 @@ def sauver(session: dict, fichier_lisible: bool = True):
 
 
 def resume(s: dict) -> dict:
+    """Ligne de la liste (à ne pas confondre avec s["resume"], le résumé du contenu : resume_transcription.py)."""
+    r = s.get("resume") or {}
     return {k: s.get(k) for k in ("id", "titre", "debut", "duree", "source", "avec_micro", "etat", "langue",
                                   "modele", "fichier", "erreur")} | {
-        "nb_locuteurs": len(locuteurs(s)), "nb_phrases": len(s.get("segments", []))}
+        "nb_locuteurs": len(locuteurs(s)), "nb_phrases": len(s.get("segments", [])),
+        "genre": r.get("genre") if r.get("texte") else "", "a_resume": bool(r.get("texte"))}
+
+
+def marquer_resume(tid: str, maj: dict, remplacer: bool = False):
+    """Range le résumé (ou son état : en cours, erreur) dans la transcription, sans toucher au reste."""
+    with _verrou:
+        if _en_cours is not None and _en_cours.session["id"] == tid:
+            raise ValueError("Attends la fin de la transcription pour la résumer.")
+        s = lire(tid)
+        if s is None:
+            raise ValueError("Transcription introuvable.")
+        s["resume"] = dict(maj) if remplacer else {**(s.get("resume") or {}), **maj}
+        sauver(s)
+    _signaler(tid)
 
 
 def lister() -> list[dict]:
@@ -1206,6 +1228,10 @@ def au_demarrage():
     for f in DOSSIER_DONNEES.glob("*.json"):
         try:
             s = json.loads(f.read_text(encoding="utf-8"))
+            if (s.get("resume") or {}).get("en_cours"):    # Wesley fermé pendant le résumé
+                s["resume"]["en_cours"] = False
+                if s.get("etat") not in ("preparation", "en_cours", "finalisation"):
+                    sauver(s)
             if s.get("etat") in ("preparation", "en_cours", "finalisation"):
                 s["etat"] = "interrompue"
                 s["duree"] = round(max([float(s.get("duree") or 0)] + [float(x["fin"]) for x in s.get("segments", [])]), 1)
@@ -1278,12 +1304,14 @@ def _signaler(tid: str):
 
 
 def _whisper(nom: str):
-    if nom not in _whisper_cache:
+    gpu = bool(CONFIG.get("transcription_gpu"))   # Mac : puce graphique (expérimental, repli sur le processeur)
+    cle = f"{nom}|{'gpu' if gpu else 'cpu'}"
+    if cle not in _whisper_cache:
         from .modeles import charger_whisper
         _whisper_cache.clear()          # un seul modèle de transcription en mémoire à la fois
         import os
-        _whisper_cache[nom] = charger_whisper(nom, cpu_threads=max(2, min(8, (os.cpu_count() or 4) - 1)))
-    return _whisper_cache[nom]
+        _whisper_cache[cle] = charger_whisper(nom, gpu=gpu, cpu_threads=max(2, min(8, (os.cpu_count() or 4) - 1)))
+    return _whisper_cache[cle]
 
 
 def _empreinte():

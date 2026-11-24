@@ -9,7 +9,7 @@
  */
 import { create } from "zustand";
 import { api } from "./compte";
-import { dechiffrerPartage } from "./crypto";
+import { b64, dechiffrerPartage } from "./crypto";
 import { envoyer } from "./appareils";
 import { chargerAppareils, useDonnees } from "./donnees";
 import { session } from "./stockage";
@@ -40,17 +40,51 @@ export type ElementPartage = {
   nb_locuteurs?: number;
   nb_phrases?: number;
   erreur?: string;
+  genre?: string;
+  a_resume?: boolean;
 };
 export type Partage = { genre: Genre; appareilId: string; modifie: number; resume: ElementPartage };
 
 type Etat = { liste: Partage[]; charge: boolean; erreur: string };
 export const usePartages = create<Etat>(() => ({ liste: [], charge: false, erreur: "" }));
 
+/** Branché par l'appli : notification quand une tâche, une transcription ou un résumé se termine sur un ordinateur. */
+export const surFin: { notifier: (titre: string, texte: string) => void } = { notifier: () => {} };
+
+const ACTIFS = ["en_cours", "preparation", "finalisation"];
+const FINS_TACHE: Record<string, string> = { terminee: "terminée", echec: "en échec", arretee: "arrêtée", interrompue: "interrompue" };
+const FINS_TRANSCRIPTION: Record<string, string> = { terminee: "terminée", erreur: "en erreur", interrompue: "interrompue" };
+
+/** Ce qui vient de se finir (même règle que wesley/partage.fins). */
+export function fins(avant: Partage[], apres: Partage[]): [string, string][] {
+  const anciens = new Map(avant.map((p) => [`${p.genre}/${p.resume.id}`, p.resume]));
+  const res: [string, string][] = [];
+  for (const p of apres) {
+    const a = anciens.get(`${p.genre}/${p.resume.id}`);
+    const r = p.resume;
+    if (!a) continue;
+    const nom = r.appareil_nom || "un ordinateur";
+    if (p.genre === "tache" && a.statut === "en_cours" && r.statut && FINS_TACHE[r.statut])
+      res.push([`Tâche ${FINS_TACHE[r.statut]} sur ${nom}`, `« ${r.titre} »${r.bilan ? "\n" + r.bilan : ""}`]);
+    else if (p.genre === "transcription") {
+      if (ACTIFS.includes(a.etat || "") && r.etat && FINS_TRANSCRIPTION[r.etat])
+        res.push([`Transcription ${FINS_TRANSCRIPTION[r.etat]} sur ${nom}`, `« ${r.titre} »${r.erreur ? "\n" + r.erreur : ""}`]);
+      else if (r.a_resume && !a.a_resume) res.push([`Résumé prêt : ${r.titre}`, `Transcription faite sur ${nom}.`]);
+    }
+  }
+  return res;
+}
+
+/** Raison d'un refus, sans le « Erreur sur X : » ajouté par l'ordinateur (son nom est déjà dans la phrase). */
+const raison = (r?: string) => (r || "").replace(/^Erreur sur [^:]+ : /, "") || "raison inconnue";
+
 const cle = () => {
   const s = session();
   if (!s) throw new Error("Il faut être connecté à ton compte.");
   return s.cle;
 };
+
+let dejaCharge = false; // pas de notification pour ce qui était déjà fini avant l'ouverture de l'appli
 
 /** Relit la liste du compte (au démarrage, puis quand le serveur signale un changement). */
 export async function chargerPartages() {
@@ -66,6 +100,9 @@ export async function chargerPartages() {
         /* chiffré avec une autre clé (ancien mot de passe) : illisible */
       }
     }
+    const avant = usePartages.getState().liste;
+    if (dejaCharge) for (const [titre, texte] of fins(avant, liste)) surFin.notifier(titre, texte);
+    dejaCharge = true;
     usePartages.setState({ liste, erreur: "" });
   } catch (e) {
     usePartages.setState({ erreur: (e as Error).message });
@@ -97,6 +134,8 @@ const VERBES: Record<string, string> = {
   arreter: "arrêter",
   consigne: "envoyer la consigne",
   supprimer: "supprimer",
+  resumer: "résumer",
+  demarrer: "lancer",
 };
 const NOMS: Record<Genre, string> = { tache: "la tâche", transcription: "la transcription" };
 
@@ -119,9 +158,119 @@ export async function agirPartage(p: Partage, action: string, params: Record<str
   } catch (e) {
     throw new Error(`Impossible de ${verbe} sur ${nom} : ${(e as Error).message}`);
   }
-  if (!rep.ok) throw new Error(`${nom} n'a pas pu ${verbe} ${NOMS[p.genre]} : ${rep.resultat || "raison inconnue"}`);
+  if (!rep.ok) throw new Error(`${nom} n'a pas pu ${verbe} ${NOMS[p.genre]} : ${raison(rep.resultat)}`);
   contenus.delete(`${p.genre}/${p.resume.id}`);
   return rep.resultat || "C'est fait.";
+}
+
+/** Lance une NOUVELLE transcription sur un ordinateur (son micro ou son son) ; erreur avec la raison sinon. */
+export async function lancerTranscription(appareilId: string, params: Record<string, unknown>, surEtat?: (s: string) => void): Promise<string> {
+  const appareils = await chargerAppareils().catch(() => useDonnees.getState().appareils);
+  const a = appareils.find((x) => x.id === appareilId);
+  if (!a) throw new Error("Impossible de lancer la transcription : cet ordinateur n'est plus connecté à ton compte.");
+  if (!a.en_ligne) throw new Error(`Impossible de lancer la transcription sur ${a.nom} : il est hors ligne (éteint, en veille, ou Wesley n'y est pas ouvert).`);
+  if (!a.accepte) throw new Error(`Impossible de lancer la transcription sur ${a.nom} : il refuse les ordres à distance (réglage dans son onglet Appareils).`);
+  let rep;
+  try {
+    rep = await envoyer(a, { type: "partage", genre: "transcription", id: "", action: "demarrer", params, texte: `Lancer la transcription « ${params.titre || ""} »` }, surEtat);
+  } catch (e) {
+    throw new Error(`Impossible de lancer la transcription sur ${a.nom} : ${(e as Error).message}`);
+  }
+  if (!rep.ok) throw new Error(`${a.nom} n'a pas pu lancer la transcription : ${raison(rep.resultat)}`);
+  return rep.resultat || "C'est lancé.";
+}
+
+// ---------- le téléphone comme micro : l'enregistrement est envoyé à un ordinateur, qui le transcrit ----------
+export const TAILLE_MORCEAU_AUDIO = 4 * 1024 * 1024; // 4 Mo par ordre chiffré (le serveur accepte ~15 Mo)
+
+/** Envoie un enregistrement à l'ordinateur, morceau par morceau (chiffrés), puis il le transcrit. */
+export async function envoyerAudio(
+  appareilId: string,
+  audio: Blob,
+  options: { titre: string; nb_locuteurs?: number },
+  progression: (fait: number, total: number) => void,
+): Promise<string> {
+  const appareils = await chargerAppareils().catch(() => useDonnees.getState().appareils);
+  const a = appareils.find((x) => x.id === appareilId);
+  if (!a) throw new Error("Impossible d'envoyer l'enregistrement : cet ordinateur n'est plus connecté à ton compte.");
+  if (!a.en_ligne) throw new Error(`Impossible d'envoyer l'enregistrement à ${a.nom} : il est hors ligne (éteint, en veille, ou Wesley n'y est pas ouvert).`);
+  if (!a.accepte) throw new Error(`Impossible d'envoyer l'enregistrement à ${a.nom} : il refuse les ordres à distance (réglage dans son onglet Appareils).`);
+  const ext = audio.type.includes("mp4") || audio.type.includes("aac") ? "m4a" : audio.type.includes("ogg") ? "ogg" : "webm";
+  const envoi = crypto.randomUUID().replace(/-/g, "");
+  const total = Math.max(1, Math.ceil(audio.size / TAILLE_MORCEAU_AUDIO));
+  let dernier = "";
+  for (let partie = 1; partie <= total; partie++) {
+    const morceau = new Uint8Array(await audio.slice((partie - 1) * TAILLE_MORCEAU_AUDIO, partie * TAILLE_MORCEAU_AUDIO).arrayBuffer());
+    progression(partie - 1, total);
+    let rep;
+    try {
+      rep = await envoyer(a, {
+        type: "partage",
+        genre: "transcription",
+        id: "",
+        action: "audio",
+        params: { envoi, partie, total, ext, titre: options.titre, nb_locuteurs: options.nb_locuteurs ?? 0, contenu: b64(morceau) },
+        texte: `Transcrire l'enregistrement du téléphone « ${options.titre} »`,
+      });
+    } catch (e) {
+      throw new Error(`Envoi à ${a.nom} interrompu (morceau ${partie}/${total}) : ${(e as Error).message}`);
+    }
+    if (!rep.ok) throw new Error(`${a.nom} n'a pas pu recevoir l'enregistrement : ${raison(rep.resultat)}`);
+    dernier = rep.resultat;
+  }
+  progression(total, total);
+  return dernier;
+}
+
+// ---------- recherche dans toutes les transcriptions (même règle que wesley/recherche_transcriptions.py) ----------
+const MOTS_VIDES = new Set(
+  "le la les un une des du de d l au aux et ou mais donc or ni car que qui quoi dont est sont a ai as avons avez ont ce cet cette ces se sa son ses mon ma mes ton ta tes leur leurs nous vous ils elles il elle on je tu en y ne pas plus pour par sur dans avec sans sous chez comme quand si tout tous toute toutes tres bien fait dit dire qu ca cela ceci the of and to in is it that this was for on with as be at by an are or from".split(
+    " ",
+  ),
+);
+export const normaliser = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const echapper = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const racine = (m: string) => (m.length > 4 && /[sx]$/.test(m) ? m.slice(0, -1) : m);
+
+export type Trouve = { id: string; titre: string; appareil: string; debut: number; locuteur: string; texte: string; score: number; date: number };
+
+export async function chercher(requete: string, limite = 15): Promise<Trouve[]> {
+  const cles = (normaliser(requete).match(/[\w$]+/g) ?? []).filter((m) => m.length >= 2 && !MOTS_VIDES.has(m));
+  if (!cles.length) return [];
+  const score = (t: string) =>
+    cles.filter((c) => new RegExp("(^|[^\\w$])" + echapper(racine(c))).test(t)).length + (cles.length > 1 && t.includes(cles.join(" ")) ? cles.length : 0);
+  const mini = Math.max(1, Math.ceil(cles.length / 2));
+  await chargerPartages();
+  const res: Trouve[] = [];
+  for (const p of usePartages.getState().liste.filter((x) => x.genre === "transcription")) {
+    let c: { segments: Segment[]; noms: Record<string, string>; resume?: { texte?: string } };
+    try {
+      c = await lirePartage("transcription", p.resume.id);
+    } catch {
+      continue;
+    }
+    const bonus = score(normaliser(`${p.resume.titre} ${c.resume?.texte ?? ""}`)) > 0 ? 1 : 0;
+    let trouve = false;
+    for (const x of toursDeParole(c.segments ?? [])) {
+      const s = score(normaliser(x.texte));
+      if (s >= mini) {
+        trouve = true;
+        res.push({
+          id: p.resume.id,
+          titre: p.resume.titre,
+          appareil: p.resume.appareil_nom,
+          debut: x.debut,
+          locuteur: c.noms?.[String(x.locuteur)]?.trim() || `Locuteur ${x.locuteur}`,
+          texte: x.texte.slice(0, 600),
+          score: s + bonus,
+          date: p.resume.debut || 0,
+        });
+      }
+    }
+    if (!trouve && bonus)
+      res.push({ id: p.resume.id, titre: p.resume.titre, appareil: p.resume.appareil_nom, debut: -1, locuteur: "", texte: (c.resume?.texte ?? "").split("\n\n")[0].slice(0, 600), score: 1, date: p.resume.debut || 0 });
+  }
+  return res.sort((a, b) => b.score - a.score || b.date - a.date || a.debut - b.debut).slice(0, limite);
 }
 
 // ---------- affichage d'une transcription (comme wesley/transcription.py : tours de parole) ----------

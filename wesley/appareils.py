@@ -21,6 +21,7 @@ from .config import CONFIG, MACHINE, RACINE, sauver_config
 JOURNAL = RACINE / "ordres.json"
 MAX_FICHIER = 10 * 1024 * 1024   # 10 Mo par fichier transféré
 _vus: set = set()
+_envois_acceptes: set = set()   # enregistrements du téléphone acceptés : pas de confirmation à chaque morceau
 _verrou = threading.Lock()
 
 
@@ -183,15 +184,21 @@ def _executer(o: dict):
         _repondre(o["id"], {"ok": False, "resultat": f"{MACHINE} refuse les ordres à distance."})
         _noter("recu", de, quoi, "refusé (réglage)", "refuse")
         return
-    if r["mode"] == "confirmation":
+    p = d.get("params") or {}
+    suite_envoi = d.get("type") == "partage" and d.get("action") == "audio" and int(p.get("partie") or 0) > 1         and p.get("envoi") in _envois_acceptes
+    if r["mode"] == "confirmation" and not suite_envoi:
         from . import web
         if not web.demander_confirmation(f"{de} demande d'exécuter sur cet appareil", quoi):
             _repondre(o["id"], {"ok": False, "resultat": "L'utilisateur a refusé sur l'appareil."})
             _noter("recu", de, quoi, "refusé par l'utilisateur", "refuse")
             return
+    if d.get("type") == "partage" and d.get("action") == "audio":
+        _envois_acceptes.add(p.get("envoi"))
     try:
         resultat, extra = _realiser(d)
         _repondre(o["id"], {"ok": True, "resultat": resultat, **extra})
+        if d.get("action") == "audio" and int(p.get("partie") or 0) < int(p.get("total") or 0):
+            return   # morceau d'un enregistrement : journal et notification seulement au dernier
         _noter("recu", de, quoi, resultat, "ok")
         from . import notifications
         notifications.ajouter(f"Ordre de {de}", f"{quoi}\n→ {resultat[:300]}", genre="info", vue="appareils")

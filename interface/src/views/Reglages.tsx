@@ -121,10 +121,11 @@ function OngletCode() {
   );
 }
 
-type Habitudes = { briefing_matin: boolean; conversation_suivie: boolean; maj_auto: boolean };
+type Habitudes = { briefing_matin: boolean; conversation_suivie: boolean; maj_auto: boolean; transcription_resume_auto: boolean; transcription_actions_afaire: boolean; transcription_gpu: boolean };
 
 /** Réglages de comportement gardés par le serveur local (config.json). */
 function PanneauHabitudes() {
+  const os = useOS();
   const [h, setH] = useState<Habitudes | null>(null);
   useEffect(() => {
     api<{ config: Habitudes }>("/api/config").then((c) => setH(c.config)).catch(() => {});
@@ -159,6 +160,26 @@ function PanneauHabitudes() {
           actif={h.maj_auto}
           onChange={(v) => regler({ maj_auto: v })}
         />
+        <Interrupteur
+          label={t("Résumé automatique des transcriptions")}
+          aide={t("À la fin d'une transcription, Wesley en fait le résumé, adapté à ce qui a été enregistré : notes de cours, décisions d'une réunion, sujets d'une discussion…")}
+          actif={h.transcription_resume_auto}
+          onChange={(v) => regler({ transcription_resume_auto: v })}
+        />
+        <Interrupteur
+          label={t("Tâches dites → À faire")}
+          aide={t("Les tâches et devoirs dits à voix haute pendant une transcription sont ajoutés à ta liste À faire, avec leur échéance.")}
+          actif={h.transcription_actions_afaire}
+          onChange={(v) => regler({ transcription_actions_afaire: v })}
+        />
+        {os.mac && (
+          <Interrupteur
+            label={t("Transcription sur la puce graphique (expérimental)")}
+            aide={t("Sur un Mac à puce Apple, la reconnaissance de la parole peut tourner sur la puce graphique : souvent plus rapide. Si ça ne marche pas, Wesley repasse tout seul sur le processeur. Compare le retard affiché pendant une transcription, avec et sans.")}
+            actif={h.transcription_gpu}
+            onChange={(v) => regler({ transcription_gpu: v })}
+          />
+        )}
       </div>
     </Panneau>
   );

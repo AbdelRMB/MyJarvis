@@ -6,6 +6,7 @@ import { cx } from "../lib/format";
 import { t } from "../lib/i18n";
 import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
+import { useOrdinateurs } from "./Transcription";
 
 type Statut = "en_cours" | "terminee" | "echec" | "arretee" | "interrompue";
 type Resume = {
@@ -70,7 +71,8 @@ export function VueTaches() {
   const [liste, setListe] = useState<Resume[]>([]);
   const [choisie, setChoisie] = useState<string | null>(null);
   const [detail, setDetail] = useState<Tache | null>(null);
-  const [nouvelle, setNouvelle] = useState({ consigne: "", projet: "", outil: "claude_code" });
+  const [nouvelle, setNouvelle] = useState({ consigne: "", projet: "", outil: "claude_code", appareil: "" });
+  const ordis = useOrdinateurs();
   const [ajout, setAjout] = useState("");
   const defilement = useRef<HTMLDivElement>(null);
 
@@ -100,9 +102,10 @@ export function VueTaches() {
 
   const creer = async () => {
     try {
-      const r = await api<Resume>("/api/taches", { method: "POST", json: nouvelle });
+      const r = await api<Resume & { message?: string; distant?: boolean }>("/api/taches", { method: "POST", json: nouvelle });
       setNouvelle({ ...nouvelle, consigne: "" });
-      setChoisie(r.id);
+      if (r.distant) toast(r.message ?? "", "succes");
+      else setChoisie(r.id);
       charger();
     } catch (x) {
       toast((x as Error).message, "erreur");
@@ -161,6 +164,20 @@ export function VueTaches() {
               placeholder={t("Ce qu'il faut coder… (ou demande-le simplement à Wesley)")}
               className="w-full rounded-md border border-ligne-forte bg-surface-2 p-2 text-sm outline-none focus:border-hud"
             />
+            {ordis.length > 0 && (
+              <select
+                value={nouvelle.appareil}
+                onChange={(e) => setNouvelle({ ...nouvelle, appareil: e.target.value })}
+                className="mt-2 h-10 w-full rounded-md border border-ligne-forte bg-surface-2 px-3 text-sm"
+              >
+                <option value="">{t("Sur cet ordinateur")}</option>
+                {ordis.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {t("Sur {appareil}", { appareil: o.nom })} {o.en_ligne ? "" : `(${t("hors ligne")})`}
+                  </option>
+                ))}
+              </select>
+            )}
             <Champ className="mt-2" placeholder={t("Dossier du projet (ex : ~/Desktop/mon-projet)")} value={nouvelle.projet} onChange={(e) => setNouvelle({ ...nouvelle, projet: e.target.value })} />
             <select
               value={nouvelle.outil}

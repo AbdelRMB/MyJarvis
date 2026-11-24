@@ -32,7 +32,7 @@ import {
 } from "./donnees";
 import { nomTelephone } from "./stockage";
 import type { Automatisation, Connecteurs } from "./types";
-import { agirPartage, chargerPartages, horodatage, lirePartage, toursDeParole, usePartages, type Genre, type Partage, type Segment } from "./partages";
+import { agirPartage, chargerPartages, chercher, horodatage, lirePartage, toursDeParole, usePartages, type Genre, type Partage, type Segment } from "./partages";
 
 export type Contexte = { surEtat: (s: string) => void; signal?: AbortSignal };
 type Params = Record<string, { type: "string" | "integer" | "boolean" | "number"; description: string; enum?: string[] }>;
@@ -528,6 +528,25 @@ export const OUTILS: Outil[] = [
       const morceau = texte.slice((n - 1) * 9000, n * 9000);
       const suite = texte.length > n * 9000 ? `\n\n(Suite : partie=${n + 1})` : "";
       return `${p.resume.titre} (sur ${p.resume.appareil_nom})\n${morceau || "Rien n'a été transcrit."}${suite}`;
+    },
+  },
+  {
+    nom: "chercher_transcriptions",
+    description:
+      "Cherche un sujet, un mot ou une phrase dans TOUTES les transcriptions (cours, réunions, discussions… de tous les ordinateurs) : passages avec la transcription, l'heure et la personne. Pour « qu'est-ce qu'on a dit sur … ? », « dans quel cours on a vu … ? ».",
+    params: { requete: s("les mots à chercher") },
+    requis: ["requete"],
+    executer: async (a) => {
+      const res = await chercher(String(a.requete || ""));
+      if (!res.length) return `Rien trouvé sur « ${a.requete} » dans les transcriptions.`;
+      return res
+        .map(
+          (r) =>
+            `[${r.id}] « ${r.titre} » (${new Date(r.date * 1000).toLocaleDateString("fr-FR")}, sur ${r.appareil})` +
+            (r.debut >= 0 ? ` à ${horodatage(r.debut)}, ${r.locuteur}` : " (titre ou résumé)") +
+            ` : ${r.texte}`,
+        )
+        .join("\n");
     },
   },
   {

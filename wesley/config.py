@@ -74,6 +74,9 @@ DEFAUT = {
     "maj_auto": True,             # télécharge les mises à jour en fond et les installe au prochain démarrage
     "conseiller": True,           # cerveau Sonnet : consulte Opus sur les décisions difficiles (outil advisor)
     "recherche_web_native": True, # cerveau Claude : recherche et lecture web par Anthropic (sources citées)
+    "transcription_resume_auto": True,     # résumé automatique à la fin d'une transcription (cours, réunion, discussion…)
+    "transcription_actions_afaire": True,  # les tâches dites à voix haute partent dans À faire (au 1er résumé auto)
+    "transcription_gpu": False,            # Mac : Whisper sur la puce graphique (MPS), expérimental
 }
 
 CONFIG = {**DEFAUT, **(json.loads(FICHIER_CONFIG.read_text(encoding="utf-8")) if FICHIER_CONFIG.exists() else {})}

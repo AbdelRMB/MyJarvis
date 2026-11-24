@@ -856,6 +856,45 @@ export const EN: Record<string, string> = {
   "Supprimer cette transcription ? Elle sera effacée de {appareil} (fichier Markdown compris) et de tous tes appareils.":
     "Delete this transcription? It will be erased from {appareil} (Markdown file included) and all your devices.",
   "Reprise demandée à {appareil}.": "Resume requested from {appareil}.",
+  // lancer à distance, résumé, recherche, reprise avec un fichier (2.7.0)
+  "Sur cet ordinateur": "On this computer",
+  "Sur {appareil}": "On {appareil}",
+  "Ordinateur qui écoute et transcrit": "Computer that listens and transcribes",
+  "L'autre ordinateur utilise son propre modèle (choisi selon sa puissance).": "The other computer uses its own model (chosen for its power).",
+  "Lancer sur {appareil}": "Start on {appareil}",
+  "Résumé copié.": "Summary copied.",
+  Résumé: "Summary",
+  Résumer: "Summarize",
+  "Le résumé est fait par {appareil}.": "The summary is made by {appareil}.",
+  "Résumé en cours…": "Summarizing…",
+  "Refaire le résumé": "Redo the summary",
+  "La transcription a continué depuis ce résumé : refais-le pour inclure la suite.": "The transcription continued after this summary: redo it to include the rest.",
+  "Tâches dites": "Tasks mentioned",
+  "Ajoutées à ta liste À faire.": "Added to your To-do list.",
+  "Wesley peut résumer cette transcription : notes de cours, décisions d'une réunion, sujets d'une discussion… selon ce qui a été dit.":
+    "Wesley can summarize this transcription: lecture notes, meeting decisions, discussion topics… depending on what was said.",
+  "Wesley lit la transcription et écrit le résumé…": "Wesley is reading the transcription and writing the summary…",
+  "La suite est dans un fichier audio (2e partie d'un cours, autre enregistrement…) : elle s'ajoute à la fin, mêmes locuteurs.":
+    "The rest is in an audio file (2nd part of a lecture, another recording…): it's added at the end, same speakers.",
+  "Continuer avec un fichier…": "Continue with a file…",
+  "Chercher dans toutes les transcriptions…": "Search all transcriptions…",
+  "Rien trouvé.": "Nothing found.",
+  Cours: "Lecture",
+  Réunion: "Meeting",
+  Discussion: "Discussion",
+  Appel: "Call",
+  Entretien: "Interview",
+  Conférence: "Talk",
+  "Note vocale": "Voice note",
+  "Résumé automatique des transcriptions": "Automatic transcription summaries",
+  "À la fin d'une transcription, Wesley en fait le résumé, adapté à ce qui a été enregistré : notes de cours, décisions d'une réunion, sujets d'une discussion…":
+    "When a transcription ends, Wesley summarizes it, adapted to what was recorded: lecture notes, meeting decisions, discussion topics…",
+  "Tâches dites → À faire": "Tasks mentioned → To-do",
+  "Les tâches et devoirs dits à voix haute pendant une transcription sont ajoutés à ta liste À faire, avec leur échéance.":
+    "Tasks and homework said out loud during a transcription are added to your To-do list, with their due date.",
+  "Transcription sur la puce graphique (expérimental)": "Transcription on the graphics chip (experimental)",
+  "Sur un Mac à puce Apple, la reconnaissance de la parole peut tourner sur la puce graphique : souvent plus rapide. Si ça ne marche pas, Wesley repasse tout seul sur le processeur. Compare le retard affiché pendant une transcription, avec et sans.":
+    "On an Apple silicon Mac, speech recognition can run on the graphics chip: often faster. If it doesn't work, Wesley falls back to the processor. Compare the delay shown during a transcription, with and without.",
   "Faite sur {appareil} : tu la lis ici, et Reprendre la relance sur {appareil} (son micro ou son son). Les changements de noms et de locuteurs lui sont demandés.":
     "Made on {appareil}: you read it here, and Resume restarts it on {appareil} (its microphone or its sound). Name and speaker changes are requested from it.",
   "Faite sur {appareil}, hors ligne pour l'instant : tu peux la lire et l'exporter ici ; pour la reprendre ou la modifier, ouvre Wesley sur {appareil}.":

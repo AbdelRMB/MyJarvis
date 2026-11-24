@@ -3,13 +3,21 @@ from . import outil
 
 
 @outil
-def lancer_tache_code(consigne: str, projet: str, outil: str = "claude_code", titre: str = ""):
+def lancer_tache_code(consigne: str, projet: str, outil: str = "claude_code", titre: str = "", appareil: str = ""):
     """Lance une tâche de code EN ARRIÈRE-PLAN : une branche est créée, Claude Code (ou Wesley) code et tu le pilotes jusqu'au bout pendant que l'utilisateur continue à te parler. Utilise-le dès qu'on te demande de coder / développer / corriger quelque chose dans un projet. Le WESLEY.md du projet (instructions du projet) est transmis à l'agent, qui doit le tenir à jour.
     consigne: la demande complète et précise de l'utilisateur
     projet: chemin du dossier du projet (voir « Projets détectés » dans ta mémoire ; demande-le s'il est ambigu)
     outil: « claude_code » (par défaut), « codex » (agent de code d'OpenAI) ou « wesley » si l'utilisateur veut que tu codes toi-même
-    titre: titre court de la tâche"""
+    titre: titre court de la tâche
+    appareil: autre ordinateur où lancer la tâche (« Mac », « PC », son nom), le projet étant sur cet ordinateur-là ; vide = cet ordinateur"""
     from .. import taches
+    if appareil.strip():
+        from .. import appareils
+        try:
+            a = appareils.trouver(appareil)
+            return _partage().lancer(a["id"], "tache", {"consigne": consigne, "projet": projet, "outil": outil, "titre": titre})
+        except ValueError as e:
+            return str(e)
     t = taches.creer(consigne, projet, outil, titre)
     nom = {"claude_code": "Claude Code", "codex": "Codex"}.get(t["outil"], "Wesley")
     return (f"Tâche [{t['id']}] lancée en arrière-plan ({nom}). "

@@ -5,6 +5,7 @@ import { cx } from "../../src/lib/format";
 import { t } from "../../src/lib/i18n";
 import { annonce, demandeRecue, useAssistant } from "./assistant";
 import { recepteur } from "./moteur/appareils";
+import { surFin } from "./moteur/partages";
 import { chargerCoffre, quandSessionRevoquee } from "./moteur/compte";
 import { useDonnees } from "./moteur/donnees";
 import { notifier, surveillerRappels } from "./moteur/rappels";
@@ -37,6 +38,8 @@ recepteur.notifier = (titre, texte) => {
   toast(titre);
   void notifier(titre, texte);
 };
+// tâche, transcription ou résumé fini sur un ordinateur
+surFin.notifier = recepteur.notifier;
 
 const ONGLETS: { id: Vue; libelle: string; icone: typeof Bot }[] = [
   { id: "assistant", libelle: "Wesley", icone: Bot },

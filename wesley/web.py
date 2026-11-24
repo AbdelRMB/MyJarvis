@@ -39,6 +39,7 @@ CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
                "max_etapes_outils", "whisper_modele", "nom_utilisateur",
                "cerveau", "claude_modele", "claude_effort", "langue",
                "briefing_matin", "conversation_suivie", "maj_auto", "conseiller", "recherche_web_native",
+               "transcription_resume_auto", "transcription_actions_afaire", "transcription_gpu",
                *CLES_MODELES, "perso_url"]
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -743,6 +744,14 @@ async def lister_appareils(req: Request):
             "connecte": compte.connecte(), "mode": compte.mode(), "erreur": erreur, "derniere_version": derniere}
 
 
+@app.get("/api/appareils/ordinateurs")
+def lister_ordinateurs(req: Request):
+    """Liste légère des autres ordinateurs du compte (lancer une transcription ou une tâche à distance)."""
+    _verifier(req)
+    from . import partage
+    return {"ordinateurs": partage.ordinateurs(), "moi": MACHINE}
+
+
 @app.post("/api/appareils/reglages")
 async def regler_appareil(req: Request):
     _verifier(req)
@@ -865,6 +874,14 @@ async def creer_tache(req: Request):
     _verifier(req)
     from . import taches
     d = await req.json()
+    if d.get("appareil"):   # sur un autre ordinateur : c'est lui qui la lance, dans SON dossier de projet
+        from . import partage
+        try:
+            return {"message": await asyncio.to_thread(partage.lancer, d["appareil"], "tache",
+                                                       {k: d.get(k, "") for k in ("consigne", "projet", "outil", "titre")}),
+                    "distant": True}
+        except ValueError as e:
+            raise HTTPException(409, str(e))
     try:
         t = await asyncio.to_thread(taches.creer, d.get("consigne", ""), d.get("projet", ""), d.get("outil", "claude_code"), d.get("titre", ""))
     except ValueError as e:
@@ -1022,6 +1039,8 @@ def _apres_transcription(t, ecoute_coupee: bool, fichier_temp: Path | None):
     t.attendre()
     if fichier_temp is not None:
         fichier_temp.unlink(missing_ok=True)
+    from . import resume_transcription
+    resume_transcription.au_terme(t.session["id"])   # résumé automatique (cours, réunion, discussion…)
     ecoute = APPLI.get("ecoute")
     if ecoute_coupee and ecoute is not None and CONFIG.get("ecoute_fond", True):
         ecoute.demarrer()
@@ -1061,6 +1080,14 @@ def lister_transcriptions(req: Request):
             "dossier": str(transcription.dossier_export()), "plateforme": "mac" if MAC else "windows" if WIN else "linux"}
 
 
+@app.get("/api/transcriptions/chercher")
+async def chercher_transcriptions(req: Request, q: str = ""):
+    """Recherche dans toutes les transcriptions, de tous les appareils (avant la route /{tid})."""
+    _verifier(req)
+    from . import recherche_transcriptions
+    return {"resultats": await asyncio.to_thread(recherche_transcriptions.chercher, q, 40)}
+
+
 @app.get("/api/transcriptions/{tid}")
 def lire_transcription(tid: str, req: Request):
     _verifier(req)
@@ -1076,6 +1103,31 @@ def lire_transcription(tid: str, req: Request):
             raise HTTPException(404, "Transcription introuvable.")
         return d | {"locuteurs": d.get("locuteurs") or transcription.locuteurs(d), "regroupable": False}
     return s | {"locuteurs": transcription.locuteurs(s), "regroupable": transcription.regroupable(tid)}
+
+
+def lancer_resume(tid: str):
+    """Résumé demandé par l'utilisateur : fait en fond (30 s à quelques minutes), l'état est dans session["resume"]."""
+    from . import resume_transcription, transcription
+    s = transcription.lire(tid)
+    if s is None:
+        raise ValueError("Transcription introuvable.")
+    if s.get("etat") in ("preparation", "en_cours", "finalisation"):
+        raise ValueError("Attends la fin de la transcription pour la résumer.")
+    if not (s.get("segments") or []):
+        raise ValueError("Rien n'a été transcrit : il n'y a rien à résumer.")
+    if tid in resume_transcription._en_cours:
+        return
+
+    def fond():
+        try:
+            resume_transcription.resumer(tid)
+        except Exception as e:
+            print(f"  ! Résumé de {tid} : {e}")
+    threading.Thread(target=fond, daemon=True, name=f"resume-{tid}").start()
+    for _ in range(20):   # le temps que l'état « en cours » soit rangé (affiché tout de suite)
+        if tid in resume_transcription._en_cours:
+            break
+        time.sleep(0.05)
 
 
 def reprendre_transcription(tid: str, d: dict) -> dict:
@@ -1098,6 +1150,13 @@ def reprendre_transcription(tid: str, d: dict) -> dict:
 async def demarrer_transcription(req: Request):
     _verifier(req)
     d = await req.json()
+    if d.get("appareil"):   # sur un autre ordinateur : son micro ou son son, son modèle de reconnaissance
+        from . import partage
+        params = {k: d[k] for k in ("source", "avec_micro", "titre", "langue", "nb_locuteurs", "vocabulaire") if k in d}
+        try:
+            return {"message": await asyncio.to_thread(partage.lancer, d["appareil"], "transcription", params), "distant": True}
+        except ValueError as e:
+            raise HTTPException(409, str(e))
     if d.get("modele"):
         CONFIG["transcription_modele"] = d["modele"]   # retenu pour la prochaine fois
         CONFIG["transcription_modele_choisi"] = True   # choix réel (les réglages d'avant 2.4.0 repassent en « auto »)
@@ -1108,11 +1167,8 @@ async def demarrer_transcription(req: Request):
         nb_locuteurs=int(d.get("nb_locuteurs") or 0), vocabulaire=str(d.get("vocabulaire") or ""))
 
 
-@app.post("/api/transcriptions/importer")
-async def importer_transcription(req: Request, nom: str = "", langue: str = "fr", modele: str = "", nb_locuteurs: int = 0,
-                                 vocabulaire: str = ""):
-    """Corps : le fichier audio ou vidéo brut (mp3, m4a, wav, mp4…), transcrit puis effacé."""
-    _verifier(req)
+async def _recevoir_fichier(req: Request, nom: str) -> Path:
+    """Enregistre le corps de la requête (fichier audio ou vidéo, 2 Go au plus) dans le dossier des imports."""
     from . import transcription
     ext = re.sub(r"[^a-z0-9]", "", Path(nom).suffix.lower())[:6] or "audio"
     dossier = transcription.DOSSIER_DONNEES / "imports"
@@ -1130,6 +1186,15 @@ async def importer_transcription(req: Request, nom: str = "", langue: str = "fr"
     if not taille:
         f.unlink(missing_ok=True)
         raise HTTPException(400, "Fichier vide.")
+    return f
+
+
+@app.post("/api/transcriptions/importer")
+async def importer_transcription(req: Request, nom: str = "", langue: str = "fr", modele: str = "", nb_locuteurs: int = 0,
+                                 vocabulaire: str = ""):
+    """Corps : le fichier audio ou vidéo brut (mp3, m4a, wav, mp4…), transcrit puis effacé."""
+    _verifier(req)
+    f = await _recevoir_fichier(req, nom)
     return await asyncio.to_thread(_lancer_transcription, f, source="fichier", fichier_audio=str(f), langue=langue,
                                    modele=modele, titre=Path(nom).stem[:120], nb_locuteurs=nb_locuteurs,
                                    vocabulaire=vocabulaire)
@@ -1140,6 +1205,21 @@ def arreter_transcription(req: Request):
     _verifier(req)
     from . import transcription
     return {"etat": transcription.arreter()}
+
+
+@app.post("/api/transcriptions/{tid}/reprendre_fichier")
+async def reprendre_avec_fichier(tid: str, req: Request, nom: str = ""):
+    """La suite d'une transcription est dans un fichier (2e partie d'un cours, autre enregistrement de la réunion) :
+    il est transcrit à la fin de la même transcription, mêmes locuteurs, horodatage qui continue. Corps : le fichier."""
+    _verifier(req)
+    from . import transcription
+    try:
+        if transcription.lire(tid) is None:
+            raise HTTPException(404, "Transcription introuvable sur cet ordinateur (une transcription d'un autre appareil se reprend sur lui).")
+    except ValueError:
+        raise HTTPException(400, "Identifiant de transcription invalide.")
+    f = await _recevoir_fichier(req, nom)
+    return await asyncio.to_thread(_lancer_transcription, f, reprendre=tid, source="fichier", fichier_audio=str(f))
 
 
 @app.post("/api/transcriptions/{tid}/{action}")
@@ -1169,7 +1249,10 @@ async def agir_transcription(tid: str, action: str, req: Request):
             return {"ok": True}
         if action == "reprendre":
             return await asyncio.to_thread(reprendre_transcription, tid, d)
-        if action == "arreter":
+        if action == "resumer":
+            lancer_resume(tid)
+            s = transcription.lire(tid)
+        elif action == "arreter":
             t = transcription.en_cours()
             if t is None or t.session["id"] != tid:
                 raise ValueError("Cette transcription n'est pas en cours.")

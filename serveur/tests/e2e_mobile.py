@@ -13,6 +13,7 @@ import os
 import threading
 import time
 import uuid
+import zlib
 
 import requests
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -35,11 +36,19 @@ def dechiffrer(b, cle):
     return json.loads(AESGCM(cle).decrypt(r[:12], r[12:], b"wesley-ordre"))
 
 recus = []
+PC = {}   # en-têtes de la session du PC simulé (propriétaire des tâches et transcriptions publiées)
+
+
+def chiffrer_partage(d, cle):
+    """Comme wesley/partage.chiffrer : JSON compressé zlib, AES-GCM, données associées « wesley-partage »."""
+    n = os.urandom(12)
+    return base64.b64encode(n + AESGCM(cle).encrypt(n, zlib.compress(json.dumps(d).encode()), b"wesley-partage")).decode()
 
 def pc_simule(stop):
     auth, cle = deriver()
     jeton = requests.post(URL + "/v1/connexion", json={"email": EMAIL, "cle_auth": auth, "appareil": "PC-Test"}, headers=H).json()["jeton"]
     h = {**H, "Authorization": f"Bearer {jeton}"}
+    PC["h"] = h
     requests.post(URL + "/v1/appareils/presence", json={"nom": "PC-Test", "plateforme": "windows", "version": "2.1.0", "accepte": True}, headers=h)
     rev = 0
     while not stop.is_set():
@@ -50,6 +59,8 @@ def pc_simule(stop):
             d = dechiffrer(o["blob"], cle)
             recus.append(d)
             rep = {"ok": True, "resultat": f"Fait sur PC-Test : {d.get('texte', d.get('type'))[-60:]}"}
+            if d.get("type") == "partage" and d.get("action") == "reprendre":   # le PC ne peut pas : il dit pourquoi
+                rep = {"ok": False, "resultat": "Erreur sur PC-Test : Une transcription est déjà en cours : arrête-la d'abord."}
             requests.post(URL + f"/v1/ordres/{o['id']}/reponse", json={"blob": chiffrer(rep, cle)}, headers=h)
     return h, cle
 
@@ -172,8 +183,42 @@ with sync_playwright() as p:
     tel.wait_for_selector("text=note.txt")
     etape("Ordre PC → téléphone : confirmation à l'écran, fichier reçu dans « Fichiers reçus »")
 
-    # 9. Plus / Réglages / Automatisations
+    # 8b. Transcription faite sur le PC : visible sur le téléphone (chiffrée), résumé, recherche, reprise refusée + raison
+    _, cle_pc = deriver()
+    resume = {"id": "tr000001", "titre": "Cours de PHP", "appareil_nom": "PC-Test", "plateforme": "windows", "machine": "pc",
+              "etat": "terminee", "debut": time.time() - 3600, "duree": 95, "source": "micro", "nb_locuteurs": 2, "nb_phrases": 3,
+              "genre": "cours", "a_resume": True}
+    contenu = {**resume, "noms": {"1": "Prof"}, "segments": [
+        {"debut": 0, "fin": 6, "locuteur": 1, "texte": "Aujourd'hui on voit les interfaces."},
+        {"debut": 40, "fin": 48, "locuteur": 2, "texte": "Est-ce qu'une interface peut avoir des attributs ?"},
+        {"debut": 80, "fin": 90, "locuteur": 1, "texte": "Non, seulement des constantes. Exercices 3 et 4 pour lundi."}],
+        "resume": {"texte": "Cours sur les **interfaces** en PHP.", "genre": "cours",
+                   "actions": [{"titre": "Faire les exercices 3 et 4", "qui": "", "echeance": ""}]}}
+    r = requests.put(URL + "/v1/partages/transcription/tr000001", headers=PC["h"],
+                     json={"resume": chiffrer_partage(resume, cle_pc), "contenu": chiffrer_partage(contenu, cle_pc)})
+    assert r.status_code == 200, r.text
     tel.click("nav >> text=Plus")
+    tel.click("text=Transcriptions")
+    tel.wait_for_selector("text=Cours de PHP", timeout=15000)
+    tel.wait_for_selector("text=sur PC-Test")
+    tel.click("text=Cours de PHP")
+    tel.wait_for_selector("text=seulement des constantes", timeout=10000)
+    tel.wait_for_selector("text=Faire les exercices 3 et 4")
+    tel.screenshot(path=CAPTURES + "/11-transcription.png")
+    etape("Transcription du PC : listée sur le téléphone avec son appareil, texte et résumé déchiffrés")
+    tel.click("text=Reprendre sur PC-Test")
+    tel.wait_for_selector("text=PC-Test n'a pas pu reprendre la transcription", timeout=40000)
+    tel.wait_for_selector("text=déjà en cours")
+    assert any(d.get("type") == "partage" and d.get("action") == "reprendre" and d.get("id") == "tr000001" for d in recus), recus
+    tel.screenshot(path=CAPTURES + "/12-reprise-refusee.png")
+    etape("Reprendre sur PC-Test : l'ordre part au PC d'origine, son refus s'affiche avec la raison")
+    tel.click("button[aria-label=Fermer]")
+    tel.fill("input[placeholder='Chercher dans toutes les transcriptions…']", "constantes")
+    tel.wait_for_selector("text=Exercices 3 et 4 pour lundi", timeout=10000)
+    etape("Recherche dans les transcriptions : le passage est trouvé")
+    tel.click("button[aria-label=Retour]")
+
+    # 9. Plus / Réglages / Automatisations
     tel.click("text=Automatisations")
     tel.wait_for_selector("text=Aucune automatisation")
     tel.screenshot(path=CAPTURES + "/7-autos.png")

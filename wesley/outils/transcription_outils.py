@@ -20,16 +20,26 @@ def _lancer(reprendre: str = "", **options):
 
 @outil
 def demarrer_transcription(source: str = "micro", avec_micro: bool = True, titre: str = "", nb_locuteurs: int = 0,
-                           langue: str = "", vocabulaire: str = ""):
+                           langue: str = "", vocabulaire: str = "", appareil: str = ""):
     """Lance la transcription d'une réunion ou d'une conversation dans un fichier, avec reconnaissance des voix (Locuteur 1, Locuteur 2…) et horodatage. Tout reste sur l'ordinateur. À utiliser quand on te demande de transcrire, d'écrire ou de prendre en note une réunion / un appel / une conversation.
     source: « systeme » pour une réunion en ligne (Teams, Zoom, Meet… : le son de l'ordinateur) ou « micro » pour une réunion physique (Wesley écoute la pièce)
     avec_micro: source « systeme » seulement : ajouter le micro pour transcrire aussi la voix de l'utilisateur (oui par défaut)
     titre: titre de la réunion (facultatif)
     nb_locuteurs: nombre de personnes s'il est connu (0 = détection automatique)
     langue: langue parlée (« fr », « en »…) ; vide = celle de Wesley
-    vocabulaire: mots techniques ou noms propres à bien orthographier, séparés par des virgules (ex. « PHP, getter, setter, $this ») ; facultatif"""
+    vocabulaire: mots techniques ou noms propres à bien orthographier, séparés par des virgules (ex. « PHP, getter, setter, $this ») ; facultatif
+    appareil: autre ordinateur où lancer la transcription (« Mac », « PC », son nom) ; vide = cet ordinateur"""
     from .. import transcription
     from ..config import CONFIG
+    if appareil.strip():
+        from .. import appareils
+        try:
+            a = appareils.trouver(appareil)
+            return _partage().lancer(a["id"], "transcription", {
+                "source": "systeme" if source == "systeme" else "micro", "avec_micro": avec_micro, "titre": titre,
+                "nb_locuteurs": nb_locuteurs, "langue": (langue or "").strip().lower()[:5] or None, "vocabulaire": vocabulaire})
+        except ValueError as e:
+            return str(e)
     try:
         s = _lancer(source="systeme" if source == "systeme" else "micro", avec_micro=avec_micro, titre=titre,
                     nb_locuteurs=nb_locuteurs, langue=(langue or CONFIG.get("langue") or "fr").strip().lower()[:5],
@@ -109,6 +119,55 @@ def reprendre_transcription(identifiant: str = "", source: str = "", avec_micro:
         return f"Impossible : {e}"
     return (f"Transcription « {r['titre']} » reprise à {transcription.horodatage(r.get('duree') or 0)} : la suite "
             "s'ajoute au même fichier, avec les mêmes locuteurs. Dis « arrête la transcription » à la fin.")
+
+
+@outil
+def resumer_transcription(identifiant: str = "", refaire: bool = False):
+    """Donne le résumé d'une transcription (cours, réunion, discussion, appel, conférence, note vocale… : le résumé s'adapte au contenu), et le crée s'il n'existe pas encore. À utiliser quand on te demande de résumer, de faire le compte rendu, les notes de cours ou « ce qu'il faut retenir » d'une transcription.
+    identifiant: code de la transcription (lister_transcriptions) ; vide = la plus récente
+    refaire: true pour refaire le résumé même s'il existe déjà"""
+    from .. import resume_transcription
+    tid = identifiant.strip("[] ")
+    if not tid:
+        liste = _toutes()
+        if not liste:
+            return "Aucune transcription."
+        tid = liste[0]["id"]
+    s = _locale(tid)
+    if s is None:   # faite sur un autre appareil : son résumé, s'il existe, a suivi la transcription
+        d = _partage().lire("transcription", tid)
+        if d is None:
+            return "Transcription introuvable."
+        r = d.get("resume") or {}
+        if r.get("texte") and not refaire:
+            return f"Résumé de « {d.get('titre')} » (fait sur {d.get('appareil')}) :\n\n{resume_transcription.en_markdown(r)}"
+        try:
+            return _partage().agir("transcription", tid, "resumer")
+        except ValueError as e:
+            return str(e)
+    r = s.get("resume") or {}
+    if r.get("texte") and not refaire and r.get("nb_phrases") == len(s.get("segments") or []):
+        return f"Résumé de « {s.get('titre')} » :\n\n{resume_transcription.en_markdown(r)}"
+    try:
+        r = resume_transcription.resumer(tid)
+    except ValueError as e:
+        return f"Impossible : {e}"
+    return f"Résumé de « {s.get('titre')} » (rangé avec la transcription) :\n\n{resume_transcription.en_markdown(r)}"
+
+
+@outil
+def chercher_transcriptions(requete: str):
+    """Cherche un sujet, un mot ou une phrase dans TOUTES les transcriptions (cours, réunions, discussions… de tous tes appareils) et renvoie les passages avec la transcription, l'heure et la personne. À utiliser pour « qu'est-ce qu'on a dit sur … ? », « quand est-ce que X a parlé de … ? », « dans quel cours on a vu … ? ». Lis ensuite le passage complet avec lire_transcription (debut/fin en minutes) si besoin.
+    requete: les mots à chercher (le sujet, un nom, un terme technique…)"""
+    from datetime import datetime
+    from .. import recherche_transcriptions
+    res = recherche_transcriptions.chercher(requete, 15)
+    if not res:
+        return f"Rien trouvé sur « {requete} » dans les transcriptions."
+    return "\n".join(f"[{r['id']}] « {r['titre']} » ({datetime.fromtimestamp(r['date']).strftime('%d/%m/%Y')}"
+                     + (f", sur {r['appareil']}" if r.get("appareil") else "") + ")"
+                     + (f" à {r['heure']}, {r['locuteur']}" if r["heure"] else " (titre ou résumé)") + f" : {r['texte']}"
+                     for r in res)
 
 
 @outil

@@ -1,5 +1,6 @@
-import { AudioLines, Check, Copy, FileAudio, FileText, FolderOpen, Loader2, Merge, Mic, Monitor, Pencil, Play, RotateCcw, Square, Trash2, Upload, Users } from "lucide-react";
+import { AudioLines, Check, ChevronDown, ChevronRight, Copy, FileAudio, FileText, FolderOpen, Loader2, Merge, Mic, Monitor, Pencil, Play, RotateCcw, Sparkles, Square, Trash2, Upload, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Markdown } from "../components/Markdown";
 import { Badge, Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
@@ -22,12 +23,37 @@ type Resume = {
   erreur: string;
   nb_locuteurs: number;
   nb_phrases: number;
+  genre?: string;
+  a_resume?: boolean;
   /** Faite sur un autre appareil du compte : c'est lui qui la reprend, l'arrête ou la modifie. */
   distant?: boolean;
   appareil?: string;
   en_ligne?: boolean;
 };
 type Segment = { debut: number; fin: number; locuteur: number; texte: string };
+type Action = { titre: string; qui: string; echeance: string };
+/** Résumé adapté au contenu (wesley/resume_transcription.py). */
+type ResumeContenu = {
+  texte?: string;
+  genre?: string;
+  titre?: string;
+  actions?: Action[];
+  date?: number;
+  nb_phrases?: number;
+  en_cours?: boolean;
+  erreur?: string;
+  afaire_ajoutees?: number;
+};
+const GENRES: Record<string, string> = {
+  cours: "Cours",
+  reunion: "Réunion",
+  discussion: "Discussion",
+  appel: "Appel",
+  entretien: "Entretien",
+  conference: "Conférence",
+  note: "Note vocale",
+  autre: "Transcription",
+};
 type Locuteur = { id: number; nom: string; duree: number; phrases: number };
 type Session = Resume & {
   segments: Segment[];
@@ -38,6 +64,7 @@ type Session = Resume & {
   locuteurs?: Locuteur[];
   regroupable?: boolean;
   reprises?: { position: number; date: number }[];
+  resume?: ResumeContenu;
   niveau?: number;
   retard?: number;
 };
@@ -86,6 +113,8 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
   const [vocabulaire, setVocabulaire] = useState("");
   const [nombre, setNombre] = useState(0);
   const [envoi, setEnvoi] = useState(false);
+  const [sur, setSur] = useState(""); // "" = cet ordinateur ; sinon l'identifiant d'un autre ordinateur du compte
+  const ordis = useOrdinateurs();
   const fichier = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (infos && !modele) setModele(infos.modele);
@@ -94,9 +123,13 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
   const lancer = async () => {
     setEnvoi(true);
     try {
-      const s = await api<Session>("/api/transcriptions/demarrer", { method: "POST", json: { source, avec_micro: avecMicro, titre, langue, modele, nb_locuteurs: nombre, vocabulaire } });
+      const s = await api<Session & { message?: string; distant?: boolean }>("/api/transcriptions/demarrer", {
+        method: "POST",
+        json: { source, avec_micro: avecMicro, titre, langue, modele: sur ? "" : modele, nb_locuteurs: nombre, vocabulaire, appareil: sur },
+      });
       setTitre("");
-      onLance(s.id);
+      if (s.distant) toast(s.message ?? "", "succes");
+      else onLance(s.id);
     } catch (x) {
       toast((x as Error).message, "erreur");
     } finally {
@@ -124,7 +157,7 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
     }
   };
 
-  if (enCours) {
+  if (enCours && !sur) {
     const niveau = Math.min(1, Math.sqrt((enCours.niveau ?? 0) / 0.25));
     const fichierEnCours = enCours.source === "fichier";
     return (
@@ -164,8 +197,26 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
   ];
   return (
     <Panneau titre={t("Nouvelle transcription")} icone={<Play className="size-4" />}>
+      {ordis.length > 0 && (
+        <select
+          value={sur}
+          onChange={(e) => {
+            setSur(e.target.value);
+            if (e.target.value && source === "fichier") setSource("micro");
+          }}
+          title={t("Ordinateur qui écoute et transcrit")}
+          className="mb-2 h-9 w-full rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px]"
+        >
+          <option value="">{t("Sur cet ordinateur")}</option>
+          {ordis.map((o) => (
+            <option key={o.id} value={o.id}>
+              {t("Sur {appareil}", { appareil: o.nom })} {o.en_ligne ? "" : `(${t("hors ligne")})`}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="grid gap-1.5">
-        {SOURCES.map(({ id, libelle, aide, icone: I }) => (
+        {SOURCES.filter((x) => !sur || x.id !== "fichier").map(({ id, libelle, aide, icone: I }) => (
           <button
             key={id}
             onClick={() => setSource(id)}
@@ -202,7 +253,13 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
           <option value="en">{t("Anglais")}</option>
           <option value="">{t("Auto")}</option>
         </select>
-        <select value={modele} onChange={(e) => setModele(e.target.value)} title={t("Modèle de reconnaissance (plus gros = plus précis, plus lent)")} className="h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px]">
+        <select
+          value={modele}
+          disabled={!!sur}
+          onChange={(e) => setModele(e.target.value)}
+          title={sur ? t("L'autre ordinateur utilise son propre modèle (choisi selon sa puissance).") : t("Modèle de reconnaissance (plus gros = plus précis, plus lent)")}
+          className="h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-[13px] disabled:opacity-50"
+        >
           {(infos?.modeles ?? ["small"]).map((m) => (
             <option key={m} value={m}>
               {m === "auto" ? t("Modèle auto ({m})", { m: infos?.modele_auto ?? "" }) : m}
@@ -226,13 +283,29 @@ function PanneauLancement({ infos, enCours, onLance }: { infos: Liste | null; en
           </Bouton>
         </>
       ) : (
-        <Bouton className="mt-3 w-full" variante="primaire" icone={<Play className="size-4" />} chargement={envoi} onClick={lancer}>
-          {t("Lancer la transcription")}
+        <Bouton className="mt-3 w-full" variante="primaire" icone={<Play className="size-4" />} chargement={envoi} disabled={!!enCours && !sur} onClick={lancer}>
+          {sur ? t("Lancer sur {appareil}", { appareil: ordis.find((o) => o.id === sur)?.nom ?? "?" }) : t("Lancer la transcription")}
         </Bouton>
       )}
       <p className="mt-2 text-[11px] text-tres-doux">{t("Tout reste sur ton ordinateur : reconnaissance de la parole et des voix en local.")}</p>
     </Panneau>
   );
+}
+
+type Ordinateur = { id: string; nom: string; plateforme: string; en_ligne: boolean; accepte: boolean };
+/** Mes autres ordinateurs (pour lancer à distance) ; rafraîchi toutes les 30 s. */
+export function useOrdinateurs() {
+  const [l, setL] = useState<Ordinateur[]>([]);
+  useEffect(() => {
+    const charger = () =>
+      api<{ ordinateurs: Ordinateur[] }>("/api/appareils/ordinateurs")
+        .then((r) => setL(r.ordinateurs))
+        .catch(() => {});
+    charger();
+    const i = setInterval(charger, 30_000);
+    return () => clearInterval(i);
+  }, []);
+  return l;
 }
 
 /** Locuteurs : nommer, fusionner deux étiquettes, refaire la répartition des voix. */
@@ -322,6 +395,84 @@ function PanneauLocuteurs({ s, agir }: { s: Session; agir: (action: string, corp
       <p className="mt-2 text-[11px] text-tres-doux">
         {t("Clique sur le nom d'une phrase pour l'attribuer à quelqu'un d'autre. L'icône de fusion réunit deux locuteurs qui sont la même personne.")}
       </p>
+    </div>
+  );
+}
+
+/** Résumé : ce qu'il faut retenir, adapté au genre (cours, réunion, discussion…), et les tâches dites. */
+function PanneauResume({ s, agir, attente }: { s: Session; agir: (action: string, corps: object) => Promise<void>; attente: string }) {
+  const r = s.resume ?? {};
+  const [ouvert, setOuvert] = useState(true);
+  if (actif(s.etat)) return null;
+  const enCours = !!r.en_cours || attente === "resumer";
+  const perime = !!r.texte && r.nb_phrases !== undefined && r.nb_phrases !== s.segments.length;
+  const copier = async () => {
+    await navigator.clipboard.writeText(r.texte ?? "");
+    toast(t("Résumé copié."), "succes");
+  };
+  return (
+    <div className="max-h-[45%] flex-none overflow-y-auto overscroll-contain border-b border-ligne p-4">
+      <div className="flex items-center gap-2">
+        <button onClick={() => setOuvert(!ouvert)} className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-tres-doux uppercase hover:text-texte">
+          {ouvert ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+          <Sparkles className="size-3.5" /> {t("Résumé")}
+        </button>
+        {r.texte && r.genre && <Badge ton="hud">{t(GENRES[r.genre] ?? r.genre)}</Badge>}
+        <span className="ml-auto flex gap-1.5">
+          {r.texte && (
+            <Bouton taille="sm" variante="fantome" icone={<Copy className="size-4" />} onClick={copier}>
+              {t("Copier")}
+            </Bouton>
+          )}
+          <Bouton
+            taille="sm"
+            variante={r.texte && !perime ? "fantome" : "primaire"}
+            icone={<Sparkles className="size-4" />}
+            chargement={enCours}
+            disabled={!s.segments.length}
+            title={s.distant ? t("Le résumé est fait par {appareil}.", { appareil: s.appareil ?? "?" }) : undefined}
+            onClick={() => agir("resumer", {})}
+          >
+            {enCours ? t("Résumé en cours…") : r.texte ? t("Refaire le résumé") : t("Résumer")}
+          </Bouton>
+        </span>
+      </div>
+      {ouvert && (
+        <div className="mt-2">
+          {r.erreur && <p className="text-[12px] text-rouge">{r.erreur}</p>}
+          {perime && !enCours && <p className="mb-1 text-[11px] text-ambre">{t("La transcription a continué depuis ce résumé : refais-le pour inclure la suite.")}</p>}
+          {r.texte ? (
+            <>
+              <div className="prose-wesley text-[14px]">
+                <Markdown texte={r.texte} />
+              </div>
+              {!!r.actions?.length && (
+                <div className="mt-3">
+                  <div className="mb-1 text-[12px] font-semibold">{t("Tâches dites")}</div>
+                  <ul className="space-y-0.5 text-[13px]">
+                    {r.actions.map((a, i) => (
+                      <li key={i}>
+                        ☐ {a.titre}
+                        {a.qui && <span className="text-doux"> · {a.qui}</span>}
+                        {a.echeance && <span className="text-doux"> · {new Date(a.echeance).toLocaleDateString()}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  {!!r.afaire_ajoutees && <p className="mt-1 text-[11px] text-tres-doux">{t("Ajoutées à ta liste À faire.")}</p>}
+                </div>
+              )}
+            </>
+          ) : (
+            !enCours &&
+            !r.erreur && (
+              <p className="text-[13px] text-doux">
+                {t("Wesley peut résumer cette transcription : notes de cours, décisions d'une réunion, sujets d'une discussion… selon ce qui a été dit.")}
+              </p>
+            )
+          )}
+          {enCours && !r.texte && <p className="text-[13px] text-doux">{t("Wesley lit la transcription et écrit le résumé…")}</p>}
+        </div>
+      )}
     </div>
   );
 }
@@ -488,6 +639,25 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
       setAttente("");
     }
   };
+  // la suite est dans un fichier (2e partie d'un cours enregistrée à part…) : transcrite à la fin de celle-ci
+  const fichierSuite = useRef<HTMLInputElement>(null);
+  const reprendreAvecFichier = async (f: File) => {
+    setAttente("reprendre");
+    try {
+      const r = await api<Session>(`/api/transcriptions/${s.id}/reprendre_fichier?nom=${encodeURIComponent(f.name)}`, {
+        method: "POST",
+        body: f,
+        headers: { "content-type": "application/octet-stream" },
+      });
+      recharger(r);
+      suivre.current = true;
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setAttente("");
+      if (fichierSuite.current) fichierSuite.current.value = "";
+    }
+  };
   const [libelle, ton] = ETATS[s.etat] ?? [s.etat, "doux"];
   // une transcription en cours sur un autre appareil ne se modifie pas d'ici (elle change encore) ; une fois
   // finie, les changements sont demandés à son appareil
@@ -549,6 +719,26 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
               {t("Reprendre") + sur}
             </Bouton>
           )}
+          {!bloque && !s.distant && (
+            <>
+              <input
+                ref={fichierSuite}
+                type="file"
+                accept="audio/*,video/*,.m4a,.mp3,.wav,.ogg,.opus,.flac,.webm,.mp4,.mov"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && reprendreAvecFichier(e.target.files[0])}
+              />
+              <Bouton
+                taille="sm"
+                icone={<Upload className="size-4" />}
+                disabled={occupe || attente === "reprendre"}
+                title={t("La suite est dans un fichier audio (2e partie d'un cours, autre enregistrement…) : elle s'ajoute à la fin, mêmes locuteurs.")}
+                onClick={() => fichierSuite.current?.click()}
+              >
+                {t("Continuer avec un fichier…")}
+              </Bouton>
+            </>
+          )}
           {s.distant && bloque && s.source !== "fichier" && (
             <Bouton taille="sm" variante="danger" icone={<Square className="size-4" />} chargement={attente === "arreter"} onClick={() => agir("arreter", {})}>
               {t("Arrêter") + sur}
@@ -575,6 +765,7 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
           )}
         </div>
       </div>
+      <PanneauResume s={s} agir={agir} attente={attente} />
       <PanneauLocuteurs s={s} agir={agir} />
       <div
         ref={defilement}
@@ -609,6 +800,62 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
         )}
       </div>
     </>
+  );
+}
+
+type Trouve = { id: string; titre: string; appareil: string; debut: number; heure: string; locuteur: string; texte: string; date: number };
+
+/** Recherche dans toutes les transcriptions (tous les appareils) : un clic ouvre la transcription. */
+function Recherche({ ouvrir }: { ouvrir: (id: string) => void }) {
+  const [q, setQ] = useState("");
+  const [res, setRes] = useState<Trouve[] | null>(null);
+  const [charge, setCharge] = useState(false);
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setRes(null);
+      return;
+    }
+    const minuterie = setTimeout(async () => {
+      setCharge(true);
+      try {
+        setRes((await api<{ resultats: Trouve[] }>(`/api/transcriptions/chercher?q=${encodeURIComponent(q)}`)).resultats);
+      } catch {
+        setRes([]);
+      } finally {
+        setCharge(false);
+      }
+    }, 350);
+    return () => clearTimeout(minuterie);
+  }, [q]);
+  return (
+    <div className="flex-none">
+      <Champ placeholder={t("Chercher dans toutes les transcriptions…")} value={q} onChange={(e) => setQ(e.target.value)} />
+      {charge && <p className="mt-1 text-[11px] text-tres-doux">{t("Recherche…")}</p>}
+      {res && !charge && (
+        <div className="mt-2 max-h-[40vh] space-y-1.5 overflow-y-auto overscroll-contain">
+          {res.length === 0 ? (
+            <p className="text-[12px] text-doux">{t("Rien trouvé.")}</p>
+          ) : (
+            res.map((r, i) => (
+              <button key={i} onClick={() => ouvrir(r.id)} className="w-full rounded-md border border-ligne bg-surface/60 px-2.5 py-2 text-left hover:border-ligne-forte">
+                <div className="flex gap-2 text-[11px] text-tres-doux">
+                  <span className="truncate font-medium text-texte">{r.titre}</span>
+                  {r.heure && <span className="flex-none font-mono">{r.heure}</span>}
+                </div>
+                <div className="mt-0.5 line-clamp-3 text-[12px] text-doux">
+                  {r.locuteur && <span className="text-hud">{r.locuteur} : </span>}
+                  {r.texte}
+                </div>
+                <div className="mt-0.5 text-[10px] text-tres-doux">
+                  {new Date(r.date * 1000).toLocaleDateString()}
+                  {r.appareil ? ` · ${r.appareil}` : ""}
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -673,6 +920,7 @@ export function VueTranscription() {
           <div className="flex-none">
             <PanneauLancement infos={infos} enCours={enCours} onLance={(id) => { setChoisie(id); charger(); }} />
           </div>
+          <Recherche ouvrir={setChoisie} />
           <div className="max-h-[45vh] flex-none space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:overflow-visible">
             {liste.length === 0 ? (
               <Vide icone={<AudioLines className="size-4" />} titre={t("Aucune transcription")} texte={t("Lance-en une, ou dis à Wesley : « transcris la réunion »")} />
@@ -691,6 +939,7 @@ export function VueTranscription() {
                     <span>{new Date(x.debut * 1000).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}</span>
                     <span>· {horodatage(x.duree || 0)}</span>
                     <span>· {t("{n} locuteur(s)", { n: x.nb_locuteurs })}</span>
+                    {x.a_resume && x.genre && <span className="text-hud">· {t(GENRES[x.genre] ?? x.genre)}</span>}
                   </div>
                   {x.distant && <Origine appareil={x.appareil} enLigne={x.en_ligne} />}
                 </button>

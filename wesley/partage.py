@@ -252,6 +252,14 @@ def rafraichir():
             continue
         liste.append({"genre": x["genre"], "resume": r, "appareil_id": x["appareil"], "modifie": x["modifie"]})
     avant = [(e["genre"], e["resume"].get("id"), e["modifie"]) for e in _cache["liste"]]
+    if _cache["lu"]:   # pas au premier chargement : seulement ce qui change pendant que Wesley tourne
+        for titre, texte in fins(_cache["liste"], liste):
+            try:
+                from . import notifications
+                notifications.ajouter(titre, texte, genre="succes" if "terminée" in titre or "prêt" in titre else "alerte",
+                                      vue="taches" if titre.startswith("Tâche") else "transcription", systeme=True)
+            except Exception:
+                pass
     _cache["liste"], _cache["lu"] = liste, time.time()
     _appareils(force=True)
     if avant != [(e["genre"], e["resume"].get("id"), e["modifie"]) for e in liste]:
@@ -260,6 +268,30 @@ def rafraichir():
                 f()
             except Exception as e:
                 print(f"  ! Après partage : {e}")
+
+
+ACTIFS = {"en_cours", "preparation", "finalisation"}
+FINS_TACHE = {"terminee": "terminée", "echec": "en échec", "arretee": "arrêtée", "interrompue": "interrompue"}
+FINS_TRANSCRIPTION = {"terminee": "terminée", "erreur": "en erreur", "interrompue": "interrompue"}
+
+
+def fins(avant: list, apres: list) -> list[tuple[str, str]]:
+    """Ce qui vient de se finir sur un autre appareil (tâche, transcription, résumé) : (titre, texte) à notifier."""
+    anciens = {(e["genre"], e["resume"].get("id")): e["resume"] for e in avant}
+    res = []
+    for e in apres:
+        r, a = e["resume"], anciens.get((e["genre"], e["resume"].get("id")))
+        if a is None:
+            continue
+        nom, titre = r.get("appareil_nom") or "un autre appareil", r.get("titre") or ""
+        if e["genre"] == "tache" and a.get("statut") == "en_cours" and r.get("statut") in FINS_TACHE:
+            res.append((f"Tâche {FINS_TACHE[r['statut']]} sur {nom}", f"« {titre} »" + (f"\n{r['bilan']}" if r.get("bilan") else "")))
+        elif e["genre"] == "transcription":
+            if a.get("etat") in ACTIFS and r.get("etat") in FINS_TRANSCRIPTION:
+                res.append((f"Transcription {FINS_TRANSCRIPTION[r['etat']]} sur {nom}", f"« {titre} »" + (f"\n{r['erreur']}" if r.get("erreur") else "")))
+            elif r.get("a_resume") and not a.get("a_resume"):
+                res.append((f"Résumé prêt : {titre}", f"Transcription faite sur {nom}."))
+    return res
 
 
 def _decorer(e: dict) -> dict:
@@ -321,9 +353,16 @@ def lire(genre: str, eid: str) -> dict | None:
 
 
 # ---------- agir sur l'élément d'un autre appareil : on le lui demande ----------
+def raison(rep: dict) -> str:
+    """Raison d'un refus, sans le « Erreur sur X : » ajouté par l'appareil (le nom est déjà dans la phrase)."""
+    import re
+    return re.sub(r"^Erreur sur [^:]+ : ", "", rep.get("resultat") or "") or "raison inconnue"
+
+
 VERBES = {"reprendre": "reprendre", "arreter": "arrêter", "consigne": "envoyer la consigne", "supprimer": "supprimer",
           "noms": "renommer les locuteurs", "fusionner": "fusionner les locuteurs", "locuteur": "changer le locuteur",
-          "texte": "corriger le texte", "regrouper": "regrouper les voix", "titre": "changer le titre"}
+          "texte": "corriger le texte", "regrouper": "regrouper les voix", "titre": "changer le titre",
+          "resumer": "résumer"}
 NOMS = {"tache": "la tâche", "transcription": "la transcription"}
 
 
@@ -358,9 +397,47 @@ def agir(genre: str, eid: str, action: str, params: dict | None = None) -> str:
     except ValueError as x:
         raise ValueError(f"Impossible de {verbe} sur {nom} : {x}")
     if not rep.get("ok"):
-        raise ValueError(f"{nom} n'a pas pu {verbe} {NOMS.get(genre, '')} : {rep.get('resultat') or 'raison inconnue'}")
+        raise ValueError(f"{nom} n'a pas pu {verbe} {NOMS.get(genre, '')} : {raison(rep)}")
     _contenus.pop((genre, eid), None)
     return rep.get("resultat") or "C'est fait."
+
+
+def ordinateurs() -> list[dict]:
+    """Mes autres ordinateurs (pas les téléphones) : où lancer une transcription ou une tâche à distance."""
+    try:
+        if not _compte().connecte():
+            return []
+    except Exception:
+        return []
+    return [{"id": a["id"], "nom": a["nom"], "plateforme": a.get("plateforme", ""), "en_ligne": bool(a.get("en_ligne")),
+             "accepte": bool(a.get("accepte", True))}
+            for a in _appareils(force=True).values() if not a.get("moi") and a.get("plateforme") in ("mac", "windows", "linux")]
+
+
+def lancer(appareil_id: str, genre: str, params: dict) -> str:
+    """Lance une NOUVELLE transcription ou tâche sur un autre ordinateur (son micro, son son, ses projets).
+    Renvoie son message ; ValueError avec la raison s'il ne peut pas."""
+    from . import appareils
+    a = _appareils(force=True).get(appareil_id)
+    quoi = "lancer la transcription" if genre == "transcription" else "lancer la tâche"
+    if a is None:
+        raise ValueError(f"Impossible de {quoi} : cet appareil n'est plus connecté à ton compte.")
+    nom = a.get("nom") or "?"
+    if not a.get("en_ligne"):
+        raise ValueError(f"Impossible de {quoi} sur {nom} : il est hors ligne (éteint, en veille, ou Wesley n'y est "
+                         "pas ouvert). Rallume-le ou ouvre Wesley dessus, puis réessaie.")
+    if not a.get("accepte", True):
+        raise ValueError(f"Impossible de {quoi} sur {nom} : il refuse les ordres à distance (réglage dans son onglet Appareils).")
+    titre = params.get("titre") or params.get("consigne", "")[:60] or ""
+    try:
+        rep = appareils.envoyer(appareil_id, {"type": "partage", "genre": genre, "id": "", "action": "demarrer", "params": params,
+                                              "texte": f"{quoi[:1].upper() + quoi[1:]}" + (f" « {titre} »" if titre else "")},
+                                delai=180)
+    except ValueError as x:
+        raise ValueError(f"Impossible de {quoi} sur {nom} : {x}")
+    if not rep.get("ok"):
+        raise ValueError(f"{nom} n'a pas pu {quoi} : {raison(rep)}")
+    return rep.get("resultat") or "C'est lancé."
 
 
 def executer(d: dict) -> str:
@@ -375,6 +452,19 @@ def executer(d: dict) -> str:
 
 def _executer_transcription(tid: str, action: str, p: dict) -> str:
     from . import transcription
+    if action == "audio":      # enregistrement fait sur le téléphone, reçu en morceaux : transcrit ici
+        return recevoir_audio(p)
+    if action == "demarrer":   # nouvelle transcription demandée depuis un autre appareil
+        from . import web
+        try:
+            s = web._lancer_transcription(
+                source="systeme" if p.get("source") == "systeme" else "micro", avec_micro=bool(p.get("avec_micro", True)),
+                titre=str(p.get("titre") or "")[:120], langue=p.get("langue") if p.get("langue") is not None else None,
+                nb_locuteurs=int(p.get("nb_locuteurs") or 0), vocabulaire=str(p.get("vocabulaire") or ""))
+        except Exception as e:
+            raise ValueError(getattr(e, "detail", None) or str(e))
+        src = "le son de l'ordinateur" + (" et le micro" if s.get("avec_micro") else "") if s.get("source") == "systeme" else "le micro"
+        return f"Transcription « {s.get('titre')} » lancée sur {MACHINE} ({src})."
     try:
         s = transcription.lire(tid)
     except ValueError:
@@ -387,6 +477,10 @@ def _executer_transcription(tid: str, action: str, p: dict) -> str:
         etat = web.reprendre_transcription(tid, p)
         src = "le son de l'ordinateur" + (" et le micro" if etat.get("avec_micro") else "") if etat.get("source") == "systeme" else "le micro"
         return f"Transcription « {titre} » reprise sur {MACHINE} ({src}) : la suite s'y écrit."
+    if action == "resumer":
+        from . import web
+        web.lancer_resume(tid)
+        return f"Résumé de « {titre} » en cours sur {MACHINE} : il s'affiche dès qu'il est prêt."
     if action == "arreter":
         t = transcription.en_cours()
         if t is None or t.session["id"] != tid:
@@ -402,8 +496,53 @@ def _executer_transcription(tid: str, action: str, p: dict) -> str:
     raise ValueError("Action inconnue.")
 
 
+MAX_AUDIO = 1024 ** 3    # 1 Go par enregistrement reçu
+
+
+def recevoir_audio(p: dict) -> str:
+    """Un morceau de l'enregistrement fait sur un téléphone (ordre chiffré). Au dernier morceau, le fichier est
+    complet : il est transcrit ici comme un fichier importé (reconnaissance des voix comprise), puis effacé."""
+    import re
+    from . import transcription
+    envoi = re.sub(r"[^a-f0-9]", "", str(p.get("envoi") or "").lower())[:32]
+    ext = re.sub(r"[^a-z0-9]", "", str(p.get("ext") or "webm").lower())[:5] or "webm"
+    partie, total = int(p.get("partie") or 0), int(p.get("total") or 0)
+    if len(envoi) < 8 or not 1 <= partie <= total <= 2000:
+        raise ValueError("morceau d'enregistrement invalide.")
+    dossier = transcription.DOSSIER_DONNEES / "imports"
+    dossier.mkdir(parents=True, exist_ok=True)
+    morceau = dossier / f"{envoi}.part"
+    if partie == 1:
+        morceau.unlink(missing_ok=True)
+    elif not morceau.exists():
+        raise ValueError(f"le début de l'enregistrement n'est pas arrivé sur {MACHINE} (Wesley y a été relancé ?) : renvoie-le.")
+    with open(morceau, "ab") as f:
+        f.write(base64.b64decode(p.get("contenu") or ""))
+    if morceau.stat().st_size > MAX_AUDIO:
+        morceau.unlink(missing_ok=True)
+        raise ValueError("enregistrement trop gros (1 Go au maximum).")
+    if partie < total:
+        return f"Morceau {partie}/{total} reçu."
+    fichier = morceau.with_suffix("." + ext)
+    morceau.replace(fichier)
+    from . import web
+    try:
+        s = web._lancer_transcription(fichier, source="fichier", fichier_audio=str(fichier),
+                                      titre=str(p.get("titre") or "Enregistrement du téléphone")[:120],
+                                      langue=p.get("langue") if p.get("langue") is not None else None,
+                                      nb_locuteurs=int(p.get("nb_locuteurs") or 0), vocabulaire=str(p.get("vocabulaire") or ""))
+    except Exception as e:
+        fichier.unlink(missing_ok=True)
+        raise ValueError(getattr(e, "detail", None) or str(e))
+    return f"Enregistrement reçu : {MACHINE} le transcrit (« {s.get('titre')} »). Il apparaîtra dans Transcriptions."
+
+
 def _executer_tache(tid: str, action: str, p: dict) -> str:
     from . import taches
+    if action == "demarrer":   # nouvelle tâche demandée depuis un autre appareil (le projet est sur CET ordinateur)
+        t = taches.creer(str(p.get("consigne") or ""), str(p.get("projet") or ""), str(p.get("outil") or "claude_code"),
+                         str(p.get("titre") or ""))
+        return f"Tâche « {t['titre']} » lancée sur {MACHINE} (code {t['id']})."
     t = taches.lire(tid)
     if not t:
         raise ValueError(f"cette tâche n'existe plus sur {MACHINE}.")
