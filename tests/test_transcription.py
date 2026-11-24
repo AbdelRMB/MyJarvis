@@ -387,7 +387,8 @@ def test_decoupeur_coupe_aux_pauses_et_saute_le_silence():
         blocs.append(fin)
     assert len(blocs) == 2
     (d1, b1), (d2, b2) = blocs
-    assert 4.0 <= d1 <= 5.0 and len(b1) / SR >= 4.0      # le silence du début n'est pas transcrit
+    # le silence du début n'est pas transcrit (sauf ~1 s gardée avant la voix : début de phrase faible)
+    assert 3.5 <= d1 <= 5.0 and len(b1) / SR >= 4.0
     assert abs((d2 - (d1 + len(b1) / SR))) < 1e-6         # les blocs se suivent sans trou
     assert d2 + len(b2) / SR <= 14.6
 
@@ -416,9 +417,12 @@ def test_mixeur_cale_sur_l_horloge_et_melange():
 
 def test_tampon_jette_le_retard():
     t = tr.Tampon("x")
-    for _ in range(50):
+    for _ in range(50):                 # 5 s d'avance (à-coup de la source) : rien n'est jeté
         t.pousser(np.zeros(SR // 10, dtype=np.float32))
-    assert t.taille <= 3 * SR
+    assert t.taille == 5 * SR and t.perdu == 0
+    for _ in range(150):                # 20 s d'avance : le plus ancien est jeté, le retard est borné
+        t.pousser(np.zeros(SR // 10, dtype=np.float32))
+    assert t.taille <= tr.Tampon.RETARD_MAX * SR and t.perdu > 0
 
 
 def test_lire_fichier_wav_stereo_44k(tmp_path):
@@ -817,3 +821,153 @@ def test_rien_de_perdu_entre_le_direct_et_la_fin(dossiers):
     # l'amorce de Whisper contient le titre et le vocabulaire du sujet
     assert vus and vus[0].startswith("Cours PHP objet.") and "setter" in vus[0]
     assert fin["modele"] in tr.MODELES_WHISPER and fin["modele"] != "auto"
+
+
+# ---------------------------------------------------------------- 2.5.0 : aucune phrase perdue
+def test_filtres_ne_jettent_pas_les_vraies_phrases():
+    # vraies phrases qui contenaient un mot des filtres : gardées
+    for texte in ["Ajoute un sous-titre à la page d'accueil.", "Le sous-titrage de la vidéo est en retard.",
+                  "Radio-Canada en a parlé hier soir.",
+                  "Sur la chaîne, on dit toujours abonnez-vous à la fin, mais nous on ne le fait pas dans ce cours."]:
+        assert not tr._hallucination(texte), texte
+    # vraies hallucinations : toujours écartées
+    for texte in ["Sous-titres réalisés par la communauté d'Amara.org", "Sous-titrage Société Radio-Canada",
+                  "Abonnez-vous à la chaîne !", "Thanks for watching!", "♪ ♪ ♪"]:
+        assert tr._hallucination(texte), texte
+    # amorce de Whisper : une phrase qui cite un mot du vocabulaire n'est plus prise pour une recopie
+    consigne = tr.consigne_whisper("Cours PHP", ["PHP", "getter", "setter", "constructeur"])
+    assert not tr.recopie_consigne("le constructeur", consigne)
+    assert not tr.recopie_consigne("getter setter", consigne)
+    assert not tr.recopie_consigne("On crée le getter et le setter.", consigne)
+    assert tr.recopie_consigne("Vocabulaire : PHP, getter", consigne)
+    assert tr.recopie_consigne("getter, setter, constructeur.", consigne)
+    assert tr.recopie_consigne("Cours PHP.", consigne)
+
+
+def test_phrase_redite_plus_tard_gardee():
+    p = " On passe à la suite du cours."
+    segs = [_seg(0.0, 2.0, p), _seg(2.1, 4.0, p), _seg(30.0, 32.0, p)]
+    res = tr.decouper_phrases(segs)
+    assert [d for d, _, _ in res] == [0.0, 30.0]       # doublon collé écarté, vraie redite gardée
+
+
+def test_bloc_transcrit_meme_si_whisper_echoue_une_fois(dossiers):
+    essais = []
+
+    def capricieux(audio, langue, consigne=""):
+        essais.append(consigne)
+        if len(essais) == 1:
+            raise RuntimeError("mémoire insuffisante")
+        return faux_whisper(audio, langue, consigne)
+    s = tr.demarrer("fichier", fichier_audio=str(_reunion(dossiers)), langue="fr", titre="Cours PHP",
+                    transcrire=capricieux, empreinte=FausseEmpreinte())
+    tr.en_cours().attendre(30)
+    fin = tr.lire(s["id"])
+    assert fin["etat"] == "terminee" and len(fin["segments"]) == 3      # le 1er bloc n'est pas perdu
+    assert essais[1] == ""                                              # 2e essai sans amorce
+
+
+def test_arret_juste_apres_la_derniere_phrase(dossiers):
+    """Arrêt pendant que la personne finit sa phrase : le son encore en route est transcrit."""
+    t = tr.Tampon("micro")
+    capture = FausseCapture(t, np.concatenate([_silence(0.5), _parole(3.0, 150)]))
+    s = tr.demarrer("micro", langue="fr", transcrire=faux_whisper, empreinte=FausseEmpreinte(),
+                    captures=[(capture, t)])
+    while t.recu < int(3.5 * SR) - SR // 20:
+        time.sleep(0.01)
+    tr.arreter()
+    tr.en_cours() and tr.en_cours().attendre(10)
+    fin = tr.lire(s["id"])
+    assert len(fin["segments"]) == 1
+    assert fin["segments"][0]["fin"] >= 3.4 and fin["duree"] >= 3.5
+
+
+# ---------------------------------------------------------------- 2.5.0 : reprendre une transcription
+class FausseEmpreinte3(FausseEmpreinte):
+    """Trois voix : grave (< 300 Hz), médium (< 600 Hz), aiguë."""
+
+    def __call__(self, audio):
+        f = np.argmax(np.abs(np.fft.rfft(audio))) * SR / len(audio)
+        return np.array([1.0, 0.05, 0.05] if f < 300 else [0.05, 1.0, 0.05] if f < 600 else [0.05, 0.05, 1.0],
+                        dtype=np.float32)
+
+
+def _wav(tmp_path, nom, x):
+    f = tmp_path / nom
+    with wave.open(str(f), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes((x * 32767).astype(np.int16).tobytes())
+    return f
+
+
+def test_rattacher_garde_les_locuteurs_d_avant():
+    # mêmes voix, numérotées autrement par le regroupement : les anciens numéros sont repris, la voix nouvelle = 3
+    assert tr.rattacher([1, 2, 1], [2, 1, 2, 1, 3, 2]) == [1, 2, 1, 2, 3, 1]
+    # les anciennes phrases gardent leur locuteur même si le regroupement les a mélangées (corrections, noms)
+    assert tr.rattacher([1, 2], [1, 1, 1])[:2] == [1, 2]
+    # une phrase d'avant de 0,5 s mal regroupée ne suffit pas à rattacher une voix nouvelle de 20 s
+    assert tr.rattacher([1, 2], [1, 3, 3, 3], durees=[10, 0.5, 20, 20]) == [1, 2, 3, 3]
+    # phrases d'avant sans empreinte : elles ne votent pas ; numéros après le plus grand ancien (depart)
+    assert tr.rattacher([1, 2], [1, 1, 1, 2], valides=[False, False, True, True]) == [1, 2, 3, 4]
+    assert tr.rattacher([], [1, 2, 1], depart=4) == [5, 6, 5]
+
+
+def test_reprendre_une_transcription_terminee(dossiers):
+    voix = FausseEmpreinte3()
+    s = tr.demarrer("fichier", fichier_audio=str(_reunion(dossiers)), langue="fr", titre="Comité",
+                    transcrire=faux_whisper, empreinte=voix)
+    tr.en_cours().attendre(30)
+    avant = tr.modifier(s["id"], "noms", {"noms": {"1": "Alice", "2": "Bob"}})
+    assert [x["locuteur"] for x in avant["segments"]] == [1, 2, 1] and avant["etat"] == "terminee"
+    with pytest.raises(ValueError):
+        tr.reprendre("20990101-000000-0000", transcrire=faux_whisper, empreinte=voix)
+    # la suite : Bob (médium), puis une nouvelle personne (aiguë), puis Alice (grave)
+    suite = _wav(dossiers, "suite.wav", np.concatenate([_silence(0.5), _parole(3.5, 450), _silence(1),
+                                                        _parole(4, 900), _silence(1), _parole(3, 150), _silence(1)]))
+    r = tr.reprendre(s["id"], source="fichier", fichier_audio=str(suite), transcrire=faux_whisper, empreinte=voix)
+    assert r["id"] == s["id"] and len(r["segments"]) == 3
+    with pytest.raises(ValueError):           # une seule à la fois
+        tr.reprendre(s["id"], transcrire=faux_whisper, empreinte=voix)
+    tr.en_cours().attendre(30)
+    fin = tr.lire(s["id"])
+    assert fin["etat"] == "terminee", fin["erreur"]
+    assert [x["locuteur"] for x in fin["segments"]] == [1, 2, 1, 2, 3, 1]
+    assert fin["segments"][:3] == avant["segments"]             # rien d'avant n'a bougé
+    assert fin["noms"] == {"1": "Alice", "2": "Bob"} and fin["titre"] == "Comité"
+    assert fin["debut"] == avant["debut"]                       # date d'origine gardée
+    # horodatage continu : la suite commence après la fin d'avant
+    assert all(x["debut"] >= avant["duree"] for x in fin["segments"][3:])
+    assert fin["duree"] == pytest.approx(avant["duree"] + 14.0, abs=0.3)
+    assert len(fin["reprises"]) == 1 and fin["reprises"][0]["position"] == pytest.approx(avant["duree"], abs=0.1)
+    md = Path(fin["fichier"]).read_text(encoding="utf-8")
+    assert "Reprise le" in md and "**Alice** · `00:00`" in md and "**Locuteur 3**" in md
+    assert md.index(avant["segments"][2]["texte"]) < md.index("Reprise le")      # repère entre les deux parties
+    # empreintes de toutes les phrases gardées : « refaire la répartition » marche encore
+    assert tr.regroupable(s["id"])
+    assert [x["locuteur"] for x in tr.modifier(s["id"], "regrouper", {"nombre": 0})["segments"]] == [1, 2, 1, 2, 3, 1]
+
+
+def test_reprendre_en_direct_sans_empreintes_d_avant(dossiers):
+    """Transcription interrompue d'une ancienne version (pas d'empreintes) : la suite s'ajoute, ses voix
+    prennent les numéros suivants, les phrases d'avant ne bougent pas."""
+    ancienne = _session(id="20261120-090000-abab", etat="interrompue", duree=0.0)
+    tr.sauver(ancienne)
+    t = tr.Tampon("micro")
+    signal = np.concatenate([_parole(3.2, 150), _silence(0.8), _parole(3.2, 900), _silence(0.8)])
+    tr.reprendre(ancienne["id"], transcrire=faux_whisper, empreinte=FausseEmpreinte3(),
+                 captures=[(FausseCapture(t, signal), t)])
+    debut = time.time()
+    while time.time() - debut < 15 and len(tr.en_cours().instantane()["segments"]) < 7:
+        time.sleep(0.1)
+    en_direct = tr.en_cours().instantane()
+    assert en_direct["etat"] == "en_cours" and en_direct["duree"] >= 75.0
+    assert [x["locuteur"] for x in en_direct["segments"]] == [1, 1, 2, 3, 1, 4, 5]
+    tr.arreter()
+    tr.en_cours() and tr.en_cours().attendre(10)
+    fin = tr.lire(ancienne["id"])
+    assert fin["etat"] == "terminee" and fin["source"] == "micro"
+    assert [x["locuteur"] for x in fin["segments"]] == [1, 1, 2, 3, 1, 4, 5]
+    assert fin["segments"][:5] == ancienne["segments"]
+    assert fin["segments"][5]["debut"] >= 75.0                   # après la dernière phrase d'avant

@@ -3,6 +3,15 @@
 Chaque section `## x.y.z` devient la description de la mise à jour affichée dans l'appli
 (écran **Mises à jour**). Écris pour l'utilisateur : ce qui change pour lui, pas le détail du code.
 
+## 2.5.0
+- **Transcription : reprendre une réunion** : une transcription terminée ou interrompue (pause, Wesley fermé…) se reprend avec le bouton **Reprendre** ou en disant « Wesley, reprends la transcription ». La suite s'écrit à la fin de la même transcription et du même fichier : les personnes gardent leur numéro et leur nom (Wesley reconnaît les voix déjà entendues, une nouvelle voix devient le locuteur suivant), et l'heure continue là où elle s'était arrêtée. Un repère « Reprise le … » marque l'endroit. / **Transcription: resume a meeting**: continue a finished or interrupted transcription; same speakers and names, timestamps carry on.
+- **Plus aucune phrase perdue** : / **No more lost sentences**:
+  - les vraies phrases qui contenaient « sous-titre », « abonnez-vous », « Radio-Canada » ou un mot de la liste des mots techniques ne sont plus prises pour des inventions et jetées ; une phrase redite plus tard n'est plus prise pour un doublon ; / real sentences are no longer mistaken for invented ones;
+  - quand tu arrêtes juste après avoir parlé, la fin de la dernière phrase est bien écrite ; / the end of the last sentence is kept when you stop right after speaking;
+  - une voix faible ou lointaine est mieux entendue, et un à-coup de la carte son ne fait plus sauter deux secondes de parole ; / faint voices are better picked up, audio hiccups no longer drop speech;
+  - si la reconnaissance échoue sur un passage, Wesley réessaie au lieu de le laisser de côté. / a failed passage is retried instead of skipped.
+- **Onglet Transcription : tout défile** : la colonne de gauche (nouvelle transcription et liste) et le texte de droite défilent chacun de leur côté, même sur un petit écran ou avec beaucoup de locuteurs. / **Transcription tab: everything scrolls**, each panel on its own.
+
 ## 2.4.0
 - **Transcription : une personne = un seul locuteur** : un professeur qui parle seul pendant tout un cours n'est plus découpé en 5, 7 ou 12 « locuteurs ». Wesley compare maintenant les voix sur plusieurs phrases à la fois, ne crée pas de nouveau locuteur pour une phrase courte et rattache les « locuteurs » qui ne parlent presque pas à la voix la plus proche. Les élèves ou collègues qui interviennent vraiment restent bien distincts. / **Transcription: one person = one speaker**: a single voice is no longer split into many speakers.
   - **Des numéros qui se suivent** : Locuteur 1, 2, 3… dans l'ordre d'apparition, sans trou (plus de « Locuteur 12 » quand il n'y avait que trois personnes), aussi pendant l'enregistrement. / Speaker numbers are always 1, 2, 3… without gaps.

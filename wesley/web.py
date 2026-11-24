@@ -1012,14 +1012,15 @@ def _apres_transcription(t, ecoute_coupee: bool, fichier_temp: Path | None):
         ecoute.demarrer()
 
 
-def _lancer_transcription(fichier_temp: Path | None = None, **options) -> dict:
+def _lancer_transcription(fichier_temp: Path | None = None, reprendre: str = "", **options) -> dict:
+    """Lance une transcription, ou reprend celle d'identifiant `reprendre` (la suite s'y ajoute)."""
     from . import transcription
     # pendant une réunion, « Wesley » dans la conversation ne doit pas réveiller l'assistant
     ecoute = APPLI.get("ecoute")
     couper = options.get("source") == "micro" or bool(options.get("avec_micro"))
     ecoute_coupee = bool(couper and ecoute is not None and ecoute.actif)
     try:
-        etat = transcription.demarrer(**options)
+        etat = transcription.reprendre(reprendre, **options) if reprendre else transcription.demarrer(**options)
     except ValueError as e:
         if fichier_temp is not None:
             fichier_temp.unlink(missing_ok=True)
@@ -1122,6 +1123,16 @@ async def agir_transcription(tid: str, action: str, req: Request):
             f = Path(s.get("fichier") or "")
             ouvrir_chemin(str(f if f.is_file() else transcription.dossier_export()))
             return {"ok": True}
+        if action == "reprendre":
+            # la suite s'ajoute à la même transcription ; source d'origine par défaut (micro pour un fichier importé)
+            s = transcription.lire(tid)
+            if not s:
+                raise ValueError("Transcription introuvable.")
+            source = d.get("source") or (s.get("source") if s.get("source") in ("micro", "systeme") else "micro")
+            source = source if source in ("micro", "systeme") else "micro"
+            avec_micro = bool(d["avec_micro"]) if "avec_micro" in d else bool(s.get("avec_micro"))
+            return await asyncio.to_thread(_lancer_transcription, reprendre=tid, source=source,
+                                           avec_micro=avec_micro and source == "systeme")
         s = await asyncio.to_thread(transcription.modifier, tid, action, d)
     except ValueError as e:
         raise HTTPException(400, str(e))

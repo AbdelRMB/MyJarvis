@@ -1,4 +1,4 @@
-import { AudioLines, Check, Copy, FileAudio, FileText, FolderOpen, Loader2, Merge, Mic, Monitor, Pencil, Play, Square, Trash2, Upload, Users } from "lucide-react";
+import { AudioLines, Check, Copy, FileAudio, FileText, FolderOpen, Loader2, Merge, Mic, Monitor, Pencil, Play, RotateCcw, Square, Trash2, Upload, Users } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -32,6 +32,7 @@ type Session = Resume & {
   empreinte: string;
   locuteurs?: Locuteur[];
   regroupable?: boolean;
+  reprises?: { position: number; date: number }[];
   niveau?: number;
   retard?: number;
 };
@@ -239,7 +240,8 @@ function PanneauLocuteurs({ s, agir }: { s: Session; agir: (action: string, corp
   const bloque = actif(s.etat);
 
   return (
-    <div className="border-b border-ligne p-4">
+    // nombreux locuteurs : le panneau défile seul (au plus 35 % de la hauteur), le texte garde sa place
+    <div className="max-h-[35%] flex-none overflow-y-auto overscroll-contain border-b border-ligne p-4">
       <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-tres-doux uppercase">
         <Users className="size-3.5" /> {t("Locuteurs")}
       </div>
@@ -405,7 +407,7 @@ function LignePhrase({ s, i, seg, precedent, agir }: { s: Session; i: number; se
   );
 }
 
-function Detail({ s, recharger, supprime }: { s: Session; recharger: (x?: Session) => void; supprime: () => void }) {
+function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?: Session) => void; supprime: () => void; occupe: boolean }) {
   const [titre, setTitre] = useState(s.titre);
   const defilement = useRef<HTMLDivElement>(null);
   const suivre = useRef(true);
@@ -448,12 +450,26 @@ function Detail({ s, recharger, supprime }: { s: Session; recharger: (x?: Sessio
       toast((x as Error).message, "erreur");
     }
   };
+  const [reprise, setReprise] = useState(false);
+  const reprendre = async () => {
+    setReprise(true);
+    try {
+      // la suite s'ajoute à la fin de cette transcription : mêmes locuteurs, horodatage qui continue
+      recharger(await api<Session>(`/api/transcriptions/${s.id}/reprendre`, { method: "POST", json: {} }));
+      suivre.current = true;
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setReprise(false);
+    }
+  };
   const [libelle, ton] = ETATS[s.etat] ?? [s.etat, "doux"];
   const bloque = actif(s.etat);
+  const sourceReprise = s.source === "systeme" ? t("son de l'ordinateur") + (s.avec_micro ? " + " + t("micro") : "") : t("micro");
 
   return (
     <>
-      <div className="border-b border-ligne p-4">
+      <div className="flex-none border-b border-ligne p-4">
         <div className="flex flex-wrap items-center gap-2">
           <input
             value={titre}
@@ -473,6 +489,19 @@ function Detail({ s, recharger, supprime }: { s: Session; recharger: (x?: Sessio
         {s.erreur && <p className="mt-1 px-1 text-[12px] text-rouge">{s.erreur}</p>}
         {s.fichier && <p className="mt-1 truncate px-1 font-mono text-[11px] text-tres-doux" title={s.fichier}>{s.fichier}</p>}
         <div className="mt-3 flex flex-wrap gap-2">
+          {!bloque && (
+            <Bouton
+              taille="sm"
+              variante="primaire"
+              icone={<RotateCcw className="size-4" />}
+              chargement={reprise}
+              disabled={occupe}
+              title={occupe ? t("Une transcription est déjà en cours : arrête-la d'abord.") : t("Continue cette transcription à la suite ({src}) : mêmes locuteurs, l'horodatage continue.", { src: sourceReprise })}
+              onClick={reprendre}
+            >
+              {t("Reprendre")}
+            </Bouton>
+          )}
           <Bouton taille="sm" icone={<FileText className="size-4" />} disabled={bloque} onClick={() => exporter("md", true)}>
             {t("Exporter en Markdown")}
           </Bouton>
@@ -499,14 +528,30 @@ function Detail({ s, recharger, supprime }: { s: Session; recharger: (x?: Sessio
           const d = e.currentTarget;
           suivre.current = d.scrollHeight - d.scrollTop - d.clientHeight < 80;
         }}
-        className="min-h-0 flex-1 overflow-y-auto p-4"
+        className="min-h-[16rem] flex-1 overflow-y-auto overscroll-contain p-4"
       >
         {s.segments.length === 0 ? (
           <div className="grid h-full place-items-center text-sm text-doux">
             {bloque ? t("Wesley écoute… les phrases apparaissent ici au fil de la conversation.") : t("Rien n'a été transcrit.")}
           </div>
         ) : (
-          s.segments.map((seg, i) => <LignePhrase key={`${s.id}-${i}-${seg.debut}`} s={s} i={i} seg={seg} precedent={s.segments[i - 1]} agir={agir} />)
+          s.segments.map((seg, i) => {
+            const precedent = s.segments[i - 1];
+            const repris = (s.reprises ?? []).find((r) => seg.debut >= r.position && (!precedent || precedent.debut < r.position));
+            return (
+              <div key={`${s.id}-${i}-${seg.debut}`}>
+                {repris && (
+                  <div className="my-3 flex items-center gap-2 text-[11px] text-tres-doux">
+                    <span className="h-px flex-1 bg-ligne" />
+                    <RotateCcw className="size-3" />
+                    {t("Reprise le {date}", { date: new Date(repris.date * 1000).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) })}
+                    <span className="h-px flex-1 bg-ligne" />
+                  </div>
+                )}
+                <LignePhrase s={s} i={i} seg={seg} precedent={repris ? undefined : precedent} agir={agir} />
+              </div>
+            );
+          })
         )}
       </div>
     </>
@@ -565,10 +610,15 @@ export function VueTranscription() {
         titre={t("Transcription")}
         sousTitre={t("Wesley écrit tout ce qui se dit pendant une réunion, reconnaît les voix (Locuteur 1, Locuteur 2…) et horodate chaque phrase. Tu nommes ensuite chaque personne et tu exportes le texte.")}
       />
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[340px_1fr]">
-        <div className="flex min-h-0 flex-col gap-3">
-          <PanneauLancement infos={infos} enCours={enCours} onLance={(id) => { setChoisie(id); charger(); }} />
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
+      {/* grand écran : une rangée bornée à la hauteur de la page (sinon la grille prend la hauteur du contenu
+          et rien ne défile) ; chaque colonne défile seule. Petit écran : la page défile, et chaque bloc a une
+          hauteur maximale avec son propre défilement. */}
+      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)]">
+        <div className="flex min-h-0 flex-col gap-3 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
+          <div className="flex-none">
+            <PanneauLancement infos={infos} enCours={enCours} onLance={(id) => { setChoisie(id); charger(); }} />
+          </div>
+          <div className="max-h-[45vh] flex-none space-y-2 overflow-y-auto overscroll-contain pr-1 lg:max-h-none lg:overflow-visible">
             {liste.length === 0 ? (
               <Vide icone={<AudioLines className="size-4" />} titre={t("Aucune transcription")} texte={t("Lance-en une, ou dis à Wesley : « transcris la réunion »")} />
             ) : (
@@ -598,12 +648,13 @@ export function VueTranscription() {
           )}
         </div>
 
-        <div className="flex min-h-[420px] flex-col rounded-md border border-ligne bg-surface/40 lg:min-h-0">
+        <div className="flex h-[80vh] min-h-[420px] flex-col overflow-y-auto overscroll-contain rounded-md border border-ligne bg-surface/40 lg:h-auto lg:min-h-0">
           {!detail ? (
             <div className="grid flex-1 place-items-center text-sm text-doux">{t("Choisis une transcription pour la relire.")}</div>
           ) : (
             <Detail
               s={detail}
+              occupe={!!enCours}
               recharger={(x) => {
                 if (x) setDetail(x);
                 else if (choisie) chargerDetail(choisie);
