@@ -1,5 +1,5 @@
 import { t } from "../lib/i18n";
-import { Blocks, CalendarDays, Check, Copy, KeyRound, Server, GitBranch, Loader2, Mail, NotebookPen, Plug, Plus, Power, Trash2, X, Zap } from "lucide-react";
+import { Blocks, CalendarDays, Check, Copy, KeyRound, Server, GitBranch, Loader2, Mail, NotebookPen, Plug, Plus, Power, Send, Trash2, X, Zap, Home, Music } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -23,7 +23,8 @@ type Donnees = { catalogue: TypeConnecteur[]; installes: Record<string, Installe
 
 const ICONES: Record<string, ReactNode> = {
   server: <Server />,
-  mail: <Mail />, calendar: <CalendarDays />, github: <GitBranch />, notebook: <NotebookPen />, blocks: <Blocks />,
+  mail: <Mail />, calendar: <CalendarDays />, github: <GitBranch />, notebook: <NotebookPen />, blocks: <Blocks />, send: <Send />,
+  home: <Home />, music: <Music />,
 };
 const icone = (n: string) => ICONES[n] ?? <Plug />;
 

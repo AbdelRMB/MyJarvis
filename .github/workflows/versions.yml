@@ -40,11 +40,36 @@ jobs:
         run: |
           git config --global user.name "CI Wesley"
           git config --global user.email "ci@example.invalid"
-          python -m pip install -q pytest numpy
+          python -m pip install -q pytest numpy cryptography pypdf
           python -m pytest tests -q
 
-  windows:
+  # serveur de comptes + appli du téléphone de bout en bout (iPhone émulé, WebKit) + types de l'interface :
+  # une version qui casse le téléphone ou le serveur ne part jamais
+  e2e:
     needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: interface/package-lock.json }
+      - name: Types de l'interface et appli du téléphone
+        run: |
+          cd interface && npm ci && npx tsc -p . && npm run build:mobile
+      - name: Tests du serveur de comptes
+        run: |
+          python -m pip install -q -r serveur/requirements.txt pytest httpx requests cryptography playwright
+          cd serveur && WESLEY_DB=/tmp/wesley-test.db python -m pytest tests -q
+      - name: Téléphone de bout en bout (Playwright, iPhone émulé)
+        run: |
+          python -m playwright install --with-deps webkit
+          cd serveur && (WESLEY_DB=/tmp/wesley-e2e.db WESLEY_CLE_APPLI=cle-e2e python -m uvicorn app:app --port 8765 &) && cd ..
+          for i in $(seq 1 30); do curl -sf -H "X-Wesley-Appli: cle-e2e" http://127.0.0.1:8765/v1/sante && break; sleep 1; done
+          WESLEY_CAPTURES=/tmp python serveur/tests/e2e_mobile.py
+
+  windows:
+    needs: [version, e2e]
     if: inputs.windows
     runs-on: windows-latest
     steps:
@@ -74,7 +99,7 @@ jobs:
           .venv\Scripts\python publier.py "installateur\WesleySetup-${{ needs.version.outputs.version }}.exe"
 
   mac:
-    needs: version
+    needs: [version, e2e]
     if: inputs.mac
     runs-on: macos-15
     steps:

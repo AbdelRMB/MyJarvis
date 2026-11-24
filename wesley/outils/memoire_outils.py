@@ -92,3 +92,23 @@ def apprendre_prononciation(mot: str, prononciation: str):
     from .. import prononciation as p
     p.apprendre(mot, prononciation)
     return f"Noté : je dirai « {prononciation} » pour « {mot} »."
+
+
+@outil
+def confirmer_memoire(proposition: str, accepter: bool):
+    """Applique la réponse de l'utilisateur à une « mémoire à vérifier » (un souvenir qui semble périmé ou contredit) : accepter=true met la mémoire à jour, false la garde telle quelle.
+    proposition: identifiant entre crochets de la proposition
+    accepter: true si l'utilisateur confirme le changement, false sinon"""
+    from .. import consolidation
+    return consolidation.repondre(proposition.strip("[] "), bool(accepter))
+
+
+@outil
+def ranger_memoire():
+    """Range la mémoire maintenant : fusionne les souvenirs en double, repère ceux qui se contredisent (à confirmer avec l'utilisateur) et résume la semaine passée. Fait automatiquement chaque jour ; à utiliser quand l'utilisateur le demande."""
+    from .. import consolidation
+    r = consolidation.consolider(forcer=True)
+    parties = [f"{r.get('fusions', 0)} doublon(s) fusionné(s)", f"{r.get('contradictions', 0)} souvenir(s) à vérifier"]
+    if r.get("semaine"):
+        parties.append("résumé de la semaine passée ajouté")
+    return "Mémoire rangée : " + ", ".join(parties) + "."

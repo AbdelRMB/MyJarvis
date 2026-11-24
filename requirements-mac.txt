@@ -17,6 +17,7 @@ psutil
 pyautogui
 pyinstaller
 pynput
+pypdf
 pyperclip
 pystray
 pywebview

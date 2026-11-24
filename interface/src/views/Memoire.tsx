@@ -1,5 +1,5 @@
 import { t } from "../lib/i18n";
-import { Brain, Check, History, Pencil, Plus, RefreshCw, RotateCcw, Search, Sparkles, Trash2, X } from "lucide-react";
+import { Brain, Check, FileText, FolderPlus, History, Pencil, Plus, RefreshCw, RotateCcw, Search, Sparkles, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Bouton, Champ, EnTetePage, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -8,7 +8,7 @@ import type { Fait } from "../lib/types";
 import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
-const CATEGORIES = ["consigne", "identite", "preference", "projet", "contact", "habitude", "general", "lecon"];
+const CATEGORIES = ["consigne", "identite", "preference", "projet", "contact", "habitude", "general", "lecon", "journal"];
 const LIBELLES: Record<string, string> = {
   identite: "Identité",
   preference: "Préférences",
@@ -18,7 +18,206 @@ const LIBELLES: Record<string, string> = {
   general: "Général",
   lecon: "Leçons apprises",
   consigne: "Consignes pour Wesley",
+  journal: "Résumés des semaines",
 };
+
+type Intelligence = {
+  semantique: { active: boolean; disponible: boolean; telechargement: boolean; erreur: string };
+  propositions: { id: string; question: string; ancien: string; garde: string; type?: string }[];
+  rangement?: { fusions: number; contradictions: number; semaine?: string | null; date: string } | null;
+  couts: { mois?: number; budget?: number; economie?: boolean };
+  nb_lecons: number;
+};
+
+type EtatDocs = { dossiers: string[]; fichiers: number; passages: number; illisibles: string[]; indexation: boolean; erreur: string };
+type Passage = { fichier: string; page: number; texte: string };
+
+/** Les documents que Wesley sait lire (PDF, Word, textes), indexés par le sens sur cet ordinateur. */
+function PanneauDocuments() {
+  const [e, setE] = useState<EtatDocs | null>(null);
+  const [chemin, setChemin] = useState("");
+  const [q, setQ] = useState("");
+  const [res, setRes] = useState<Passage[] | null>(null);
+  const charger = () =>
+    api<EtatDocs>("/api/documents")
+      .then(setE)
+      .catch(() => {});
+  useEffect(() => {
+    charger();
+    const i = setInterval(charger, 10_000);
+    return () => clearInterval(i);
+  }, []);
+  const agir = async (action: string, corps: object = {}) => {
+    try {
+      setE(await api<EtatDocs>(`/api/documents/${action}`, { method: "POST", json: corps }));
+      if (action === "ajouter") setChemin("");
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  const chercher = async () => {
+    if (!q.trim()) return;
+    try {
+      setRes((await api<{ resultats: Passage[] }>("/api/documents/chercher", { method: "POST", json: { question: q } })).resultats);
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  if (!e) return null;
+  return (
+    <div className="coins mb-6 border border-ligne bg-surface/60 p-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-doux">
+        <span className="flex items-center gap-1.5 font-semibold text-texte">
+          <FileText className="size-4 text-hud" /> {t("Documents")}
+        </span>
+        <span>
+          {t("{f} fichier(s), {p} passage(s)", { f: e.fichiers, p: e.passages })}
+          {e.indexation && ` · ${t("lecture en cours…")}`}
+        </span>
+        <span className="text-tres-doux">{t("PDF, Word, textes : Wesley y cherche par le sens et cite le fichier et la page.")}</span>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {e.dossiers.map((d) => (
+          <span key={d} className="inline-flex items-center gap-1 rounded border border-ligne px-2 py-0.5 font-mono text-[11px]">
+            {d}
+            <button onClick={() => agir("retirer", { chemin: d })} title={t("Retirer")} className="text-tres-doux hover:text-rouge">
+              <X className="size-3" />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Champ className="min-w-48 flex-1" placeholder={t("Dossier à lire (ex : ~/Documents/Administratif)")} value={chemin} onChange={(x) => setChemin(x.target.value)} />
+        <Bouton taille="sm" icone={<FolderPlus className="size-4" />} disabled={!chemin.trim()} onClick={() => agir("ajouter", { chemin })}>
+          {t("Ajouter")}
+        </Bouton>
+        {e.dossiers.length > 0 && (
+          <>
+            <Champ
+              className="min-w-48 flex-1"
+              placeholder={t("Essayer : qu'est-ce que dit mon bail sur le préavis ?")}
+              value={q}
+              onChange={(x) => setQ(x.target.value)}
+              onKeyDown={(x) => x.key === "Enter" && chercher()}
+            />
+            <Bouton taille="sm" variante="fantome" icone={<Search className="size-4" />} onClick={chercher}>
+              {t("Chercher")}
+            </Bouton>
+          </>
+        )}
+      </div>
+      {res && (
+        <div className="mt-2 max-h-72 space-y-2 overflow-y-auto">
+          {res.length === 0 ? (
+            <p className="text-[12px] text-doux">{t("Rien trouvé.")}</p>
+          ) : (
+            res.map((r, i) => (
+              <div key={i} className="rounded border border-ligne p-2 text-[12px]">
+                <div className="font-mono text-[11px] text-hud" title={r.fichier}>
+                  {r.fichier.split(/[\/]/).pop()}
+                  {r.page ? ` · p. ${r.page}` : ""}
+                </div>
+                <div className="line-clamp-4 text-doux">{r.texte}</div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Ce qui rend Wesley plus malin : mémoire par le sens, rangement automatique, leçons, budget. */
+function PanneauIntelligence({ recharger }: { recharger: () => void }) {
+  const [e, setE] = useState<Intelligence | null>(null);
+  const [rangement, setRangement] = useState(false);
+  const charger = () =>
+    api<Intelligence>("/api/memoire/intelligence")
+      .then(setE)
+      .catch(() => {});
+  useEffect(() => {
+    charger();
+    const i = setInterval(charger, 15_000);
+    return () => clearInterval(i);
+  }, []);
+  if (!e) return null;
+  const repondre = async (id: string, accepter: boolean) => {
+    try {
+      toast((await api<{ message: string }>(`/api/memoire/propositions/${id}`, { method: "POST", json: { accepter } })).message, "succes");
+      charger();
+      recharger();
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    }
+  };
+  const ranger = async () => {
+    setRangement(true);
+    try {
+      const r = await api<{ fusions: number; contradictions: number; semaine?: string }>("/api/memoire/ranger", { method: "POST" });
+      toast(t("Mémoire rangée : {f} doublon(s) fusionné(s), {c} à vérifier.", { f: r.fusions ?? 0, c: r.contradictions ?? 0 }), "succes");
+      charger();
+      recharger();
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setRangement(false);
+    }
+  };
+  const s = e.semantique;
+  const sens = !s.active
+    ? t("désactivée (Réglages › Habitudes)")
+    : s.disponible
+      ? t("prête")
+      : s.telechargement
+        ? t("téléchargement du modèle (~270 Mo, une seule fois)…")
+        : t("modèle pas encore téléchargé") + (s.erreur ? ` (${s.erreur.slice(0, 80)})` : "");
+  return (
+    <div className="coins mb-6 border border-ligne bg-surface/60 p-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-doux">
+        <span className="flex items-center gap-1.5 font-semibold text-texte">
+          <Brain className="size-4 text-hud" /> {t("Intelligence")}
+        </span>
+        <span>
+          {t("Recherche par le sens")} : <span className={s.disponible && s.active ? "text-vert" : ""}>{sens}</span>
+        </span>
+        <span>{t("{n} leçon(s) apprise(s)", { n: e.nb_lecons })}</span>
+        {e.rangement && <span>{t("Dernier rangement : {d}", { d: new Date(e.rangement.date).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) })}</span>}
+        {!!e.couts?.budget && (
+          <span className={e.couts.economie ? "text-ambre" : ""}>
+            {t("Ce mois-ci : {m} $ / {b} $", { m: (e.couts.mois ?? 0).toFixed(2), b: e.couts.budget.toFixed(2) })}
+            {e.couts.economie && ` · ${t("mode économie")}`}
+          </span>
+        )}
+        <Bouton taille="sm" variante="fantome" className="ml-auto" icone={<Sparkles className="size-4" />} chargement={rangement} onClick={ranger}>
+          {t("Ranger maintenant")}
+        </Bouton>
+      </div>
+      {e.propositions.length > 0 && (
+        <div className="mt-3 space-y-2">
+          <div className="text-[12px] font-semibold text-ambre">{t("À vérifier")}</div>
+          {e.propositions.map((p) => (
+            <div key={p.id} className="flex flex-wrap items-center gap-2 rounded-md border border-ambre/40 bg-ambre/5 px-3 py-2 text-[13px]">
+              <span className="min-w-0 flex-1">
+                {p.question}
+                {p.type !== "routine" && (
+                  <span className="block text-[11px] text-tres-doux">
+                    {t("Souvenir concerné")} : « {p.ancien} »
+                  </span>
+                )}
+              </span>
+              <Bouton taille="sm" variante="primaire" icone={<Check className="size-4" />} onClick={() => repondre(p.id, true)}>
+                {p.type === "routine" ? t("Oui, automatise") : t("Oui, mets à jour")}
+              </Bouton>
+              <Bouton taille="sm" variante="fantome" icone={<X className="size-4" />} onClick={() => repondre(p.id, false)}>
+                {p.type === "routine" ? t("Non merci") : t("Non, garde-le")}
+              </Bouton>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function VueMemoire() {
   const [faits, setFaits] = useState<Fait[]>([]);
@@ -140,6 +339,9 @@ export function VueMemoire() {
       />
 
       {journalOuvert && <JournalMemoire onRestaure={charger} />}
+
+      <PanneauIntelligence recharger={charger} />
+      <PanneauDocuments />
 
       <div className="coins mb-6 flex flex-wrap gap-2 border border-ligne bg-surface/60 p-3">
         <Champ

@@ -123,10 +123,62 @@ def enregistrer_cout(usage, modele: str) -> float:
     return cout
 
 
+def cout_du_mois() -> float:
+    c = _lire_couts()
+    mois = f"{datetime.now():%Y-%m}"
+    return sum(v for j, v in c.get("jours", {}).items() if j.startswith(mois))
+
+
 def resume_couts():
     c = _lire_couts()
     return {"total": round(c.get("total", 0), 4), "appels": c.get("appels", 0),
-            "aujourdhui": round(c.get("jours", {}).get(f"{datetime.now():%Y-%m-%d}", 0), 4)}
+            "aujourdhui": round(c.get("jours", {}).get(f"{datetime.now():%Y-%m-%d}", 0), 4),
+            "mois": round(cout_du_mois(), 4), "budget": float(CONFIG.get("budget_mensuel") or 0),
+            "economie": en_economie()}
+
+
+# ---------- budget mensuel et modèle rapide ----------
+MODELE_RAPIDE = "claude-haiku-5-5"   # travaux de fond (résumés, rangement de la mémoire, leçons, pilotage des tâches)
+
+
+def en_economie() -> bool:
+    """Budget du mois dépassé : la conversation passe sur le modèle rapide jusqu'au 1er du mois suivant."""
+    b = float(CONFIG.get("budget_mensuel") or 0)
+    return b > 0 and cout_du_mois() >= b
+
+
+def modele_conversation() -> str:
+    return MODELE_RAPIDE if en_economie() else CONFIG["claude_modele"]
+
+
+def modele_fond() -> str:
+    """Travaux de fond : le modèle rapide (bien moins cher) si le réglage le permet, sinon celui de la conversation."""
+    return MODELE_RAPIDE if CONFIG.get("modele_rapide_fond", True) or en_economie() else CONFIG["claude_modele"]
+
+
+_alertes_budget: set = set()
+
+
+def surveiller_budget():
+    """Prévient à 80 % puis à 100 % du budget du mois (une fois chacun)."""
+    b = float(CONFIG.get("budget_mensuel") or 0)
+    if b <= 0:
+        return
+    mois, depense = f"{datetime.now():%Y-%m}", cout_du_mois()
+    for seuil, titre, texte in ((1.0, "Budget du mois atteint",
+                                 f"{depense:.2f} $ dépensés sur {b:.2f} $ : Wesley passe sur un modèle plus économique jusqu'à la fin du mois "
+                                 "(Réglages › Cerveau pour changer le budget)."),
+                                (0.8, "80 % du budget du mois", f"{depense:.2f} $ dépensés sur {b:.2f} $ ce mois-ci.")):
+        if depense >= b * seuil:
+            if (mois, seuil) not in _alertes_budget:
+                _alertes_budget.add((mois, seuil))
+                _alertes_budget.add((mois, 0.8))
+                try:
+                    from . import notifications
+                    notifications.ajouter(titre, texte, genre="alerte", vue="reglages", systeme=True)
+                except Exception:
+                    pass
+            return
 
 
 def _journal_perf(rep, ttft, duree, cout):
@@ -151,20 +203,29 @@ def _web_natif() -> bool:
 
 def _avec_conseiller() -> bool:
     # le conseiller doit être au moins aussi puissant : utile seulement quand le cerveau est Sonnet
-    return bool(CONFIG.get("conseiller", True)) and CONFIG["claude_modele"] == "claude-sonnet-5-5"
+    # (pas en mode économie : il coûterait plus que l'économie faite)
+    return bool(CONFIG.get("conseiller", True)) and modele_conversation() == "claude-sonnet-5-5"
+
+
+def _rapide() -> bool:
+    """Conversation sur Haiku (mode économie) : pas de secours côté serveur, outils web de base."""
+    return modele_conversation() == MODELE_RAPIDE
 
 
 def outils_claude():
     """Les outils au format Anthropic (ordre stable = cache stable ; recalculé si un connecteur ou un réglage change)."""
     global _outils_cache, _outils_version
-    cle = (outils.VERSION, _web_natif(), _avec_conseiller())
+    cle = (outils.VERSION, _web_natif(), _avec_conseiller(), _rapide())
     if _outils_cache is None or _outils_version != cle:
         liste = [{"name": f["name"], "description": f["description"], "input_schema": f["parameters"]}
                  for f in (s["function"] for s in outils.schemas())
                  if not (_web_natif() and f["name"] in OUTILS_WEB_REMPLACES)]
         if _web_natif():   # recherche et lecture de pages par Anthropic : filtrage dynamique, sources citées
-            liste += [{"type": "web_search_20260209", "name": "web_search", "max_uses": 6},
-                      {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 6}]
+            # Haiku (mode économie) n'a que les versions de base de ces outils
+            recherche, lecture = ("web_search_20250305", "web_fetch_20250910") if _rapide() else \
+                ("web_search_20260209", "web_fetch_20260209")
+            liste += [{"type": recherche, "name": "web_search", "max_uses": 6},
+                      {"type": lecture, "name": "web_fetch", "max_uses": 6}]
         if _avec_conseiller():
             liste.append({"type": "advisor_20260301", "name": "advisor", "model": CONSEILLER, "max_uses": 2,
                           "caching": {"type": "ephemeral", "ttl": "5m"}})
@@ -203,12 +264,15 @@ def _effort_de_base() -> str:
 
 
 def _parametres_requete():
-    betas = ["server-side-fallback-2026-07-01", "thinking-binding-controls-2026-08-01",
+    betas = ["thinking-binding-controls-2026-08-01",
              "mid-conversation-output-config-2026-07-01", "mid-conversation-system-clear-at-2026-08-21"]
+    if not _rapide():
+        betas.insert(0, "server-side-fallback-2026-07-01")
     if _avec_conseiller():
         betas.append("advisor-tool-2026-03-01")
+    secours = {} if _rapide() else {"fallbacks": "default"}   # Haiku : pas de modèle de secours côté serveur
     return dict(
-        model=CONFIG["claude_modele"],
+        model=modele_conversation(),   # budget du mois dépassé : modèle rapide jusqu'au mois suivant
         max_tokens=32000,
         # réflexion adaptative : à effort « low », le modèle saute la réflexion sur les demandes simples (réactif à l'oral)
         # la mémoire (dans les instructions) peut changer en cours de conversation (synchro entre appareils) :
@@ -220,7 +284,7 @@ def _parametres_requete():
         cache_control={"type": "ephemeral"},   # met en cache tout le début de conversation, automatiquement
         # si le modèle refuse une demande (faux positif de sécurité), l'API la rejoue sur un modèle de secours
         betas=betas,
-        fallbacks="default",
+        **secours,
     )
 
 
@@ -251,6 +315,11 @@ def _demander(j, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
     if not cle_configuree():
         raise RuntimeError("Clé API Claude manquante : ajoute-la dans Réglages > Cerveau.")
     memoire.journaliser(CONFIG.get("nom_utilisateur") or "Utilisateur", texte)
+    if getattr(j, "modele_claude", None) not in (None, modele_conversation()):
+        # changement de modèle (budget atteint, ou nouveau mois) : on repart d'une conversation neuve (la réflexion
+        # signée par l'autre modèle et son cache ne serviraient plus) ; la fin des échanges reste dans les instructions
+        j.histo_claude, j.effort_claude = [], None
+    j.modele_claude = modele_conversation()
     j.histo_claude.append({"role": "user", "content": texte})
     # placé juste après la demande : règle l'effort de CETTE réponse ; ajouté à la suite (jamais retiré) pour garder
     # le cache et les blocs de réflexion valides. Un effort réglé ainsi tient jusqu'au suivant, d'où le suivi.
@@ -261,7 +330,7 @@ def _demander(j, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
         j.effort_claude = effort
     # ses consignes (« réponds en une phrase »…) rappelées pour CE tour : visibles maintenant, effacées (gratuites)
     # dès le message suivant, et jamais retirées de l'historique (cache et réflexion restent valides)
-    rappel = memoire.rappel_consignes()
+    rappel = memoire.rappel_pour(texte)   # ses consignes + les souvenirs utiles à cette demande
     if rappel:
         j.histo_claude.append({"role": "system", "clear_at": "next_user_message", "content": rappel})
     j.arreter = False
@@ -289,6 +358,7 @@ def _demander(j, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
             final += "\n(Tâche interrompue.)"
             break
         cout = enregistrer_cout(rep.usage, rep.model or CONFIG["claude_modele"])
+        surveiller_budget()
         _journal_perf(rep, ttft or time.time() - t0, time.time() - t0, cout)
         # on renvoie le tour tel quel (blocs de réflexion compris) : ne jamais le modifier
         j.histo_claude.append({"role": "assistant", "content": rep.content})

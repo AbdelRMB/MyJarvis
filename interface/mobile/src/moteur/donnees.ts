@@ -259,12 +259,16 @@ export function decrireAutomatisation(r: Automatisation) {
   } else if (d.type === "intervalle") quand = `Toutes les ${d.minutes} min`;
   else if (d.type === "demarrage") quand = "Au démarrage de Wesley";
   else if (d.type === "commande") quand = `Quand tu dis « ${d.phrase || r.nom} »`;
+  else if (d.type === "rendez_vous") quand = `${d.avant || 15} min avant un rendez-vous${d.contient ? ` « ${d.contient} »` : ""}`;
+  else if (d.type === "fichier") quand = `Quand un fichier ${d.motif || "*"} arrive dans ${d.dossier || "Téléchargements"}`;
+  else if (d.type === "tache_finie") quand = "Quand une tâche de code se termine";
+  else if (d.type === "site") quand = `Quand ${d.url} ne répond plus`;
   else {
     const f = [d.expediteur && `de ${d.expediteur}`, d.sujet && `sujet « ${d.sujet} »`, d.contient && `contenant « ${d.contient} »`].filter(Boolean);
     quand = `Mail ${f.join(", ") || "(tous)"}`;
   }
   const quoi = a.type === "wesley" ? `Wesley : ${a.consigne || "…"}` : `Prévenir${a.message ? ` : « ${a.message} »` : ""}`;
-  return `${quand} → ${quoi}${r.appareil ? ` (sur ${r.appareil})` : ""}`;
+  return `${quand}${d.condition ? `, si ${d.condition}` : ""} → ${quoi}${r.appareil ? ` (sur ${r.appareil})` : ""}`;
 }
 
 export async function creerAutomatisation(p: {

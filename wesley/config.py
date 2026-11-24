@@ -69,6 +69,7 @@ DEFAUT = {
     "seuil_eveil": 0.5,           # sensibilité du mot d'activation (0-1, plus bas = plus sensible)
     "silence_fin": 2.5,           # s de silence avant d'envoyer ta demande (il écoute en continu jusque-là)
     "raccourci": "<ctrl>+<alt>+w",   # W comme Wesley
+    "raccourci_contexte": "<ctrl>+<alt>+e",   # « ce que je regarde » : sélection / écran envoyés à Wesley
     "briefing_matin": True,       # au premier échange de la journée (5 h-12 h), Wesley commence par le briefing
     "conversation_suivie": True,  # après une réponse à l'oral, il écoute la suite quelques secondes sans « Wesley »
     "maj_auto": True,             # télécharge les mises à jour en fond et les installe au prochain démarrage
@@ -77,6 +78,13 @@ DEFAUT = {
     "transcription_resume_auto": True,     # résumé automatique à la fin d'une transcription (cours, réunion, discussion…)
     "transcription_actions_afaire": True,  # les tâches dites à voix haute partent dans À faire (au 1er résumé auto)
     "transcription_gpu": False,            # Mac : Whisper sur la puce graphique (MPS), expérimental
+    "memoire_semantique": True,   # recherche par le sens (modèle local ~270 Mo) : souvenirs utiles joints à chaque demande
+    "apprentissage_auto": True,   # Wesley note seul une leçon quand il est corrigé ou qu'une méthode a échoué puis marché
+    "budget_mensuel": 0,          # $ par mois pour le cerveau Claude (0 = pas de limite) ; au-delà : modèle économique
+    "modele_rapide_fond": True,   # travaux de fond (résumés, mémoire, leçons, tâches) sur le modèle rapide
+    "bilan_soir": False,          # bilan de la journée dit à voix haute, chaque soir, sur cet appareil
+    "bilan_soir_heure": "19:00",
+    "dossiers_documents": [],     # dossiers lus par Wesley (PDF, Word, textes), indexés par le sens en local
 }
 
 CONFIG = {**DEFAUT, **(json.loads(FICHIER_CONFIG.read_text(encoding="utf-8")) if FICHIER_CONFIG.exists() else {})}

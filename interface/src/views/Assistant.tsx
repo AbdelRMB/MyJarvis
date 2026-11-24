@@ -22,7 +22,8 @@ import { VuMetre } from "../components/VuMetre";
 import { cx, heure, nomOutil } from "../lib/format";
 import type { BlocOutil, Message, MessageWesley } from "../lib/types";
 import { useAudio } from "../stores/audio";
-import { envoyer, nouvelleConversation, useWesley } from "../stores/wesley";
+import { bus, envoyer, nouvelleConversation, useWesley } from "../stores/wesley";
+import { api } from "../lib/api";
 import { useReglages } from "../stores/reglages";
 import { useSysteme } from "../stores/systeme";
 
@@ -390,6 +391,73 @@ function EnTeteConversation({ children }: { children?: ReactNode }) {
   );
 }
 
+type Contexte = { selection: string; fenetre: string };
+const ACTIONS_CONTEXTE: [string, string][] = [
+  ["expliquer", "Explique"],
+  ["corriger", "Corrige"],
+  ["repondre", "Réponds"],
+  ["traduire", "Traduis"],
+  ["resumer", "Résume"],
+];
+
+/** Ctrl+Alt+E dans n'importe quelle appli : la sélection (ou l'écran) arrive ici, prête à être traitée. */
+function BandeauContexte() {
+  const [c, setC] = useState<Contexte | null>(null);
+  const [precision, setPrecision] = useState("");
+  useEffect(() => {
+    api<Partial<Contexte>>("/api/contexte")
+      .then((x) => x.fenetre !== undefined && setC({ selection: x.selection ?? "", fenetre: x.fenetre ?? "" }))
+      .catch(() => {});
+    const sur = (e: Event) => setC((e as CustomEvent<Contexte>).detail);
+    bus.addEventListener("contexte", sur);
+    return () => bus.removeEventListener("contexte", sur);
+  }, []);
+  if (!c) return null;
+  const agir = async (action: string) => {
+    try {
+      const r = await api<{ texte: string }>("/api/contexte/consigne", { method: "POST", json: { ...c, action, precision } });
+      envoyer(r.texte);
+      setC(null);
+      setPrecision("");
+    } catch {
+      /* serveur indisponible : le bandeau reste */
+    }
+  };
+  return (
+    <div className="mb-2 rounded-md border border-hud/40 bg-hud/5 p-2.5 text-[13px]">
+      <div className="flex items-start gap-2">
+        <span className="min-w-0 flex-1">
+          <span className="text-[11px] text-doux">{c.fenetre ? t("Depuis « {f} »", { f: c.fenetre }) : t("Ce que tu regardes")}</span>
+          <span className="line-clamp-3 block whitespace-pre-wrap">{c.selection || t("Rien de sélectionné : je peux regarder ton écran.")}</span>
+        </span>
+        <button onClick={() => setC(null)} className="text-tres-doux hover:text-texte" aria-label={t("Fermer")}>
+          ×
+        </button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {c.selection ? (
+          ACTIONS_CONTEXTE.map(([a, l]) => (
+            <button key={a} onClick={() => agir(a)} className="rounded border border-ligne-forte px-2 py-1 text-[12px] hover:border-hud hover:text-hud">
+              {t(l)}
+            </button>
+          ))
+        ) : (
+          <button onClick={() => agir("ecran")} className="rounded border border-ligne-forte px-2 py-1 text-[12px] hover:border-hud hover:text-hud">
+            {t("Regarde mon écran")}
+          </button>
+        )}
+        <input
+          value={precision}
+          onChange={(e) => setPrecision(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && precision.trim() && agir("")}
+          placeholder={t("ou dis ce que tu veux en faire…")}
+          className="h-7 min-w-40 flex-1 rounded border border-ligne bg-transparent px-2 text-[12px] outline-none focus:border-hud"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function VueAssistant() {
   const messages = useWesley((s) => s.messages);
   const fil = useRef<HTMLDivElement>(null);
@@ -430,6 +498,7 @@ export function VueAssistant() {
           )}
         </div>
         <div className="mx-auto w-full max-w-3xl px-4 pt-2 pb-4 md:px-6">
+          <BandeauContexte />
           <Saisie />
           <p className="mt-2 text-center text-[11px] text-tres-doux max-sm:hidden">
             {t("Entrée pour envoyer · Maj+Entrée nouvelle ligne · Espace maintenu pour parler · Échap pour stopper")}

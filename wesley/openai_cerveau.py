@@ -152,7 +152,7 @@ def _demander(j, texte, sur_texte=None, sur_outil=None):
     if not cle_configuree():
         raise RuntimeError(f"Clé API {f['nom']} manquante : ajoute-la dans Réglages › Cerveau.")
     memoire.journaliser(CONFIG.get("nom_utilisateur") or "Utilisateur", texte)
-    rappel = memoire.rappel_consignes()
+    rappel = memoire.rappel_pour(texte)   # ses consignes + les souvenirs utiles à cette demande
     if f["id"] == "openai":
         j.histo_openai.append({"role": "user", "content": texte})
         if rappel:   # ses consignes, juste après sa demande : bien plus respectées qu'en haut des instructions

@@ -41,8 +41,10 @@ def ecrire_fichier(chemin: str, contenu: str):
     """Crée ou remplace entièrement un fichier (crée les dossiers parents). Pour coder un fichier complet.
     chemin: chemin du fichier
     contenu: contenu complet"""
+    from .. import annulation
     p = _p(chemin)
     p.parent.mkdir(parents=True, exist_ok=True)
+    annulation.avant_ecriture(p)   # « annule » remettra le fichier comme avant
     p.write_text(contenu, encoding="utf-8")
     return f"Écrit : {p} ({len(contenu)} caractères)" + _rappel_projet(p)
 
@@ -60,6 +62,8 @@ def modifier_fichier(chemin: str, ancien: str, nouveau: str):
         return "Erreur : texte 'ancien' introuvable. Relis le fichier avec lire_fichier."
     if n > 1:
         return f"Erreur : texte trouvé {n} fois, ajoute plus de contexte."
+    from .. import annulation
+    annulation.avant_ecriture(p)
     p.write_text(t.replace(ancien, nouveau), encoding="utf-8")
     return f"Modifié : {p}" + _rappel_projet(p)
 
@@ -148,7 +152,11 @@ def deplacer(source: str, destination: str):
     """Déplace ou renomme un fichier/dossier.
     source: chemin source
     destination: chemin destination"""
-    shutil.move(str(_p(source)), str(_p(destination)))
+    from .. import annulation
+    s, d = _p(source), _p(destination)
+    arrivee = d / s.name if d.is_dir() else d
+    shutil.move(str(s), str(d))
+    annulation.apres_deplacement(s, arrivee)
     return f"Déplacé vers {destination}"
 
 
@@ -157,8 +165,14 @@ def copier(source: str, destination: str):
     """Copie un fichier ou un dossier.
     source: chemin source
     destination: chemin destination"""
+    from .. import annulation
     s, d = _p(source), _p(destination)
+    arrivee = d / s.name if d.is_dir() and not s.is_dir() else d
+    existait = arrivee.exists()
+    if existait and arrivee.is_file():
+        annulation.avant_ecriture(arrivee)   # copie par-dessus un fichier : on garde l'ancien
     shutil.copytree(s, d) if s.is_dir() else shutil.copy2(s, d)
+    annulation.apres_copie(arrivee, existait)
     return f"Copié vers {d}"
 
 
@@ -166,13 +180,43 @@ def copier(source: str, destination: str):
 def creer_dossier(chemin: str):
     """Crée un dossier (et ses parents).
     chemin: chemin du dossier"""
-    _p(chemin).mkdir(parents=True, exist_ok=True)
+    from .. import annulation
+    p = _p(chemin)
+    existait = p.exists()
+    p.mkdir(parents=True, exist_ok=True)
+    annulation.apres_dossier(p, existait)
     return "Créé."
 
 
 @outil
 def supprimer(chemin: str):
-    """Supprime un fichier ou dossier (envoyé à la corbeille, récupérable).
+    """Supprime un fichier ou dossier (récupérable : « annule » le remet en place pendant 14 jours, puis il rejoint la corbeille du système).
     chemin: chemin"""
-    send2trash(str(_p(chemin)))
-    return f"Mis à la corbeille : {chemin}"
+    from .. import annulation
+    p = _p(chemin)
+    if not p.exists():
+        return f"Erreur : introuvable : {chemin}"
+    try:
+        annulation.supprimer(p)
+    except OSError:
+        send2trash(str(p))   # autre disque, droits… : corbeille du système directement
+    return f"Supprimé (récupérable avec « annule ») : {chemin}"
+
+
+@outil
+def annuler(demandes: int = 1):
+    """Annule ce que Wesley a fait sur les fichiers lors de la (ou des) dernière(s) demande(s) : fichiers écrits ou modifiés remis comme avant, créés ou copiés retirés, déplacés remis en place, supprimés restaurés. À utiliser pour « annule », « annule ce que tu viens de faire », « remets comme avant ».
+    demandes: combien de demandes défaire (1 = la dernière)"""
+    from .. import annulation
+    res = annulation.annuler(max(1, int(demandes or 1)))
+    return "\n".join(res) or "Rien à annuler : aucune action récente sur les fichiers."
+
+
+@outil
+def actions_recentes_fichiers():
+    """Liste les dernières actions de Wesley sur les fichiers (celles qu'on peut encore annuler)."""
+    from datetime import datetime
+    from .. import annulation
+    return "\n".join(f"{datetime.fromtimestamp(a['ts']):%d/%m %H:%M} — {a['type']} {a.get('chemin') or a.get('destination')}"
+                     + (f" (demande : « {a['demande'][:60]} »)" if a.get("demande") else "")
+                     for a in annulation.recentes()) or "Aucune action récente."

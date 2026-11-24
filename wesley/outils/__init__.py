@@ -118,7 +118,13 @@ def appeler(nom: str, args: dict) -> str:
             _tuer_enfants_depuis(t0)
             log.info("  -> interrompu par l'utilisateur")
             return "Action interrompue par l'utilisateur (STOP). Ne la relance pas."
-    return resultat.get("r", "Erreur : l'outil n'a rien renvoyé.")
+    res = resultat.get("r", "Erreur : l'outil n'a rien renvoyé.")
+    try:
+        from .. import sante
+        sante.outil(nom, time.time() - t0, res)   # tableau de santé (écran Système)
+    except Exception:
+        pass
+    return res
 
 
 def _appeler(nom: str, args: dict) -> str:
@@ -155,4 +161,4 @@ def _appeler(nom: str, args: dict) -> str:
 
 
 def charger_tous():
-    from . import systeme, fichiers, controle, ecran, web, code, memoire_outils, divers, automatisations_outils, taches_outils, appareils_outils, afaire_outils, sites_outils, projets_outils, transcription_outils  # noqa: F401
+    from . import systeme, fichiers, controle, ecran, web, code, memoire_outils, divers, automatisations_outils, taches_outils, appareils_outils, afaire_outils, sites_outils, projets_outils, transcription_outils, documents_outils  # noqa: F401

@@ -67,7 +67,7 @@ Tu as le contrôle TOTAL de son ordinateur et l'autorisation permanente d'agir s
 - Tu peux utiliser les services connectés par l'utilisateur (mails, agenda, etc.) via les outils correspondants quand ils sont disponibles.
 - AGIS avec tes outils au lieu d'expliquer comment faire. Enchaîne autant d'outils que nécessaire jusqu'à ce que la tâche soit finie, puis résume en une ou deux phrases.
 - Pour coder : écris les fichiers directement avec ecrire_fichier / modifier_fichier (bien plus fiable que taper au clavier), puis ouvre-les avec vscode_ouvrir, et teste avec l'outil {OUTIL_SHELL}.
-- Pour l'interface graphique : préfère cliquer_element (par texte), sinon regarder_ecran puis trouver_et_cliquer. Vérifie le résultat avec regarder_ecran.
+- Pour l'interface graphique : préfère cliquer_element (par texte), sinon regarder_ecran puis trouver_et_cliquer. Après chaque clic, saisie ou raccourci, le résultat indique la fenêtre au premier plan : si ce n'est pas celle attendue (une autre appli, une fenêtre d'erreur, une boîte de dialogue), regarde l'écran avec regarder_ecran AVANT de continuer ; ne tape jamais de texte sans être sûr de la fenêtre qui le reçoit. À la fin, vérifie le résultat avec regarder_ecran.
 - N'invente jamais de données : si tu ne sais pas, vérifie avec un outil.
 - Dès que tu apprends un fait durable sur {CONFIG['nom_utilisateur']} (goût, projet, personne, habitude), appelle memoriser.
 - Quand {CONFIG['nom_utilisateur']} te dit comment te comporter avec lui (« réponds-moi en une phrase », « détaille seulement si je te le demande », « tutoie-moi », « ne me demande pas confirmation pour… »), enregistre-le avec memoriser, catégorie « consigne », et applique-le dès cette réponse, puis TOUJOURS ensuite.
@@ -177,7 +177,45 @@ class Wesley:
             self.messages = [self.messages[0]] + reste
 
     def demander(self, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
-        """Envoie un message ; callbacks pour afficher le flux. Renvoie la réponse finale."""
+        """Envoie un message ; callbacks pour afficher le flux. Renvoie la réponse finale.
+        Après coup, en fond : Wesley apprend de l'échange s'il a été corrigé ou si une méthode a échoué puis marché."""
+        trace = []
+        try:
+            from . import annulation
+            annulation.nouvelle_demande(texte)   # « annule » défera tout ce que cette demande fait sur les fichiers
+        except Exception:
+            pass
+
+        def suivre_outil(nom, args, res):
+            if res is not None:
+                trace.append((nom, args, res))
+            if sur_outil:
+                sur_outil(nom, args, res)
+        import time as _t
+        debut = _t.time()
+        try:
+            finale = self._demander(texte, sur_texte, suivre_outil, sur_pensee)
+        except Exception as e:
+            try:
+                from . import sante
+                sante.demande(CONFIG.get("cerveau", ""), _t.time() - debut, str(e))
+            except Exception:
+                pass
+            raise
+        try:
+            from . import sante
+            sante.demande(CONFIG.get("cerveau", ""), _t.time() - debut)
+        except Exception:
+            pass
+        try:
+            from . import apprentissage
+            apprentissage.en_fond(texte, getattr(self, "derniere_reponse", ""), trace, finale or "")
+        except Exception:
+            pass
+        self.derniere_reponse = finale or ""
+        return finale
+
+    def _demander(self, texte, sur_texte=None, sur_outil=None, sur_pensee=None):
         # relit sa mémoire et ses services à jour avant chaque réponse (instructions inchangées si rien n'a bougé)
         try:
             nouveau = prompt_systeme()
@@ -193,7 +231,7 @@ class Wesley:
             return openai_cerveau.demander(self, texte, sur_texte, sur_outil, sur_pensee)
         memoire.journaliser(CONFIG.get("nom_utilisateur") or "Utilisateur", texte)
         self.messages.append({"role": "user", "content": texte})
-        rappel = memoire.rappel_consignes()
+        rappel = memoire.rappel_pour(texte)   # ses consignes + les souvenirs utiles à cette demande
         if rappel:
             self.messages.append({"role": "system", "content": rappel})
         self._tronquer()
@@ -251,7 +289,7 @@ class Wesley:
                         if m["role"] in ("user", "assistant") and m.get("content")]
             if len(echanges) < 2:
                 return []
-            faits = openai_cerveau.souvenirs(echanges, memoire.profil_texte()[0])
+            faits = openai_cerveau.souvenirs(echanges, memoire.profil_texte(complet=True)[0])
             return [memoire.ajouter(f["fait"], f.get("categorie", "general")) for f in faits if f.get("fait")]
         if self.avec_claude:
             from . import claude
@@ -263,13 +301,13 @@ class Wesley:
                     echanges.append(f"{m['role']}: {txt[:500]}")
             if len(echanges) < 2:
                 return []
-            faits = claude.souvenirs(echanges, memoire.profil_texte()[0])
+            faits = claude.souvenirs(echanges, memoire.profil_texte(complet=True)[0])
             return [memoire.ajouter(f["fait"], f.get("categorie", "general")) for f in faits if f.get("fait")]
         echanges = [f"{m['role']}: {m['content'][:500]}" for m in self.messages[1:]
                     if m["role"] in ("user", "assistant") and m.get("content")]
         if len(echanges) < 2:
             return []
-        faits_actuels, _ = memoire.profil_texte()
+        faits_actuels, _ = memoire.profil_texte(complet=True)
         r = ollama.chat(model=CONFIG["modele"], think=False, format="json",
                         options={"num_ctx": CONFIG["num_ctx"], "temperature": 0.2},
                         messages=[{"role": "user", "content":
@@ -290,9 +328,11 @@ def completer(prompt: str) -> str:
     cerveau = CONFIG.get("cerveau")
     if cerveau == "claude":
         from . import claude
-        r = claude.client().messages.create(model=CONFIG["claude_modele"], max_tokens=3000, output_config={"effort": "low"},
+        modele = claude.modele_fond()   # travail de fond : modèle rapide, bien moins cher
+        # la réflexion compte dans max_tokens : de la marge pour un long résumé
+        r = claude.client().messages.create(model=modele, max_tokens=16000, output_config={"effort": "low"},
                                             messages=[{"role": "user", "content": prompt}])
-        claude.enregistrer_cout(r.usage, CONFIG["claude_modele"])
+        claude.enregistrer_cout(r.usage, modele)
         return "".join(b.text for b in r.content if b.type == "text")
     from .fournisseurs import est_compatible
     if est_compatible(cerveau):

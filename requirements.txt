@@ -17,6 +17,7 @@ pyautogui
 pygetwindow
 pyinstaller
 pynput
+pypdf
 pyperclip
 pystray
 pyttsx3

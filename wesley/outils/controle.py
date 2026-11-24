@@ -11,6 +11,18 @@ pyautogui.FAILSAFE = True   # coup de souris dans le coin haut-gauche = arrêt d
 pyautogui.PAUSE = 0.05
 
 
+def _apres() -> str:
+    """Observation gratuite après une action à l'écran : la fenêtre au premier plan (pour vérifier sans capture)."""
+    import time
+    time.sleep(0.25)   # le temps que l'action produise son effet
+    try:
+        from ..contexte import fenetre_active
+        f = fenetre_active()
+    except Exception:
+        f = ""
+    return f" — fenêtre au premier plan : « {f} »" if f else ""
+
+
 @outil
 def souris_deplacer(x: int, y: int):
     """Déplace la souris à des coordonnées écran en pixels.
@@ -31,7 +43,7 @@ def souris_cliquer(x: int = -1, y: int = -1, bouton: str = "left", nombre: int =
         pyautogui.click(x, y, clicks=nombre, button=bouton, interval=0.1)
     else:
         pyautogui.click(clicks=nombre, button=bouton, interval=0.1)
-    return f"Clic {bouton} x{nombre} en {pyautogui.position()}"
+    return f"Clic {bouton} x{nombre} en {pyautogui.position()}" + _apres()
 
 
 @outil
@@ -75,7 +87,7 @@ def taper_texte(texte: str, entree: bool = False):
         pyperclip.copy(ancien)
     if entree:
         pyautogui.press("enter")
-    return "Tapé."
+    return "Tapé." + _apres()
 
 
 @outil
@@ -88,7 +100,7 @@ def raccourci_clavier(touches: str):
     else:
         ks = ["win" if k in ("windows", "super", "cmd", "command") else k for k in ks]
     pyautogui.hotkey(*ks) if len(ks) > 1 else pyautogui.press(ks[0])
-    return f"Touches : {touches}"
+    return f"Touches : {touches}" + _apres()
 
 
 @outil
@@ -223,7 +235,7 @@ def cliquer_element(nom: str, fenetre: str = ""):
             if n in el.window_text().lower() and el.is_visible():
                 r = el.rectangle()
                 pyautogui.click((r.left + r.right) // 2, (r.top + r.bottom) // 2)
-                return f"Cliqué sur '{el.window_text()}' ({el.element_info.control_type})"
+                return f"Cliqué sur '{el.window_text()}' ({el.element_info.control_type})" + _apres()
         except Exception:
             continue
     return "Élément introuvable. Essaie regarder_ecran ou trouver_et_cliquer."

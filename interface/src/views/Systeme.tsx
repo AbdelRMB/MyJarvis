@@ -1,5 +1,6 @@
 import { t } from "../lib/i18n";
-import { HardDrive, Layers, Power, Server, Thermometer } from "lucide-react";
+import { Activity, HardDrive, Layers, Power, Server, Thermometer } from "lucide-react";
+import { useEffect, useState } from "react";
 import { JaugeRonde, Sparkline } from "../components/Sparkline";
 import { Badge, Bouton, EnTetePage, Panneau, Pastille } from "../components/ui";
 import { api } from "../lib/api";
@@ -12,6 +13,68 @@ function Carte({ titre, valeur, serie, detail, couleur }: { titre: string; valeu
     <Panneau titre={titre} actions={<span className="font-display text-sm font-bold">{Math.round(valeur)}%</span>} corpsClassName="space-y-2">
       <Sparkline valeurs={serie} couleur={couleur} className="h-16" />
       <p className="font-mono text-xs text-doux">{detail}</p>
+    </Panneau>
+  );
+}
+
+type Ligne = { nom: string; n: number; echecs: number; taux: number; duree: number; erreur: string };
+type Sante = { jours: number; appels: number; echecs: number; outils: Ligne[]; cerveaux: Ligne[] };
+
+/** Ce qui marche et ce qui échoue (outils, cerveaux), compté sur cet appareil : quoi améliorer en priorité. */
+function PanneauSante() {
+  const [s, setS] = useState<Sante | null>(null);
+  const [jours, setJours] = useState(7);
+  useEffect(() => {
+    api<Sante>(`/api/sante?jours=${jours}`)
+      .then(setS)
+      .catch(() => {});
+  }, [jours]);
+  if (!s) return null;
+  const enEchec = s.outils.filter((x) => x.echecs > 0).slice(0, 8);
+  return (
+    <Panneau
+      titre={t("Santé de Wesley")}
+      icone={<Activity />}
+      actions={
+        <select value={jours} onChange={(e) => setJours(+e.target.value)} className="h-7 rounded border border-ligne-forte bg-surface-2 px-1 text-[12px]">
+          <option value={1}>{t("Aujourd'hui")}</option>
+          <option value={7}>{t("7 jours")}</option>
+          <option value={30}>{t("30 jours")}</option>
+        </select>
+      }
+      corpsClassName="space-y-3 text-sm"
+    >
+      <p className="text-doux">
+        {t("{n} action(s), {e} en échec ({p} %).", { n: s.appels, e: s.echecs, p: s.appels ? Math.round((s.echecs / s.appels) * 100) : 0 })}
+      </p>
+      {s.cerveaux.map((c) => (
+        <div key={c.nom} className="flex justify-between gap-2 text-[13px]">
+          <span>
+            {t("Cerveau")} <span className="font-mono">{c.nom}</span>
+          </span>
+          <span className="font-mono text-doux">
+            {t("{n} demandes · {e} échecs · {d} s", { n: c.n, e: c.echecs, d: c.duree })}
+          </span>
+        </div>
+      ))}
+      {enEchec.length > 0 ? (
+        <div className="space-y-1.5">
+          <div className="text-[12px] font-semibold">{t("Outils qui échouent le plus")}</div>
+          {enEchec.map((x) => (
+            <div key={x.nom} className="text-[12px]" title={x.erreur}>
+              <div className="flex justify-between gap-2">
+                <span className="font-mono">{x.nom}</span>
+                <span className={cx("font-mono", x.taux > 0.3 ? "text-rouge" : "text-ambre")}>
+                  {x.echecs}/{x.n}
+                </span>
+              </div>
+              <div className="truncate text-tres-doux">{x.erreur}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[13px] text-vert">{t("Aucun outil en échec sur cette période.")}</p>
+      )}
     </Panneau>
   );
 }
@@ -100,6 +163,7 @@ export function VueSysteme() {
             {t("Avec 8 Go de VRAM, les autres applis qui utilisent la carte graphique (jeux, LDPlayer, Wallpaper Engine…) font déborder le modèle sur le CPU : Wesley devient plus lent. Libère la VRAM avant de jouer.")}
           </p>
         </Panneau>
+        <PanneauSante />
       </div>
     </div>
   );

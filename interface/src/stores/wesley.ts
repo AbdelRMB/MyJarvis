@@ -86,6 +86,7 @@ export function ajouterSysteme(role: "info" | "erreur", texte: string) {
 type Evt =
   | { type: "maj"; etape: string; pct: number; texte: string }
   | { type: "naviguer"; vue: Vue }
+  | { type: "contexte"; selection: string; fenetre: string }
   | { type: "memoire_maj"; faits: boolean; historique: number }
   | { type: "annonce"; texte: string }
   | { type: "confirmation"; id: string; titre: string; detail: string; saisie?: boolean }
@@ -259,6 +260,10 @@ function recevoir(e: Evt) {
       break;
     case "naviguer":
       useReglages.getState().maj({ vue: e.vue });
+      break;
+    case "contexte":   // Ctrl+Alt+E : ce que l'utilisateur regardait (sélection, fenêtre)
+      useReglages.getState().maj({ vue: "assistant" });
+      emettre("contexte", { selection: e.selection, fenetre: e.fenetre });
       break;
   }
 }

@@ -238,6 +238,15 @@ def main():
         ecoute.demarrer()
     web.APPLI.update(active=True, afficher=afficher, ecoute=ecoute)
 
+    def sur_contexte():
+        def fond():
+            from . import contexte
+            c = contexte.capturer()
+            afficher()
+            time.sleep(0.6)   # le temps que l'interface soit là
+            web.diffuser(type="contexte", selection=c["selection"], fenetre=c["fenetre"])
+        threading.Thread(target=fond, daemon=True).start()
+
     # --- raccourci clavier global (relancé quand l'Accessibilité est accordée : macOS ne l'active qu'au démarrage)
     raccourcis = {"ecouteur": None}
 
@@ -247,7 +256,9 @@ def main():
             if raccourcis["ecouteur"]:
                 raccourcis["ecouteur"].stop()
             raccourcis["ecouteur"] = keyboard.GlobalHotKeys({CONFIG.get("raccourci") or "<ctrl>+<alt>+w": afficher,
-                                                            "<ctrl>+<alt>+s": web.stop_vocal})   # arrêt d'urgence
+                                                            "<ctrl>+<alt>+s": web.stop_vocal,   # arrêt d'urgence
+                                                            # « ce que je regarde » : sélection + fenêtre, puis Wesley
+                                                            CONFIG.get("raccourci_contexte") or "<ctrl>+<alt>+e": sur_contexte})
             raccourcis["ecouteur"].start()
         except Exception as e:
             print(f"  ! Raccourci clavier : {e}")

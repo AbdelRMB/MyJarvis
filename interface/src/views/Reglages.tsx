@@ -121,7 +121,9 @@ function OngletCode() {
   );
 }
 
-type Habitudes = { briefing_matin: boolean; conversation_suivie: boolean; maj_auto: boolean; transcription_resume_auto: boolean; transcription_actions_afaire: boolean; transcription_gpu: boolean };
+type Habitudes = { briefing_matin: boolean; conversation_suivie: boolean; maj_auto: boolean; transcription_resume_auto: boolean; transcription_actions_afaire: boolean; transcription_gpu: boolean;
+  memoire_semantique: boolean; apprentissage_auto: boolean; modele_rapide_fond: boolean; budget_mensuel: number;
+  bilan_soir: boolean; bilan_soir_heure: string };
 
 /** Réglages de comportement gardés par le serveur local (config.json). */
 function PanneauHabitudes() {
@@ -160,6 +162,58 @@ function PanneauHabitudes() {
           actif={h.maj_auto}
           onChange={(v) => regler({ maj_auto: v })}
         />
+        <Interrupteur
+          label={t("Bilan du soir")}
+          aide={t("Chaque soir, Wesley te dit ce que tu as fait, ce qui reste et ce qui t'attend demain (sur cet appareil).")}
+          actif={h.bilan_soir}
+          onChange={(v) => regler({ bilan_soir: v })}
+        />
+        {h.bilan_soir && (
+          <label className="flex items-center justify-between gap-4 pb-2.5 pl-4 text-[13px] text-doux">
+            {t("Heure du bilan")}
+            <input
+              type="time"
+              value={h.bilan_soir_heure || "19:00"}
+              onChange={(e) => regler({ bilan_soir_heure: e.target.value })}
+              className="h-9 rounded-md border border-ligne-forte bg-surface-2 px-2 text-sm"
+            />
+          </label>
+        )}
+        <Interrupteur
+          label={t("Mémoire par le sens")}
+          aide={t("Wesley retrouve un souvenir même avec d'autres mots (« ma voiture » → « la Clio est au garage ») et joint à chaque demande les souvenirs utiles. Modèle local de ~270 Mo, téléchargé une fois ; rien ne sort de ton ordinateur.")}
+          actif={h.memoire_semantique}
+          onChange={(v) => regler({ memoire_semantique: v })}
+        />
+        <Interrupteur
+          label={t("Apprendre de ses erreurs")}
+          aide={t("Quand tu le corriges, ou qu'une méthode échoue puis qu'une autre marche, Wesley note tout seul la leçon pour la prochaine fois (Mémoire › Leçons apprises).")}
+          actif={h.apprentissage_auto}
+          onChange={(v) => regler({ apprentissage_auto: v })}
+        />
+        <Interrupteur
+          label={t("Modèle rapide pour le travail de fond")}
+          aide={t("Résumés, rangement de la mémoire, leçons et pilotage des tâches passent par un modèle rapide et bien moins cher (cerveau Claude). La conversation garde ton modèle.")}
+          actif={h.modele_rapide_fond}
+          onChange={(v) => regler({ modele_rapide_fond: v })}
+        />
+        <label className="flex items-center justify-between gap-4 py-2.5">
+          <span>
+            <span className="block text-sm">{t("Budget mensuel (cerveau Claude)")}</span>
+            <span className="block text-[12px] text-doux">
+              {t("En dollars ; 0 = pas de limite. Alerte à 80 %, puis Wesley passe sur un modèle économique jusqu'à la fin du mois.")}
+            </span>
+          </span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={h.budget_mensuel ?? 0}
+            onChange={(e) => setH((x) => (x ? { ...x, budget_mensuel: Math.max(0, +e.target.value || 0) } : x))}
+            onBlur={(e) => regler({ budget_mensuel: Math.max(0, +e.target.value || 0) })}
+            className="h-9 w-24 flex-none rounded-md border border-ligne-forte bg-surface-2 px-2 text-right text-sm"
+          />
+        </label>
         <Interrupteur
           label={t("Résumé automatique des transcriptions")}
           aide={t("À la fin d'une transcription, Wesley en fait le résumé, adapté à ce qui a été enregistré : notes de cours, décisions d'une réunion, sujets d'une discussion…")}

@@ -40,6 +40,8 @@ CLES_CONFIG = ["modele", "modele_vision", "temperature", "reflexion", "num_ctx",
                "cerveau", "claude_modele", "claude_effort", "langue",
                "briefing_matin", "conversation_suivie", "maj_auto", "conseiller", "recherche_web_native",
                "transcription_resume_auto", "transcription_actions_afaire", "transcription_gpu",
+               "memoire_semantique", "apprentissage_auto", "budget_mensuel", "modele_rapide_fond",
+               "bilan_soir", "bilan_soir_heure",
                *CLES_MODELES, "perso_url"]
 
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
@@ -186,6 +188,94 @@ async def modifier_fait(req: Request):
     if not memoire.modifier(d.get("fid", ""), d["fait"], d.get("categorie")):
         raise HTTPException(404, "Souvenir introuvable (actualise la mémoire).")
     return {"ok": True}
+
+
+@app.get("/api/memoire/intelligence")
+def etat_intelligence(req: Request):
+    """Écran Mémoire : recherche par le sens, propositions à confirmer, dernier rangement, coûts du mois."""
+    _verifier(req)
+    from . import consolidation, semantique
+    couts = {}
+    try:
+        from . import claude
+        couts = claude.resume_couts()
+    except Exception:
+        pass
+    return {"semantique": semantique.etat(), "propositions": consolidation.propositions(),
+            "rangement": consolidation._etat().get("resultat"), "couts": couts,
+            "nb_lecons": len([x for x in memoire._charger() if x.get("categorie") == "lecon"])}
+
+
+@app.get("/api/sante")
+def sante_wesley(req: Request, jours: int = 7):
+    """Tableau de santé : outils qui échouent, cerveaux, temps de réponse (compté sur cet appareil)."""
+    _verifier(req)
+    from . import sante
+    return sante.resume(max(1, min(30, jours)))
+
+
+@app.get("/api/documents")
+def etat_documents(req: Request):
+    _verifier(req)
+    from . import documents
+    return documents.etat()
+
+
+@app.post("/api/documents/{action}")
+async def agir_documents(action: str, req: Request):
+    _verifier(req)
+    from . import documents
+    d = await req.json() if (await req.body()) else {}
+    try:
+        if action == "ajouter":
+            documents.ajouter_dossier(str(d.get("chemin") or ""))
+        elif action == "retirer":
+            documents.retirer_dossier(str(d.get("chemin") or ""))
+        elif action == "reindexer":
+            documents.indexer_en_fond()
+        elif action == "chercher":
+            return {"resultats": await asyncio.to_thread(documents.chercher, str(d.get("question") or ""), 8)}
+        else:
+            raise HTTPException(404, "Action inconnue.")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return documents.etat()
+
+
+@app.get("/api/contexte")
+def dernier_contexte(req: Request):
+    """Dernière capture du raccourci « ce que je regarde » (si l'interface vient de s'ouvrir et l'a ratée)."""
+    _verifier(req)
+    from . import contexte
+    c = dict(contexte.DERNIER)
+    return c if c and time.time() - c.get("ts", 0) < 30 else {}
+
+
+@app.post("/api/contexte/consigne")
+async def consigne_contexte(req: Request):
+    _verifier(req)
+    from . import contexte
+    d = await req.json()
+    return {"texte": contexte.consigne(str(d.get("action") or ""), str(d.get("selection") or ""), str(d.get("fenetre") or ""),
+                                       str(d.get("precision") or ""))}
+
+
+@app.post("/api/memoire/propositions/{pid}")
+async def repondre_proposition(pid: str, req: Request):
+    _verifier(req)
+    from . import consolidation
+    d = await req.json()
+    return {"message": await asyncio.to_thread(consolidation.repondre, pid, bool(d.get("accepter")))}
+
+
+@app.post("/api/memoire/ranger")
+async def ranger_memoire(req: Request):
+    _verifier(req)
+    from . import consolidation
+    try:
+        return await asyncio.to_thread(consolidation.consolider, None, True)
+    except Exception as e:
+        raise HTTPException(400, f"Rangement impossible : {e}")
 
 
 @app.get("/api/memoire/journal")
@@ -946,12 +1036,16 @@ async def creer_automatisation(req: Request):
         raise HTTPException(400, "Indique l'heure.")
     if typ == "intervalle" and not d.get("minutes"):
         raise HTTPException(400, "Indique l'intervalle en minutes.")
+    if typ == "site" and not str(d.get("url") or "").strip():
+        raise HTTPException(400, "Indique l'adresse du site ou du serveur.")
     if d.get("action") == "wesley" and not d.get("consigne", "").strip():
         raise HTTPException(400, "Indique ce que Wesley doit faire.")
     automatisations.creer(d.get("nom", ""), d.get("expediteur", ""), d.get("sujet", ""), d.get("contient", ""),
                           d.get("connecteur", ""), d.get("action", "prevenir"), d.get("consigne", ""), typ,
                           d.get("heure", ""), d.get("jours") or [], int(d.get("minutes") or 0),
-                          None if d.get("appareil") is None else d.get("appareil"), d.get("message", ""), d.get("phrase", ""))
+                          None if d.get("appareil") is None else d.get("appareil"), d.get("message", ""), d.get("phrase", ""),
+                          int(d.get("avant") or 15), d.get("dossier", ""), d.get("motif", ""), d.get("url", ""),
+                          d.get("condition", ""))
     return lister_automatisations(req)
 
 
@@ -1953,6 +2047,12 @@ def preparer():
     transcription.au_demarrage()  # transcription coupée par la fermeture : marquée « interrompue »
     from . import partage
     partage.demarrer()           # tâches et transcriptions visibles (chiffrées) sur tes autres appareils
+    from . import consolidation, semantique
+    memoire.indexer_en_fond()    # mémoire par le sens : modèle téléchargé une fois, vecteurs calculés à l'avance
+    consolidation.demarrer()     # chaque jour : doublons fusionnés, contradictions à confirmer, résumé de la semaine
+    from . import annulation, documents
+    threading.Thread(target=annulation.menage, daemon=True).start()   # copies de plus de 14 jours
+    documents.demarrer()         # tes documents (PDF, Word…) indexés par le sens, mis à jour toutes les 30 min
     partage.ecouteurs.append(lambda: (diffuser(type="tache_maj", id=""), diffuser(type="transcription_maj", id="")))
     from . import agents_code
     agents_code.surveiller()     # prévient si Claude Code / Codex ne sont plus connectés

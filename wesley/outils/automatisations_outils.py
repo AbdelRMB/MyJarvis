@@ -6,16 +6,22 @@ from . import outil
 def creer_automatisation(description: str, declencheur: str = "mail", heure: str = "", jours: str = "", minutes: int = 0,
                          expediteur: str = "", sujet: str = "", contient: str = "", compte_mail: str = "",
                          action: str = "wesley", consigne: str = "", message: str = "", tous_les_appareils: bool = False,
-                         phrase: str = ""):
-    """Crée une automatisation (règle permanente) : « tous les matins à 8 h lis-moi mon agenda », « toutes les heures vérifie mon serveur », « quand je reçois un mail de papa préviens-moi », « au démarrage donne-moi la météo »…
+                         phrase: str = "", avant: int = 15, dossier: str = "", motif: str = "", url: str = "",
+                         condition: str = ""):
+    """Crée une automatisation (règle permanente) : « tous les matins à 8 h lis-moi mon agenda », « toutes les heures vérifie mon serveur », « quand je reçois un mail de papa préviens-moi », « 15 min avant chaque rendez-vous prépare-moi le contexte », « quand une facture arrive dans Téléchargements range-la », « préviens-moi quand ma tâche de code est finie », « préviens-moi si mon site tombe »…
     description: nom court de la règle (ex : « Agenda du matin »)
-    declencheur: « horaire » (à heure fixe), « intervalle » (toutes les X minutes), « demarrage » (quand Wesley démarre), « mail » (arrivée d'un e-mail) ou « commande » (ROUTINE lancée quand l'utilisateur dit sa phrase : « mode travail », « fin de journée »… ; consigne = toutes les étapes)
+    declencheur: « horaire » (à heure fixe), « intervalle » (toutes les X minutes), « demarrage » (quand Wesley démarre), « mail » (arrivée d'un e-mail), « commande » (ROUTINE lancée quand l'utilisateur dit sa phrase : « mode travail »… ; consigne = toutes les étapes), « rendez_vous » (X minutes avant un événement de l'agenda), « fichier » (un nouveau fichier arrive dans un dossier), « tache_finie » (une tâche de code se termine) ou « site » (un site ou serveur ne répond plus)
+    avant: pour rendez_vous, combien de minutes avant (15 par défaut)
+    dossier: pour fichier, le dossier surveillé (vide = Téléchargements)
+    motif: pour fichier, filtre sur le nom (ex : « *.pdf », « facture* » ; vide = tous)
+    url: pour site, l'adresse à vérifier (minutes = fréquence, 5 par défaut)
+    condition: facultatif, condition en français vérifiée avant d'agir (ex : « seulement si c'est une facture », « si le mail parle d'un paiement »)
     heure: pour horaire, au format HH:MM (ex : 08:00)
     jours: pour horaire, jours séparés par des virgules (0=lundi … 6=dimanche ; vide = tous les jours ; « 0,1,2,3,4 » = en semaine)
     minutes: pour intervalle, toutes les combien de minutes
     expediteur: pour mail, adresse ou nom de l'expéditeur. « Mon père », « ma femme »… : utilise l'adresse connue dans sa mémoire, sinon demande-la
     sujet: pour mail, mot à trouver dans le sujet
-    contient: pour mail, mot à trouver dans le texte
+    contient: pour mail, mot à trouver dans le texte ; pour rendez_vous et tache_finie, mot à trouver dans le titre
     compte_mail: pour mail, identifiant du connecteur à surveiller (vide = toutes ses boîtes)
     action: « wesley » (tu exécutes la consigne avec tous tes outils et tu lis le résultat à voix haute) ou « prevenir » (dire simplement le message)
     consigne: pour action wesley, ce que tu dois faire (ex : « lis mon agenda du jour et résume-le »)
@@ -29,9 +35,12 @@ def creer_automatisation(description: str, declencheur: str = "mail", heure: str
         return "Précise l'heure (HH:MM)."
     if declencheur == "intervalle" and not minutes:
         return "Précise l'intervalle en minutes."
+    if declencheur == "site" and not url:
+        return "Précise l'adresse du site ou du serveur à surveiller."
     liste_jours = [int(x) for x in jours.replace(" ", "").split(",") if x.isdigit()] if jours else []
     r = automatisations.creer(description, expediteur, sujet, contient, compte_mail, action, consigne, declencheur,
-                              heure, liste_jours, minutes, "" if tous_les_appareils else None, message, phrase)
+                              heure, liste_jours, minutes or (5 if declencheur == "site" else 0),
+                              "" if tous_les_appareils else None, message, phrase, avant, dossier, motif, url, condition)
     return f"Automatisation créée : {automatisations.decrire(r)}"
 
 

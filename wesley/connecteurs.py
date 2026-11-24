@@ -937,3 +937,14 @@ def etat():
 def catalogue():
     return [{"type": t, "nom": c.nom, "description": c.description, "icone": c.icone, "champs": c.champs,
              "aide": c.aide, "multiple": True} for t, c in TYPES.items()]   # autant de comptes que tu veux par type
+
+
+# Telegram (wesley/telegram.py) : importé ici, après la classe de base dont il hérite
+from .telegram import Telegram  # noqa: E402
+
+TYPES[Telegram.type] = Telegram
+
+from .connecteurs_maison import HomeAssistant, Webhook  # noqa: E402
+
+TYPES[HomeAssistant.type] = HomeAssistant
+TYPES[Webhook.type] = Webhook

@@ -42,8 +42,14 @@ def diagnostic() -> str:
     from .plateforme import MAC
     from .version import VERSION
     import platform
+    sante = ""
+    try:   # outils qui échouent, cerveaux (compté sur cet appareil ; joint seulement si l'utilisateur l'accepte)
+        from . import sante as s
+        sante = "\n" + s.texte(7)
+    except Exception:
+        pass
     return (f"Version : {VERSION} — {'macOS' if MAC else 'Windows'} {platform.release()} ({platform.machine()})\n"
-            f"Date : {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            f"Date : {time.strftime('%Y-%m-%d %H:%M:%S')}" + sante)
 
 
 def noter(erreur: str, contexte: str = "", plantage: bool = False):

@@ -144,18 +144,107 @@ def _signaler_utilisation(faits):
             _envoyer({**x, "modifie": t}, "utilisation")
 
 
+HISTORIQUE_MAX = 6000       # lignes d'historique (les plus récentes) où chercher par le sens
+
+
+def _lignes_historique(limite: int = HISTORIQUE_MAX) -> list[tuple[str, str]]:
+    """(jour__appareil, ligne) des conversations, les plus récentes d'abord (un an au plus)."""
+    res = []
+    for fic in sorted(HIST.glob("*.md"), reverse=True)[:400]:
+        try:
+            lignes = fic.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        res += [(fic.stem, l) for l in reversed(lignes) if len(l.strip()) > 12]
+        if len(res) >= limite:
+            break
+    return res[:limite]
+
+
 def chercher(req):
-    mots = [m for m in req.lower().split() if len(m) > 2]
-    trouves = [x for x in _charger() if any(m in x["fait"].lower() for m in mots)]
+    """Souvenirs et passages des conversations passées qui correspondent à la demande, PAR LE SENS
+    (« ma voiture » trouve « la Clio est au garage ») et par les mots exacts. Sans le modèle : par les mots."""
+    from . import semantique
+    faits = _charger()
+    res = []
+    trouves = [faits[i] for i, _ in semantique.classer(req, [x["fait"] for x in faits], k=12, nom_index="faits", seuil=0.77)]
     _signaler_utilisation(trouves)
-    res = [f"[mémoire] {x['fait']}" for x in trouves]
-    for fic in sorted(HIST.glob("*.md"), reverse=True)[:60]:
-        for l in fic.read_text(encoding="utf-8").splitlines():
-            if any(m in l.lower() for m in mots):
-                res.append(f"[{fic.stem}] {l[:250]}")
-                if len(res) > 40:
-                    return "\n".join(res)
+    res += [f"[mémoire] {x['fait']}" for x in trouves]
+    hist = _lignes_historique()
+    for i, _ in semantique.classer(req, [l for _, l in hist], k=25, nom_index="historique", seuil=0.80):
+        jour, l = hist[i]
+        res.append(f"[{jour}] {l[:250]}")
     return "\n".join(res) or "Rien trouvé."
+
+
+SEUIL_PROMPT = 40           # au-delà, les instructions ne gardent que l'essentiel ; le reste vient à la demande
+TOUJOURS = ("identite",)    # catégories toujours dans les instructions
+
+
+def faits_du_prompt() -> list[dict]:
+    """Souvenirs recopiés dans les instructions de Wesley : tous s'il y en a peu ; sinon l'identité et les plus
+    utilisés récemment. Les autres arrivent avec chaque message quand ils servent (rappel_pour)."""
+    # « journal » (résumés de semaine) : jamais dans les instructions, retrouvés par le sens quand on parle du passé
+    faits = [x for x in _charger() if x.get("categorie") not in ("consigne", "journal")]
+    if len(faits) <= SEUIL_PROMPT:
+        return faits
+    gardes = [x for x in faits if x.get("categorie") in TOUJOURS]
+    reste = sorted((x for x in faits if x.get("categorie") not in TOUJOURS), key=lambda x: x.get("modifie") or 0, reverse=True)
+    return gardes + reste[:max(0, 25 - len(gardes) // 2)]
+
+
+def souvenirs_pour(texte: str, k: int = 6) -> list[dict]:
+    """Les souvenirs utiles à CETTE demande qui ne sont pas déjà dans les instructions."""
+    from . import semantique
+    if not texte.strip():
+        return []
+    deja = {x.get("fid") for x in faits_du_prompt()}
+    candidats = [x for x in _charger() if x.get("categorie") != "consigne" and x.get("fid") not in deja]
+    if not candidats:
+        return []
+    return [candidats[i] for i, _ in semantique.classer(texte, [x["fait"] for x in candidats], k=k, nom_index="faits", seuil=0.77)]
+
+
+def rappel_pour(texte: str) -> str:
+    """Joint à la demande (effacé au message suivant chez Claude) : consignes + souvenirs utiles à cette demande."""
+    parties = []
+    r = rappel_consignes()
+    if r:
+        parties.append(r)
+    try:
+        s = souvenirs_pour(texte)
+    except Exception as e:
+        print(f"  (souvenirs liés : {e})")
+        s = []
+    if s:
+        parties.append("Souvenirs liés à cette demande (ta mémoire, sers-t'en si c'est utile) :\n"
+                       + "\n".join(f"- {x['fait']}" for x in s))
+    try:
+        from . import consolidation
+        p = consolidation.rappel_propositions()
+        if p:
+            parties.append(p)
+    except Exception:
+        pass
+    return "\n\n".join(parties)
+
+
+def indexer_en_fond():
+    """Calcule à l'avance les vecteurs des souvenirs et de l'historique (la 1re recherche reste instantanée)."""
+    import threading
+
+    def fond():
+        from . import semantique
+        if not semantique.disponible():
+            semantique.telecharger()
+        if not semantique.disponible():
+            return
+        try:
+            semantique.index("faits").matrice([x["fait"] for x in _charger()])
+            semantique.index("historique").matrice([l for _, l in _lignes_historique()])
+        except Exception as e:
+            print(f"  (index de la mémoire : {e})")
+    threading.Thread(target=fond, daemon=True, name="index-memoire").start()
 
 
 # préférences qui sont en fait des consignes pour Wesley (enregistrées avant la catégorie « consigne »)
@@ -179,13 +268,17 @@ def rappel_consignes() -> str:
             "règles par défaut ; respecte-les à la lettre) :\n" + "\n".join(f"- {x}" for x in c))
 
 
-def profil_texte():
+def profil_texte(complet: bool = False):
+    """Souvenirs pour les instructions (consignes à part). complet : tous (extraction de nouveaux souvenirs)."""
     par_cat = {}
-    for x in _charger():
-        if x.get("categorie") == "consigne":
-            continue   # affichées à part, en tête des instructions
+    tous = [x for x in _charger() if x.get("categorie") not in ("consigne", "journal")]   # consignes : à part, en tête
+    choisis = tous if complet else faits_du_prompt()
+    for x in choisis:
         par_cat.setdefault(x["categorie"], []).append(x["fait"])
     txt = "\n".join(f"## {c}\n" + "\n".join(f"- {f}" for f in fs) for c, fs in par_cat.items())
+    if len(choisis) < len(tous):
+        txt += (f"\n\n(+ {len(tous) - len(choisis)} autres souvenirs : ceux utiles à une demande te sont donnés avec elle ; "
+                "sinon chercher_memoire les retrouve par le sens.)")
     sysm = SYSTEME.read_text(encoding="utf-8") if SYSTEME.exists() else ""
     sysm = sysm.split("## Applications installées")[0].rstrip()
     return txt, sysm

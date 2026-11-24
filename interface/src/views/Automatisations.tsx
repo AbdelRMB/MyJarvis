@@ -1,4 +1,4 @@
-import { Clock, Mail, Play, Plus, Power, Repeat, Trash2, Volume2, Wand2, Zap } from "lucide-react";
+import { CalendarClock, CheckCircle2, Clock, FolderDown, Globe, Mail, Play, Plus, Power, Repeat, Trash2, Volume2, Wand2, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Bouton, Champ, EnTetePage, Interrupteur, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -7,7 +7,7 @@ import { t } from "../lib/i18n";
 import { useReglages } from "../stores/reglages";
 import { toast } from "../stores/toasts";
 
-type TypeDecl = "horaire" | "intervalle" | "demarrage" | "mail" | "commande";
+type TypeDecl = "horaire" | "intervalle" | "demarrage" | "mail" | "commande" | "rendez_vous" | "fichier" | "tache_finie" | "site";
 type Regle = {
   id: string;
   nom: string;
@@ -22,13 +22,28 @@ const JOURS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 const VIDE = {
   nom: "", type: "horaire" as TypeDecl, heure: "08:00", jours: [] as number[], minutes: 60,
   expediteur: "", sujet: "", contient: "", connecteur: "", action: "wesley", consigne: "", message: "", partout: false, phrase: "",
+  avant: 15, dossier: "", motif: "", url: "", condition: "",
 };
-const ICONES: Record<TypeDecl, typeof Clock> = { horaire: Clock, intervalle: Repeat, demarrage: Power, mail: Mail, commande: Wand2 };
+const ICONES: Record<TypeDecl, typeof Clock> = {
+  horaire: Clock,
+  intervalle: Repeat,
+  demarrage: Power,
+  mail: Mail,
+  commande: Wand2,
+  rendez_vous: CalendarClock,
+  fichier: FolderDown,
+  tache_finie: CheckCircle2,
+  site: Globe,
+};
 const EXEMPLES = [
   { nom: "Agenda du matin", type: "horaire", heure: "08:00", jours: [0, 1, 2, 3, 4], consigne: "Lis mon agenda du jour et résume-le-moi en quelques phrases." },
   { nom: "Surveillance du serveur", type: "intervalle", minutes: 60, consigne: "Vérifie l'état de mon serveur (disque, mémoire, conteneurs) et préviens-moi seulement s'il y a un problème." },
   { nom: "Bonjour au démarrage", type: "demarrage", consigne: "Dis-moi la météo du jour et mes rendez-vous importants." },
   { nom: "Mode travail", type: "commande", phrase: "mode travail", consigne: "Ouvre mes applis de travail (VS Code, le terminal, mon navigateur), active le mode Ne pas déranger si tu peux, et dis-moi ce qui est en cours dans ma liste À faire." },
+  { nom: "Avant chaque rendez-vous", type: "rendez_vous", avant: 15, consigne: "Prépare-moi ce rendez-vous : avec qui, les derniers mails échangés avec cette personne, et ce que je dois avoir en tête." },
+  { nom: "Ranger les factures", type: "fichier", motif: "*.pdf", condition: "seulement si c'est une facture", consigne: "Renomme ce fichier « AAAA-MM-JJ - Fournisseur - montant.pdf » et range-le dans Documents/Factures/<année>." },
+  { nom: "Site surveillé", type: "site", url: "https://", minutes: 5, action: "prevenir", consigne: "" },
+  { nom: "Tâche de code finie", type: "tache_finie", consigne: "Dis-moi en une phrase ce que la tâche a fait et si quelque chose me demande une action." },
   { nom: "Fin de journée", type: "commande", phrase: "fin de journée", consigne: "Fais le point sur ma liste À faire : ce que j'ai fini aujourd'hui, ce qui reste pour demain (propose de décaler les échéances dépassées), puis souhaite-moi une bonne soirée." },
 ];
 
@@ -45,7 +60,12 @@ export function VueAutomatisations() {
       setE(
         await api<Etat>("/api/automatisations", {
           method: "POST",
-          json: { ...f, action: f.type === "commande" ? "wesley" : f.action, appareil: f.type === "mail" || f.type === "commande" || f.partout ? "" : e?.machine },
+          json: {
+            ...f,
+            type: f.type,
+            action: f.type === "commande" ? "wesley" : f.action,
+            appareil: f.type === "mail" || f.type === "commande" || f.partout ? "" : e?.machine,
+          },
         }),
       );
       setF(VIDE);
@@ -71,7 +91,7 @@ export function VueAutomatisations() {
     <div className="h-full overflow-y-auto p-4 md:p-8">
       <EnTetePage
         titre={t("Automatisations")}
-        sousTitre={t("Wesley agit tout seul : à heure fixe, à intervalle, au démarrage ou quand un mail arrive. Les routines se lancent quand tu dis leur phrase (« mode travail »). Tu peux aussi lui dire : « tous les matins à 8 h, lis-moi mon agenda ».")}
+        sousTitre={t("Wesley agit tout seul : à heure fixe, à intervalle, au démarrage, quand un mail ou un fichier arrive, avant un rendez-vous, quand une tâche finit ou qu'un site tombe — avec une condition si tu veux. Les routines se lancent quand tu dis leur phrase (« mode travail »).")}
         actions={
           <Bouton variante="fantome" icone={<Volume2 className="size-4" />} onClick={tester}>
             {t("Tester la voix")}
@@ -99,6 +119,10 @@ export function VueAutomatisations() {
             <option value="demarrage">{t("Au démarrage de Wesley")}</option>
             <option value="mail">{t("Quand un mail arrive")}</option>
             <option value="commande">{t("Routine : quand je dis une phrase")}</option>
+            <option value="rendez_vous">{t("Avant un rendez-vous de mon agenda")}</option>
+            <option value="fichier">{t("Quand un fichier arrive dans un dossier")}</option>
+            <option value="tache_finie">{t("Quand une tâche de code se termine")}</option>
+            <option value="site">{t("Quand un site ou un serveur ne répond plus")}</option>
           </select>
 
           {f.type === "horaire" && (
@@ -123,6 +147,36 @@ export function VueAutomatisations() {
           )}
           {f.type === "intervalle" && (
             <Champ type="number" min={1} value={String(f.minutes)} onChange={(x) => setF({ ...f, minutes: +x.target.value })} placeholder={t("Minutes")} />
+          )}
+          {f.type === "rendez_vous" && (
+            <>
+              <Champ type="number" min={1} value={String(f.avant)} onChange={(x) => setF({ ...f, avant: +x.target.value })} title={t("Minutes avant le rendez-vous")} placeholder={t("Minutes avant")} />
+              <Champ placeholder={t("Mot dans le titre (optionnel)")} value={f.contient} onChange={(x) => setF({ ...f, contient: x.target.value })} />
+            </>
+          )}
+          {f.type === "fichier" && (
+            <>
+              <Champ placeholder={t("Dossier (vide = Téléchargements)")} value={f.dossier} onChange={(x) => setF({ ...f, dossier: x.target.value })} />
+              <Champ placeholder={t("Nom du fichier (ex : *.pdf, facture*)")} value={f.motif} onChange={(x) => setF({ ...f, motif: x.target.value })} />
+            </>
+          )}
+          {f.type === "tache_finie" && (
+            <Champ placeholder={t("Mot dans le titre de la tâche (optionnel)")} value={f.contient} onChange={(x) => setF({ ...f, contient: x.target.value })} />
+          )}
+          {f.type === "site" && (
+            <>
+              <Champ placeholder="https://…" value={f.url} onChange={(x) => setF({ ...f, url: x.target.value })} />
+              <Champ type="number" min={1} value={String(f.minutes)} onChange={(x) => setF({ ...f, minutes: +x.target.value })} title={t("Vérifié toutes les X minutes")} placeholder={t("Minutes")} />
+            </>
+          )}
+          {f.type !== "commande" && (
+            <Champ
+              className="sm:col-span-2"
+              placeholder={t("Condition (optionnel) : seulement si c'est une facture, si le mail parle d'un paiement…")}
+              title={t("Wesley la vérifie avec le contexte (mail, fichier, rendez-vous…) avant d'agir.")}
+              value={f.condition}
+              onChange={(x) => setF({ ...f, condition: x.target.value })}
+            />
           )}
           {f.type === "mail" && (
             <>

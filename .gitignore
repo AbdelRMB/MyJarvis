@@ -26,6 +26,9 @@ CLAUDE.local.md
 # Cache du compte et état de connexion (mode développement : données dans le dossier du projet)
 comptes/
 compte.json
+# Copies de sauvegarde pour « annule » (contenu de tes fichiers) et identifiant de cet appareil
+annulation/
+appareil.id
 
 # Déploiement du serveur de comptes (Apache, Docker, scripts du VPS) : gardé en local, jamais publié
 serveur/apache-wesley.conf

@@ -20,7 +20,7 @@ export type Automatisation = {
   nom: string;
   actif: boolean;
   declencheur: {
-    type: "mail" | "horaire" | "intervalle" | "demarrage" | "commande";
+    type: "mail" | "horaire" | "intervalle" | "demarrage" | "commande" | "rendez_vous" | "fichier" | "tache_finie" | "site";
     expediteur?: string;
     sujet?: string;
     contient?: string;
@@ -29,6 +29,11 @@ export type Automatisation = {
     jours?: number[];
     minutes?: number;
     phrase?: string;
+    avant?: number;
+    dossier?: string;
+    motif?: string;
+    url?: string;
+    condition?: string;
   };
   action: { type: "prevenir" | "wesley"; consigne?: string; message?: string };
   appareil: string;

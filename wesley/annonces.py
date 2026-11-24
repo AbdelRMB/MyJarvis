@@ -69,5 +69,10 @@ def annoncer(texte: str, titre: str = "Wesley", vue: str = "", genre: str = "inf
         web.diffuser(type="annonce", texte=texte)
     else:
         threading.Thread(target=_parler_en_fond, args=(texte,), daemon=True).start()
+    try:   # aussi sur Telegram, si l'utilisateur l'a choisi (wesley/telegram.py)
+        from . import telegram
+        threading.Thread(target=telegram.transmettre_annonce, args=(texte, titre), daemon=True).start()
+    except Exception:
+        pass
     print(f"  Annonce : {texte}")
     sys.stdout.flush()

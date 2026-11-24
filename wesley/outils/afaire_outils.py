@@ -111,6 +111,36 @@ def briefing_du_jour():
     return "\n".join(parties)
 
 
+@outil
+def bilan_du_soir():
+    """Prépare le bilan du soir : à appeler pour « fais-moi le bilan de la journée », « qu'est-ce que j'ai fait aujourd'hui ? », « qu'est-ce qui m'attend demain ? ». Renvoie ce qui a été fait, ce qui reste, ce qui est prévu demain et ce qu'il reste à vérifier avec tes autres outils."""
+    from datetime import datetime, timedelta
+    from .. import afaire, taches, transcription
+    n = datetime.now()
+    jour, demain = n.strftime("%Y-%m-%d"), (n + timedelta(days=1)).strftime("%Y-%m-%d")
+    toutes = afaire.lister()
+    faites = [t for t in toutes if t["statut"] == "fait" and (t.get("fait_le") or "")[:10] == jour]
+    restantes = [t for t in toutes if t["statut"] != "fait"]
+    pour_demain = [t for t in restantes if (t.get("echeance") or "")[:10] == demain or (t.get("rappel") or "")[:10] == demain]
+    retard = [t for t in restantes if t.get("echeance") and t["echeance"][:10] <= jour]
+    code = [t for t in taches.lister() if datetime.fromtimestamp(t.get("maj") or 0).strftime("%Y-%m-%d") == jour]
+    trs = [r for r in transcription.lister() if datetime.fromtimestamp(r.get("debut") or 0).strftime("%Y-%m-%d") == jour]
+    parties = [f"Bilan du {n:%d/%m/%Y}, il est {n:%H:%M}."]
+    parties += ["", "# Fait aujourd'hui (À faire)", "\n".join("- " + afaire.decrire(t) for t in faites) or "(rien de coché)"]
+    if code:
+        parties += ["", "# Tâches de code du jour", "\n".join(f"- {t['titre']} : {t['statut']}" + (f" — {t['bilan'][:150]}" if t.get("bilan") else "") for t in code)]
+    if trs:
+        parties += ["", "# Transcriptions du jour", "\n".join(f"- {r['titre']} ({transcription.horodatage(r.get('duree') or 0)})" for r in trs)]
+    parties += ["", "# Reste à faire, en retard ou pour aujourd'hui", "\n".join("- " + afaire.decrire(t) for t in retard) or "(rien)"]
+    parties += ["", "# Prévu demain", "\n".join("- " + afaire.decrire(t) for t in pour_demain) or "(rien dans la liste)"]
+    parties += ["", "# À vérifier avec tes outils (seulement ceux disponibles, sans demander) :",
+                "- rendez-vous de demain (connecteur agenda) ;",
+                "- mails importants restés sans réponse aujourd'hui (connecteurs mail).",
+                "Puis fais un bilan ORAL court (5 à 7 phrases) : ce qui a avancé (félicite sans en faire trop), ce qui reste, "
+                "ce qui attend demain ; propose de décaler les tâches en retard si besoin, et souhaite une bonne soirée."]
+    return "\n".join(parties)
+
+
 # ---------- tickets ----------
 @outil
 def envoyer_ticket(genre: str, titre: str, description: str = "", joindre_journal: bool = False):

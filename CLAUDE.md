@@ -55,6 +55,9 @@ Wesley vit près de l'horloge (zone de notification).
   Ollama puis `ollama pull qwen3.5:9b`) / **LM Studio**. Ajouter une IA compatible OpenAI = une entrée dans
   `wesley/fournisseurs.py` (plus sa traduction dans `interface/src/lib/en.ts`).
 - L'appeler : dire « Wesley, … » ou `Ctrl+Alt+W` (Windows) / `⌃⌥W` (Mac). Le faire taire : « Wesley, stop » ou `Ctrl+Alt+S`.
+  Lui envoyer ce qu'on regarde (texte sélectionné dans n'importe quelle appli, sinon l'écran) : `Ctrl+Alt+E` / `⌃⌥E`.
+- Au premier usage, la mémoire par le sens télécharge un modèle local d'environ 270 Mo (une fois, dans le dossier des
+  données de l'appli). Telegram, Home Assistant, Discord/Slack s'ajoutent dans Connecteurs.
 
 Vérifie que ça tourne : `curl -s http://127.0.0.1:7777/api/session` doit répondre (serveur local de l'appli).
 Journal en cas de souci : `~/Library/Application Support/Wesley/logs/wesley.log` (Mac) ou

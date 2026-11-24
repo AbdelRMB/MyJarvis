@@ -14,7 +14,7 @@ declare global {
 
 /** Version de la politique de confidentialité (même valeur que POLITIQUE dans serveur/app.py). */
 export const POLITIQUE = "2026-11-21";
-export const VERSION_MOBILE = "2.7.0";
+export const VERSION_MOBILE = "2.8.0";
 
 export class ErreurCompte extends Error {
   constructor(message: string, public statut = 0) {
