@@ -2,15 +2,16 @@
 from . import outil
 
 
-def _lancer(**options):
-    """Passe par le serveur de l'interface quand il tourne (il coupe l'écoute « Wesley » pendant la réunion)."""
+def _lancer(reprendre: str = "", **options):
+    """Passe par le serveur de l'interface quand il tourne (il coupe l'écoute « Wesley » pendant la réunion).
+    reprendre : identifiant d'une transcription à continuer."""
     try:
         from .. import web
     except ImportError:          # Wesley en mode terminal, sans interface
         from .. import transcription
-        return transcription.demarrer(**options)
+        return transcription.reprendre(reprendre, **options) if reprendre else transcription.demarrer(**options)
     try:
-        return web._lancer_transcription(**options)
+        return web._lancer_transcription(reprendre=reprendre, **options)
     except Exception as e:
         if e.__class__.__name__ == "HTTPException":
             raise ValueError(getattr(e, "detail", str(e)))
@@ -50,6 +51,34 @@ def arreter_transcription():
         return "Aucune transcription en cours."
     return (f"Transcription « {s['titre']} » arrêtée ({transcription.horodatage(s['duree'])}). Les dernières phrases "
             "sont en cours de transcription ; l'utilisateur peut nommer les locuteurs dans l'onglet Transcription.")
+
+
+@outil
+def reprendre_transcription(identifiant: str = "", source: str = "", avec_micro: bool = True):
+    """Reprend une transcription de réunion déjà faite (terminée ou interrompue) : la suite s'écrit à la fin de la même transcription, avec les mêmes personnes (Locuteur 1, 2… et leurs noms) et l'horodatage qui continue. À utiliser quand on te demande de continuer, reprendre ou compléter une transcription (la réunion reprend après une pause, Wesley a été fermé…).
+    identifiant: code de la transcription (lister_transcriptions) ; vide = la plus récente
+    source: « systeme » (réunion en ligne) ou « micro » (réunion physique) ; vide = la même qu'avant
+    avec_micro: source « systeme » seulement : ajouter le micro pour transcrire aussi la voix de l'utilisateur"""
+    from .. import transcription
+    tid = identifiant.strip("[] ")
+    if not tid:
+        liste = transcription.lister()
+        if not liste:
+            return "Aucune transcription à reprendre."
+        tid = liste[0]["id"]
+    try:
+        s = transcription.lire(tid)
+    except ValueError:
+        s = None
+    if s is None:
+        return "Transcription introuvable."
+    source = source if source in ("micro", "systeme") else (s.get("source") if s.get("source") in ("micro", "systeme") else "micro")
+    try:
+        r = _lancer(reprendre=tid, source=source, avec_micro=bool(avec_micro) and source == "systeme")
+    except ValueError as e:
+        return f"Impossible : {e}"
+    return (f"Transcription « {r['titre']} » reprise à {transcription.horodatage(r.get('duree') or 0)} : la suite "
+            "s'ajoute au même fichier, avec les mêmes locuteurs. Dis « arrête la transcription » à la fin.")
 
 
 @outil
