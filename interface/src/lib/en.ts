@@ -841,4 +841,25 @@ export const EN: Record<string, string> = {
   "Choisis une transcription pour la relire.": "Choose a transcription to review it.",
   "Préparation…": "Preparing…",
   "Finalisation…": "Finishing…",
+  // tâches et transcriptions des autres appareils (wesley/partage.py)
+  "En ligne": "Online",
+  "Hors ligne": "Offline",
+  "sur {appareil}": "on {appareil}",
+  "Supprimer cette tâche ? Elle sera retirée de {appareil} et de tous tes appareils (la branche et son code restent).":
+    "Delete this task? It will be removed from {appareil} and all your devices (the branch and its code stay).",
+  "Lancée sur {appareil} : c'est lui qui la fait tourner. Reprendre, arrêter ou changer la consigne lui est demandé.":
+    "Started on {appareil}: it runs there. Resuming, stopping or changing the instructions is requested from it.",
+  "Lancée sur {appareil}, hors ligne pour l'instant : ouvre Wesley dessus pour la reprendre ou l'arrêter.":
+    "Started on {appareil}, offline for now: open Wesley on it to resume or stop it.",
+  "Wesley demande à {appareil} de relancer la tâche ; s'il ne peut pas, il te dit pourquoi.":
+    "Wesley asks {appareil} to restart the task; if it can't, it tells you why.",
+  "Supprimer cette transcription ? Elle sera effacée de {appareil} (fichier Markdown compris) et de tous tes appareils.":
+    "Delete this transcription? It will be erased from {appareil} (Markdown file included) and all your devices.",
+  "Reprise demandée à {appareil}.": "Resume requested from {appareil}.",
+  "Faite sur {appareil} : tu la lis ici, et Reprendre la relance sur {appareil} (son micro ou son son). Les changements de noms et de locuteurs lui sont demandés.":
+    "Made on {appareil}: you read it here, and Resume restarts it on {appareil} (its microphone or its sound). Name and speaker changes are requested from it.",
+  "Faite sur {appareil}, hors ligne pour l'instant : tu peux la lire et l'exporter ici ; pour la reprendre ou la modifier, ouvre Wesley sur {appareil}.":
+    "Made on {appareil}, offline for now: you can read and export it here; to resume or edit it, open Wesley on {appareil}.",
+  "Wesley demande à {appareil} de reprendre cette transcription ({src}) ; s'il ne peut pas, il te dit pourquoi.":
+    "Wesley asks {appareil} to resume this transcription ({src}); if it can't, it tells you why.",
 };

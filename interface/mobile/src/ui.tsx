@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { create } from "zustand";
 import { cx } from "../../src/lib/format";
 
-export type Vue = "assistant" | "afaire" | "memoire" | "appareils" | "plus" | "automatisations" | "services" | "taches" | "tickets" | "reglages";
+export type Vue = "assistant" | "afaire" | "memoire" | "appareils" | "plus" | "automatisations" | "services" | "taches" | "transcriptions" | "tickets" | "reglages";
 
 type Ui = {
   vue: Vue;

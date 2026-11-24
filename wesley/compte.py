@@ -711,6 +711,13 @@ def _session_revoquee():
         pass
 
 
+def _sans_erreur(f):
+    try:
+        f()
+    except Exception as e:
+        print(f"  ! {getattr(f, '__name__', f)} : {e}")
+
+
 def demarrer_synchro():
     """Temps réel : le serveur répond dès qu'un appareil change quelque chose dans le compte (attente longue).
     Chaque ajout, suppression ou modification arrive sur tous tes appareils en ~1 seconde."""
@@ -720,27 +727,34 @@ def demarrer_synchro():
     _synchro_lancee = True
 
     def boucle():
-        from . import appareils
-        revision, derniere_presence = 0, 0.0
+        from . import appareils, partage
+        revision, derniere_presence, partages, reconcilie = 0, 0.0, 0.0, False
         while True:
             if not connecte():
                 time.sleep(5)
-                revision = 0
+                revision, partages, reconcilie = 0, 0.0, False
                 continue
+            if not reconcilie:   # (re)connexion : ce qui a changé ici hors ligne part dans le compte
+                reconcilie = True
+                threading.Thread(target=_sans_erreur, args=(partage.reconcilier,), daemon=True).start()
             try:
                 if time.time() - derniere_presence > 20:   # « je suis en ligne » (onglet Appareils)
                     derniere_presence = time.time()
                     threading.Thread(target=appareils.presence, daemon=True).start()
                 vider_attente()   # écritures faites hors ligne : elles repartent dès que le réseau revient
-                r = _appel("GET", f"/v1/attendre?depuis={revision}", http=_http_attente, timeout=45)
+                r = _appel("GET", f"/v1/attendre?depuis={revision}&partages={partages}", http=_http_attente, timeout=45)
                 if r.get("ordres"):   # un de tes autres appareils demande quelque chose à celui-ci
                     appareils.traiter(r["ordres"])
                 if r["change"]:
                     synchroniser()
+                if r.get("partages", -1) >= 0 and r["partages"] != partages:   # tâche ou transcription d'un autre appareil
+                    partages = r["partages"]
+                    threading.Thread(target=_sans_erreur, args=(partage.rafraichir,), daemon=True).start()
                 revision = r["revision"]
             except SessionRevoquee:
                 _session_revoquee()
             except ErreurCompte:
+                reconcilie = False   # au retour du réseau, ce qui a changé ici repart dans le compte
                 time.sleep(10)   # pas de réseau ou serveur indisponible : on réessaie
             except Exception as e:
                 print(f"  ! Synchro temps réel : {e}")

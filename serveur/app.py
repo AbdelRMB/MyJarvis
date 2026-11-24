@@ -144,6 +144,11 @@ CREATE INDEX IF NOT EXISTS tickets_par_utilisateur ON tickets (utilisateur, modi
 CREATE TABLE IF NOT EXISTS documents (
     utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE, nom TEXT NOT NULL,
     contenu TEXT NOT NULL, modifie REAL NOT NULL, PRIMARY KEY (utilisateur, nom));
+CREATE TABLE IF NOT EXISTS partages (
+    utilisateur INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE, genre TEXT NOT NULL, eid TEXT NOT NULL,
+    appareil TEXT NOT NULL, resume TEXT NOT NULL DEFAULT '', contenu TEXT NOT NULL DEFAULT '',
+    modifie REAL NOT NULL, supprime INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (utilisateur, genre, eid));
+CREATE INDEX IF NOT EXISTS partages_par_date ON partages (utilisateur, modifie);
 """
 
 
@@ -364,7 +369,7 @@ def supprimer_mon_compte(d: CleAuth, uid: int = Depends(utilisateur)):
         u = c.execute("SELECT auth_sel, auth_hash FROM utilisateurs WHERE id = ?", (uid,)).fetchone()
         if not u or not hmac.compare_digest(u["auth_hash"], _hacher(d.cle_auth, u["auth_sel"])):
             raise HTTPException(403, "Mot de passe incorrect.")
-        for table in ("sessions", "faits", "historique", "journal_memoire", "appareils", "ordres", "tickets", "documents"):
+        for table in ("sessions", "faits", "historique", "journal_memoire", "appareils", "ordres", "tickets", "documents", "partages"):
             c.execute(f"DELETE FROM {table} WHERE utilisateur = ?", (uid,))   # en plus du ON DELETE CASCADE
         c.execute("DELETE FROM utilisateurs WHERE id = ?", (uid,))
     return {"ok": True}
@@ -649,18 +654,99 @@ def _ordres_en_attente(uid: int, appareil: str) -> list:
         c.close()
 
 
+def _version_partages(uid: int) -> float:
+    c = _connexion()
+    try:
+        return c.execute("SELECT COALESCE(MAX(modifie), 0) AS m FROM partages WHERE utilisateur = ?", (uid,)).fetchone()["m"]
+    finally:
+        c.close()
+
+
 @app.get("/v1/attendre")
-async def attendre(depuis: int = 0, s: tuple = Depends(session_courante)):
-    """Répond dès que le compte change (révision > depuis), qu'un ordre arrive pour cet appareil, ou au bout de
-    25 s. Les appareils rappellent aussitôt : changements et ordres arrivent partout en ~1 s."""
+async def attendre(depuis: int = 0, partages: float = -1, s: tuple = Depends(session_courante)):
+    """Répond dès que le compte change (révision > depuis), qu'un ordre arrive pour cet appareil, qu'une tâche ou
+    une transcription partagée change (partages = dernière version vue ; -1 : l'appareil ne les suit pas), ou au
+    bout de 25 s. Les appareils rappellent aussitôt : changements et ordres arrivent partout en ~1 s.
+    Les partages ont leur propre compteur : une transcription en cours (envoyée toutes les ~10 s) ne déclenche
+    pas une synchro complète de la mémoire sur chaque appareil."""
     uid, appareil = s
     for _ in range(50):
         ordres = await asyncio.to_thread(_ordres_en_attente, uid, appareil[:16])
         r = await asyncio.to_thread(_revision, uid)
-        if r > depuis or ordres:
-            return {"revision": r, "change": r > depuis, "ordres": ordres}
+        p = await asyncio.to_thread(_version_partages, uid) if partages >= 0 else -1
+        if r > depuis or ordres or p != partages:
+            return {"revision": r, "change": r > depuis, "ordres": ordres, "partages": p}
         await asyncio.sleep(0.5)
-    return {"revision": await asyncio.to_thread(_revision, uid), "change": False, "ordres": []}
+    return {"revision": await asyncio.to_thread(_revision, uid), "change": False, "ordres": [],
+            "partages": await asyncio.to_thread(_version_partages, uid) if partages >= 0 else -1}
+
+
+# ---------- partages : tâches de fond et transcriptions de chaque appareil, visibles sur tous ----------
+# Chiffrés par les appareils (clé du coffre) : le serveur ne voit ni le titre ni le contenu. Chaque élément
+# appartient à l'appareil qui l'a publié (`appareil` = identifiant de sa session) : les autres le lisent, et lui
+# demandent d'agir dessus par un ordre (reprendre, arrêter…).
+GENRES_PARTAGE = {"tache", "transcription"}
+MAX_PARTAGE = 8_000_000
+
+
+def _verifier_partage(genre: str, eid: str):
+    if genre not in GENRES_PARTAGE or not re.fullmatch(r"[\w-]{1,64}", eid):
+        raise HTTPException(404, "Élément inconnu.")
+
+
+class Partage(BaseModel):
+    resume: str = Field(max_length=200_000)
+    contenu: str = Field("", max_length=MAX_PARTAGE)
+
+
+@app.get("/v1/partages")
+def lister_partages(genre: str = "", s: tuple = Depends(session_courante)):
+    """Résumés chiffrés (sans le contenu) ; `moi` = élément publié par l'appareil qui demande."""
+    uid, h = s
+    with db() as c:
+        lignes = c.execute("SELECT genre, eid, appareil, resume, modifie FROM partages WHERE utilisateur = ? AND supprime = 0"
+                           + (" AND genre = ?" if genre else "") + " ORDER BY modifie DESC",
+                           (uid, genre) if genre else (uid,)).fetchall()
+    return [{"genre": l["genre"], "id": l["eid"], "appareil": l["appareil"], "resume": l["resume"],
+             "modifie": l["modifie"], "moi": l["appareil"] == h[:16]} for l in lignes]
+
+
+@app.get("/v1/partages/{genre}/{eid}")
+def lire_partage(genre: str, eid: str, s: tuple = Depends(session_courante)):
+    _verifier_partage(genre, eid)
+    uid, h = s
+    with db() as c:
+        l = c.execute("SELECT appareil, resume, contenu, modifie FROM partages WHERE utilisateur = ? AND genre = ? AND eid = ? "
+                      "AND supprime = 0", (uid, genre, eid)).fetchone()
+    if not l:
+        raise HTTPException(404, "Élément introuvable (supprimé sur son appareil ?).")
+    return {"genre": genre, "id": eid, "appareil": l["appareil"], "resume": l["resume"], "contenu": l["contenu"],
+            "modifie": l["modifie"], "moi": l["appareil"] == h[:16]}
+
+
+@app.put("/v1/partages/{genre}/{eid}")
+def ecrire_partage(genre: str, eid: str, d: Partage, s: tuple = Depends(session_courante)):
+    """Publié par l'appareil d'origine : il en devient (ou en reste) le propriétaire."""
+    _verifier_partage(genre, eid)
+    uid, h = s
+    with db() as c:
+        c.execute("INSERT INTO partages (utilisateur, genre, eid, appareil, resume, contenu, modifie, supprime) "
+                  "VALUES (?, ?, ?, ?, ?, ?, ?, 0) ON CONFLICT (utilisateur, genre, eid) DO UPDATE SET "
+                  "appareil = excluded.appareil, resume = excluded.resume, contenu = excluded.contenu, "
+                  "modifie = excluded.modifie, supprime = 0",
+                  (uid, genre, eid, h[:16], d.resume, d.contenu, time.time()))
+    return {"ok": True}
+
+
+@app.post("/v1/partages/{genre}/{eid}/supprimer")
+def supprimer_partage(genre: str, eid: str, s: tuple = Depends(session_courante)):
+    """Retiré de tous les appareils (pierre tombale datée : les autres appareils voient le changement)."""
+    _verifier_partage(genre, eid)
+    uid, _ = s
+    with db() as c:
+        n = c.execute("UPDATE partages SET resume = '', contenu = '', supprime = 1, modifie = ? "
+                      "WHERE utilisateur = ? AND genre = ? AND eid = ? AND supprime = 0", (time.time(), uid, genre, eid)).rowcount
+    return {"ok": bool(n)}
 
 
 # ---------- mes appareils : présence, déconnexion à distance ----------

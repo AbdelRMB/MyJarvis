@@ -23,6 +23,7 @@ import { Reglages } from "./vues/Reglages";
 import { Services } from "./vues/Services";
 import { Taches } from "./vues/Taches";
 import { Tickets } from "./vues/Tickets";
+import { Transcriptions } from "./vues/Transcriptions";
 
 // ordres reçus des autres appareils : exécutés par le Wesley du téléphone, avec confirmation à l'écran
 recepteur.demande = demandeRecue;
@@ -44,7 +45,7 @@ const ONGLETS: { id: Vue; libelle: string; icone: typeof Bot }[] = [
   { id: "appareils", libelle: "Appareils", icone: MonitorSmartphone },
   { id: "plus", libelle: "Plus", icone: Menu },
 ];
-const SOUS_PLUS: Vue[] = ["automatisations", "services", "taches", "tickets", "reglages"];
+const SOUS_PLUS: Vue[] = ["automatisations", "services", "taches", "transcriptions", "tickets", "reglages"];
 
 export default function App() {
   const [s, setS] = useState<Session | undefined>(session());
@@ -89,6 +90,7 @@ function Coque({ onDeconnecte }: { onDeconnecte: () => void }) {
         {vue === "automatisations" && <Automatisations />}
         {vue === "services" && <Services />}
         {vue === "taches" && <Taches />}
+        {vue === "transcriptions" && <Transcriptions />}
         {vue === "tickets" && <Tickets />}
         {vue === "reglages" && <Reglages onDeconnecte={onDeconnecte} />}
       </main>

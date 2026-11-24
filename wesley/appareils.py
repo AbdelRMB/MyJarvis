@@ -241,6 +241,9 @@ def _realiser(d: dict) -> tuple[str, dict]:
         return f"Fichier enregistré sur {MACHINE} : {p}", {}
     if t == "ping":
         return f"{MACHINE} est là.", {}
+    if t == "partage":   # tâche ou transcription de cet appareil, pilotée depuis un autre (reprendre, arrêter…)
+        from . import partage
+        return partage.executer(d), {}
     if t == "mettre_a_jour":
         return _mettre_a_jour(), {}
     raise ValueError(f"Type d'ordre inconnu : {t}")

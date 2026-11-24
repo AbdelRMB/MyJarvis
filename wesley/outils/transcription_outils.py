@@ -42,12 +42,38 @@ def demarrer_transcription(source: str = "micro", avec_micro: bool = True, titre
             "Dis « arrête la transcription » à la fin.")
 
 
+def _partage():
+    from .. import partage
+    return partage
+
+
+def _locale(tid: str):
+    from .. import transcription
+    try:
+        return transcription.lire(tid)
+    except ValueError:
+        return None
+
+
+def _toutes() -> list[dict]:
+    """Transcriptions de cet appareil et des autres appareils du compte, les plus récentes d'abord."""
+    from .. import transcription
+    return sorted(transcription.lister() + _partage().distants("transcription"), key=lambda r: r.get("debut") or 0,
+                  reverse=True)
+
+
 @outil
 def arreter_transcription():
-    """Arrête la transcription de réunion en cours (la fin est transcrite et les voix sont regroupées une dernière fois)."""
+    """Arrête la transcription de réunion en cours (la fin est transcrite et les voix sont regroupées une dernière fois). Si elle tourne sur un autre appareil, c'est lui qui l'arrête."""
     from .. import transcription
     s = transcription.arreter()
     if s is None:
+        ailleurs = [r for r in _partage().distants("transcription") if r.get("etat") in ("preparation", "en_cours")]
+        if len(ailleurs) == 1:
+            try:
+                return _partage().agir("transcription", ailleurs[0]["id"], "arreter")
+            except ValueError as e:
+                return str(e)
         return "Aucune transcription en cours."
     return (f"Transcription « {s['titre']} » arrêtée ({transcription.horodatage(s['duree'])}). Les dernières phrases "
             "sont en cours de transcription ; l'utilisateur peut nommer les locuteurs dans l'onglet Transcription.")
@@ -62,16 +88,20 @@ def reprendre_transcription(identifiant: str = "", source: str = "", avec_micro:
     from .. import transcription
     tid = identifiant.strip("[] ")
     if not tid:
-        liste = transcription.lister()
+        liste = _toutes()
         if not liste:
             return "Aucune transcription à reprendre."
         tid = liste[0]["id"]
-    try:
-        s = transcription.lire(tid)
-    except ValueError:
-        s = None
+    s = _locale(tid)
     if s is None:
-        return "Transcription introuvable."
+        if _partage().trouver("transcription", tid) is None:
+            return "Transcription introuvable."
+        # faite sur un autre appareil : c'est lui qui la reprend (son micro / le son de cet ordinateur-là)
+        params = {"source": source} if source in ("micro", "systeme") else {}
+        try:
+            return _partage().agir("transcription", tid, "reprendre", params | {"avec_micro": bool(avec_micro)})
+        except ValueError as e:
+            return str(e)
     source = source if source in ("micro", "systeme") else (s.get("source") if s.get("source") in ("micro", "systeme") else "micro")
     try:
         r = _lancer(reprendre=tid, source=source, avec_micro=bool(avec_micro) and source == "systeme")
@@ -83,12 +113,13 @@ def reprendre_transcription(identifiant: str = "", source: str = "", avec_micro:
 
 @outil
 def lister_transcriptions():
-    """Liste les transcriptions de réunions (titre, date, durée, nombre de personnes, identifiant)."""
+    """Liste les transcriptions de réunions (titre, date, durée, nombre de personnes, identifiant), y compris celles faites sur tes autres appareils (« sur … »)."""
     from datetime import datetime
     from .. import transcription
     lignes = [f"[{r['id']}] {r['titre']} — {datetime.fromtimestamp(r['debut']).strftime('%d/%m/%Y %H:%M')}, "
               f"{transcription.horodatage(r.get('duree') or 0)}, {r['nb_locuteurs']} locuteur(s), {r['etat']}"
-              for r in transcription.lister()[:30]]
+              + (f", sur {r['appareil']}" if r.get("distant") else "")
+              for r in _toutes()[:30]]
     return "\n".join(lignes) or "Aucune transcription."
 
 
@@ -102,14 +133,11 @@ def lire_transcription(identifiant: str = "", debut: float = 0, fin: float = 0, 
     from .. import transcription
     tid = identifiant.strip("[] ")
     if not tid:
-        liste = transcription.lister()
+        liste = _toutes()
         if not liste:
             return "Aucune transcription."
         tid = liste[0]["id"]
-    try:
-        s = transcription.lire(tid)
-    except ValueError:
-        s = None
+    s = _locale(tid) or _partage().lire("transcription", tid)   # ou faite sur un autre appareil
     if s is None:
         return "Transcription introuvable."
     return transcription.extrait(s, debut, fin, partie)

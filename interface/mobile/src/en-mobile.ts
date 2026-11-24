@@ -218,4 +218,11 @@ export const EN_MOBILE: Record<string, string> = {
   samedi: "Saturday",
   dimanche: "Sunday",
   Actualiser: "Refresh",
+  "Changer ou préciser la tâche…": "Change or refine the task…",
+  Déroulé: "Progress",
+  "Aucune tâche sur tes ordinateurs pour l'instant.": "No tasks on your computers yet.",
+  Transcriptions: "Transcriptions",
+  "Réunions transcrites sur tes ordinateurs": "Meetings transcribed on your computers",
+  "Aucune transcription sur tes ordinateurs. Lance-en une depuis l'onglet Transcription de Wesley sur ton Mac ou ton PC.":
+    "No transcriptions on your computers. Start one from Wesley's Transcription tab on your Mac or PC.",
 };

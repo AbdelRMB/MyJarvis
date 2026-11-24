@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, CircleDot, FolderOpen, ListTodo, Loader2, Play, Plus, Send, Square, Trash2, User, Wrench, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, CircleDot, FolderOpen, ListTodo, Loader2, Monitor, Play, Plus, Send, Square, Trash2, User, Wrench, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge, Bouton, Champ, EnTetePage, Panneau, Vide } from "../components/ui";
 import { api } from "../lib/api";
@@ -8,7 +8,24 @@ import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
 
 type Statut = "en_cours" | "terminee" | "echec" | "arretee" | "interrompue";
-type Resume = { id: string; titre: string; statut: Statut; outil: string; projet: string; branche: string; dossier: string; cree: number; maj: number; etape: number; bilan: string; wesley_md?: string[] | null };
+type Resume = {
+  id: string;
+  titre: string;
+  statut: Statut;
+  outil: string;
+  projet: string;
+  branche: string;
+  dossier: string;
+  cree: number;
+  maj: number;
+  etape: number;
+  bilan: string;
+  wesley_md?: string[] | null;
+  /** Lancée sur un autre appareil du compte : c'est lui qui la reprend, l'arrête ou la change. */
+  distant?: boolean;
+  appareil?: string;
+  en_ligne?: boolean;
+};
 type Entree = { ts: number; genre: "utilisateur" | "wesley" | "claude" | "outil" | "info" | "erreur"; texte: string };
 type Tache = Resume & { consigne: string; ajouts: string[]; journal: Entree[] };
 
@@ -27,6 +44,17 @@ const QUI: Record<Entree["genre"], [string, typeof User]> = {
   info: ["Info", CircleDot],
   erreur: ["Erreur", XCircle],
 };
+
+/** Appareil d'origine d'une tâche lancée ailleurs (point vert : allumé avec Wesley ouvert). */
+export function Origine({ appareil, enLigne }: { appareil?: string; enLigne?: boolean }) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1 text-[11px] text-doux" title={enLigne ? t("En ligne") : t("Hors ligne")}>
+      <Monitor className="size-3 flex-none" />
+      <span className="truncate">{t("sur {appareil}", { appareil: appareil ?? "?" })}</span>
+      <span className={cx("size-1.5 flex-none rounded-full", enLigne ? "bg-vert" : "bg-tres-doux")} />
+    </span>
+  );
+}
 
 function Pastille({ s }: { s: Statut }) {
   const [l, c] = STATUTS[s] ?? [s, "text-doux"];
@@ -52,8 +80,9 @@ export function VueTaches() {
     charger();
     const sur = (e: Event) => {
       charger();
+      // id vide : une tâche d'un autre appareil a changé (elle peut être celle qu'on regarde)
       const id = (e as CustomEvent<string>).detail;
-      if (id && id === choisieRef.current) chargerDetail(id);
+      if (choisieRef.current && (!id || id === choisieRef.current)) chargerDetail(choisieRef.current);
     };
     bus.addEventListener("tache_maj", sur);
     return () => bus.removeEventListener("tache_maj", sur);
@@ -79,8 +108,11 @@ export function VueTaches() {
       toast((x as Error).message, "erreur");
     }
   };
+  // tâche d'un autre appareil : l'action lui est demandée (jusqu'à ~1 min) ; s'il ne peut pas, on dit pourquoi
+  const [attente, setAttente] = useState("");
   const agir = async (action: string, corps?: object) => {
     if (!detail) return;
+    setAttente(action);
     try {
       const r = await api<{ message?: string }>(`/api/taches/${detail.id}/${action}`, { method: "POST", json: corps ?? {} });
       if (r.message) toast(r.message, "succes");
@@ -88,15 +120,30 @@ export function VueTaches() {
       charger();
     } catch (x) {
       toast((x as Error).message, "erreur");
+    } finally {
+      setAttente("");
     }
   };
   const supprimer = async () => {
-    if (!detail || !confirm(t("Supprimer cette tâche de la liste ? (la branche et son code restent)"))) return;
-    await api(`/api/taches/${detail.id}`, { method: "DELETE" });
-    setChoisie(null);
-    setDetail(null);
-    charger();
+    if (!detail) return;
+    const question = detail.distant
+      ? t("Supprimer cette tâche ? Elle sera retirée de {appareil} et de tous tes appareils (la branche et son code restent).", { appareil: detail.appareil ?? "?" })
+      : t("Supprimer cette tâche de la liste ? (la branche et son code restent)");
+    if (!confirm(question)) return;
+    setAttente("supprimer");
+    try {
+      const r = await api<{ message?: string }>(`/api/taches/${detail.id}`, { method: "DELETE" });
+      if (r.message) toast(r.message, "succes");
+      setChoisie(null);
+      setDetail(null);
+      charger();
+    } catch (x) {
+      toast((x as Error).message, "erreur");
+    } finally {
+      setAttente("");
+    }
   };
+  const sur = detail?.distant ? ` ${t("sur {appareil}", { appareil: detail.appareil ?? "?" })}` : "";
 
   return (
     <div className="flex h-full min-h-0 flex-col p-4 md:p-8">
@@ -143,6 +190,7 @@ export function VueTaches() {
                     <Pastille s={x.statut} />
                   </div>
                   <div className="mt-0.5 truncate font-mono text-[11px] text-tres-doux">{x.branche || x.projet}</div>
+                  {x.distant && <Origine appareil={x.appareil} enLigne={x.en_ligne} />}
                 </button>
               ))
             )}
@@ -162,6 +210,7 @@ export function VueTaches() {
                   <Badge ton="doux">
                     {t("étape")} {detail.etape}
                   </Badge>
+                  {detail.distant && <Origine appareil={detail.appareil} enLigne={detail.en_ligne} />}
                 </div>
                 <p className="mt-1 font-mono text-[11px] text-tres-doux">
                   {detail.branche ? `${detail.branche} · ` : ""}
@@ -172,23 +221,36 @@ export function VueTaches() {
                     {t("Suit")} <span className="font-mono">{detail.wesley_md.join(", ")}</span>
                   </p>
                 )}
+                {detail.distant && (
+                  <p className="mt-2 rounded-md border border-ligne bg-surface-2/40 px-2 py-1.5 text-[12px] text-doux">
+                    {detail.en_ligne
+                      ? t("Lancée sur {appareil} : c'est lui qui la fait tourner. Reprendre, arrêter ou changer la consigne lui est demandé.", { appareil: detail.appareil ?? "?" })
+                      : t("Lancée sur {appareil}, hors ligne pour l'instant : ouvre Wesley dessus pour la reprendre ou l'arrêter.", { appareil: detail.appareil ?? "?" })}
+                  </p>
+                )}
                 {detail.bilan && <p className="mt-2 text-[13px] text-doux">{detail.bilan}</p>}
                 <div className="mt-3 flex flex-wrap gap-2">
                   {detail.statut === "en_cours" ? (
-                    <Bouton taille="sm" variante="danger" icone={<Square />} onClick={() => agir("arreter")}>
-                      {t("Arrêter")}
+                    <Bouton taille="sm" variante="danger" icone={<Square />} chargement={attente === "arreter"} onClick={() => agir("arreter")}>
+                      {t("Arrêter") + sur}
                     </Bouton>
                   ) : (
-                    <Bouton taille="sm" icone={<Play />} onClick={() => agir("reprendre")}>
-                      {t("Reprendre")}
+                    <Bouton
+                      taille="sm"
+                      icone={<Play />}
+                      chargement={attente === "reprendre"}
+                      title={detail.distant ? t("Wesley demande à {appareil} de relancer la tâche ; s'il ne peut pas, il te dit pourquoi.", { appareil: detail.appareil ?? "?" }) : undefined}
+                      onClick={() => agir("reprendre")}
+                    >
+                      {t("Reprendre") + sur}
                     </Bouton>
                   )}
-                  {detail.dossier && (
+                  {detail.dossier && !detail.distant && (
                     <Bouton taille="sm" variante="fantome" icone={<FolderOpen />} onClick={() => agir("ouvrir")}>
                       {t("Ouvrir le dossier")}
                     </Bouton>
                   )}
-                  <Bouton taille="sm" variante="fantome" icone={<Trash2 />} onClick={supprimer}>
+                  <Bouton taille="sm" variante="fantome" icone={<Trash2 />} chargement={attente === "supprimer"} onClick={supprimer}>
                     {t("Supprimer")}
                   </Bouton>
                 </div>

@@ -1,6 +1,7 @@
-import { ChevronRight, Code2, LifeBuoy, Plug, Settings, Workflow } from "lucide-react";
+import { AudioLines, ChevronRight, Code2, LifeBuoy, Plug, Settings, Workflow } from "lucide-react";
 import { t } from "../../../src/lib/i18n";
 import { useDonnees } from "../moteur/donnees";
+import { usePartages } from "../moteur/partages";
 import { session } from "../moteur/stockage";
 import { allerA, Entete, Ligne, type Vue } from "../ui";
 
@@ -8,14 +9,18 @@ const ENTREES: { vue: Vue; titre: string; detail: string; icone: typeof Plug }[]
   { vue: "automatisations", titre: "Automatisations", detail: "Règles « quand… alors… » et routines", icone: Workflow },
   { vue: "services", titre: "Services connectés", detail: "Mails, GitHub, SSH, navigateur, sites appris", icone: Plug },
   { vue: "taches", titre: "Tâches de fond", detail: "Code avec Claude Code sur tes ordinateurs", icone: Code2 },
+  { vue: "transcriptions", titre: "Transcriptions", detail: "Réunions transcrites sur tes ordinateurs", icone: AudioLines },
   { vue: "tickets", titre: "Tickets", detail: "Bugs, idées, questions au développeur", icone: LifeBuoy },
   { vue: "reglages", titre: "Réglages", detail: "Cerveau, voix, compte, ce téléphone", icone: Settings },
 ];
 
 export function Plus() {
   const { automatisations, connecteurs, tickets } = useDonnees();
+  const partages = usePartages((p) => p.liste);
   const compteurs: Partial<Record<Vue, number>> = {
     automatisations: automatisations.length,
+    taches: partages.filter((x) => x.genre === "tache").length,
+    transcriptions: partages.filter((x) => x.genre === "transcription").length,
     services: Object.keys(connecteurs).length,
     tickets: tickets.filter((x) => x.statut !== "ferme").length,
   };

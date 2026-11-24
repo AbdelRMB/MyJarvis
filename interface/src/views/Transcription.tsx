@@ -6,6 +6,7 @@ import { cx } from "../lib/format";
 import { LANGUE, t } from "../lib/i18n";
 import { bus } from "../stores/wesley";
 import { toast } from "../stores/toasts";
+import { Origine } from "./Taches";
 
 type Source = "systeme" | "micro" | "fichier";
 type Etat = "preparation" | "en_cours" | "finalisation" | "terminee" | "erreur" | "interrompue";
@@ -21,6 +22,10 @@ type Resume = {
   erreur: string;
   nb_locuteurs: number;
   nb_phrases: number;
+  /** Faite sur un autre appareil du compte : c'est lui qui la reprend, l'arrête ou la modifie. */
+  distant?: boolean;
+  appareil?: string;
+  en_ligne?: boolean;
 };
 type Segment = { debut: number; fin: number; locuteur: number; texte: string };
 type Locuteur = { id: number; nom: string; duree: number; phrases: number };
@@ -417,11 +422,20 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
     if (d && actif(s.etat) && suivre.current) d.scrollTop = d.scrollHeight;
   }, [s.segments.length]);
 
+  const [attente, setAttente] = useState("");
   const agir = async (action: string, corps: object) => {
+    setAttente(action);
     try {
-      recharger(await api<Session>(`/api/transcriptions/${s.id}/${action}`, { method: "POST", json: corps }));
+      const r = await api<Session & { message?: string }>(`/api/transcriptions/${s.id}/${action}`, { method: "POST", json: corps });
+      if (s.distant) {
+        // faite sur un autre appareil : il a fait le changement chez lui, la nouvelle version arrive ici dans un instant
+        if (r.message) toast(r.message, "succes");
+        recharger();
+      } else recharger(r);
     } catch (x) {
       toast((x as Error).message, "erreur");
+    } finally {
+      setAttente("");
     }
   };
   const exporter = async (format: "md" | "txt", ouvrir = false) => {
@@ -442,29 +456,43 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
     }
   };
   const supprimer = async () => {
-    if (!confirm(t("Supprimer cette transcription ? Le fichier Markdown dans tes Documents est aussi effacé."))) return;
+    const question = s.distant
+      ? t("Supprimer cette transcription ? Elle sera effacée de {appareil} (fichier Markdown compris) et de tous tes appareils.", { appareil: s.appareil ?? "?" })
+      : t("Supprimer cette transcription ? Le fichier Markdown dans tes Documents est aussi effacé.");
+    if (!confirm(question)) return;
+    setAttente("supprimer");
     try {
-      await api(`/api/transcriptions/${s.id}?fichier=true`, { method: "DELETE" });
+      const r = await api<{ message?: string }>(`/api/transcriptions/${s.id}?fichier=true`, { method: "DELETE" });
+      if (r.message) toast(r.message, "succes");
       supprime();
     } catch (x) {
       toast((x as Error).message, "erreur");
+    } finally {
+      setAttente("");
     }
   };
-  const [reprise, setReprise] = useState(false);
   const reprendre = async () => {
-    setReprise(true);
+    setAttente("reprendre");
     try {
-      // la suite s'ajoute à la fin de cette transcription : mêmes locuteurs, horodatage qui continue
-      recharger(await api<Session>(`/api/transcriptions/${s.id}/reprendre`, { method: "POST", json: {} }));
+      // la suite s'ajoute à la fin de cette transcription : mêmes locuteurs, horodatage qui continue.
+      // Faite sur un autre appareil : c'est lui qui la relance (son micro, son son) ; sinon il dit pourquoi.
+      const r = await api<Session & { message?: string }>(`/api/transcriptions/${s.id}/reprendre`, { method: "POST", json: {} });
+      if (s.distant) {
+        toast(r.message || t("Reprise demandée à {appareil}.", { appareil: s.appareil ?? "?" }), "succes");
+        recharger();
+      } else recharger(r);
       suivre.current = true;
     } catch (x) {
       toast((x as Error).message, "erreur");
     } finally {
-      setReprise(false);
+      setAttente("");
     }
   };
   const [libelle, ton] = ETATS[s.etat] ?? [s.etat, "doux"];
+  // une transcription en cours sur un autre appareil ne se modifie pas d'ici (elle change encore) ; une fois
+  // finie, les changements sont demandés à son appareil
   const bloque = actif(s.etat);
+  const sur = s.distant ? ` ${t("sur {appareil}", { appareil: s.appareil ?? "?" })}` : "";
   const sourceReprise = s.source === "systeme" ? t("son de l'ordinateur") + (s.avec_micro ? " + " + t("micro") : "") : t("micro");
 
   return (
@@ -480,6 +508,7 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
             className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 text-base font-semibold outline-none hover:border-ligne focus:border-hud"
           />
           <Badge ton={ton}>{t(libelle)}</Badge>
+          {s.distant && <Origine appareil={s.appareil} enLigne={s.en_ligne} />}
         </div>
         <p className="mt-1 px-1 text-[12px] text-doux">
           {new Date(s.debut * 1000).toLocaleString()} · {horodatage(s.duree)} ·{" "}
@@ -487,19 +516,42 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
           {s.empreinte && ` · ${t("voix")} : ${s.empreinte}`}
         </p>
         {s.erreur && <p className="mt-1 px-1 text-[12px] text-rouge">{s.erreur}</p>}
-        {s.fichier && <p className="mt-1 truncate px-1 font-mono text-[11px] text-tres-doux" title={s.fichier}>{s.fichier}</p>}
+        {s.fichier && (
+          <p className="mt-1 truncate px-1 font-mono text-[11px] text-tres-doux" title={s.fichier}>
+            {s.distant ? `${s.appareil} : ` : ""}
+            {s.fichier}
+          </p>
+        )}
+        {s.distant && (
+          <p className="mt-2 rounded-md border border-ligne bg-surface-2/40 px-2 py-1.5 text-[12px] text-doux">
+            {s.en_ligne
+              ? t("Faite sur {appareil} : tu la lis ici, et Reprendre la relance sur {appareil} (son micro ou son son). Les changements de noms et de locuteurs lui sont demandés.", { appareil: s.appareil ?? "?" })
+              : t("Faite sur {appareil}, hors ligne pour l'instant : tu peux la lire et l'exporter ici ; pour la reprendre ou la modifier, ouvre Wesley sur {appareil}.", { appareil: s.appareil ?? "?" })}
+          </p>
+        )}
         <div className="mt-3 flex flex-wrap gap-2">
           {!bloque && (
             <Bouton
               taille="sm"
               variante="primaire"
               icone={<RotateCcw className="size-4" />}
-              chargement={reprise}
-              disabled={occupe}
-              title={occupe ? t("Une transcription est déjà en cours : arrête-la d'abord.") : t("Continue cette transcription à la suite ({src}) : mêmes locuteurs, l'horodatage continue.", { src: sourceReprise })}
+              chargement={attente === "reprendre"}
+              disabled={occupe && !s.distant}
+              title={
+                s.distant
+                  ? t("Wesley demande à {appareil} de reprendre cette transcription ({src}) ; s'il ne peut pas, il te dit pourquoi.", { appareil: s.appareil ?? "?", src: sourceReprise })
+                  : occupe
+                    ? t("Une transcription est déjà en cours : arrête-la d'abord.")
+                    : t("Continue cette transcription à la suite ({src}) : mêmes locuteurs, l'horodatage continue.", { src: sourceReprise })
+              }
               onClick={reprendre}
             >
-              {t("Reprendre")}
+              {t("Reprendre") + sur}
+            </Bouton>
+          )}
+          {s.distant && bloque && s.source !== "fichier" && (
+            <Bouton taille="sm" variante="danger" icone={<Square className="size-4" />} chargement={attente === "arreter"} onClick={() => agir("arreter", {})}>
+              {t("Arrêter") + sur}
             </Bouton>
           )}
           <Bouton taille="sm" icone={<FileText className="size-4" />} disabled={bloque} onClick={() => exporter("md", true)}>
@@ -511,11 +563,13 @@ function Detail({ s, recharger, supprime, occupe }: { s: Session; recharger: (x?
           <Bouton taille="sm" variante="fantome" icone={<Copy className="size-4" />} onClick={copier}>
             {t("Copier")}
           </Bouton>
-          <Bouton taille="sm" variante="fantome" icone={<FolderOpen className="size-4" />} onClick={() => agir("ouvrir", {})}>
-            {t("Ouvrir le fichier")}
-          </Bouton>
+          {!s.distant && (
+            <Bouton taille="sm" variante="fantome" icone={<FolderOpen className="size-4" />} onClick={() => agir("ouvrir", {})}>
+              {t("Ouvrir le fichier")}
+            </Bouton>
+          )}
           {!bloque && (
-            <Bouton taille="sm" variante="fantome" icone={<Trash2 className="size-4" />} onClick={supprimer}>
+            <Bouton taille="sm" variante="fantome" icone={<Trash2 className="size-4" />} chargement={attente === "supprimer"} onClick={supprimer}>
               {t("Supprimer")}
             </Bouton>
           )}
@@ -580,8 +634,9 @@ export function VueTranscription() {
     charger();
     const sur = (e: Event) => {
       charger();
+      // id vide : une transcription d'un autre appareil a changé (elle peut être celle qu'on regarde)
       const id = (e as CustomEvent<string>).detail;
-      if (id && id === choisieRef.current) chargerDetail(id);
+      if (choisieRef.current && (!id || id === choisieRef.current)) chargerDetail(choisieRef.current);
     };
     bus.addEventListener("transcription_maj", sur);
     return () => bus.removeEventListener("transcription_maj", sur);
@@ -637,6 +692,7 @@ export function VueTranscription() {
                     <span>· {horodatage(x.duree || 0)}</span>
                     <span>· {t("{n} locuteur(s)", { n: x.nb_locuteurs })}</span>
                   </div>
+                  {x.distant && <Origine appareil={x.appareil} enLigne={x.en_ligne} />}
                 </button>
               ))
             )}

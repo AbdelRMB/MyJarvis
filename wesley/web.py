@@ -14,6 +14,7 @@ import subprocess
 import threading
 import time
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -834,19 +835,29 @@ async def agir_agent_code(agent: str, action: str, req: Request):
 # ---------- tâches de fond (code avec Claude Code / Wesley) ----------
 @app.get("/api/taches")
 def lister_taches(req: Request):
+    """Celles de cet appareil, puis celles des autres appareils du compte (`distant`, `appareil`)."""
     _verifier(req)
-    from . import taches
-    return [taches.resume(t) for t in taches.lister()]
+    from . import partage, taches
+    return [taches.resume(t) | {"appareil": MACHINE} for t in taches.lister()] + partage.distants("tache")
 
 
 @app.get("/api/taches/{tid}")
 def lire_tache(tid: str, req: Request):
     _verifier(req)
-    from . import taches
-    t = taches.lire(tid)
+    from . import partage, taches
+    t = taches.lire(tid) or partage.lire("tache", tid)
     if not t:
         raise HTTPException(404, "Tâche introuvable.")
     return t
+
+
+def _agir_a_distance(genre: str, tid: str, action: str, params: dict | None = None) -> str:
+    """Action sur une tâche / transcription d'un autre appareil : c'est lui qui la fait (ordre chiffré)."""
+    from . import partage
+    try:
+        return partage.agir(genre, tid, action, params)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
 
 
 @app.post("/api/taches")
@@ -865,17 +876,19 @@ async def creer_tache(req: Request):
 async def agir_tache(tid: str, action: str, req: Request):
     _verifier(req)
     from . import taches
+    if not taches.lire(tid) and action in ("consigne", "arreter", "reprendre"):
+        # tâche lancée sur un autre appareil : on lui demande de le faire, sinon on dit pourquoi
+        corps = await req.json() if (await req.body()) else {}
+        return {"message": await asyncio.to_thread(_agir_a_distance, "tache", tid, action, corps)}
     if action == "consigne":
         return {"message": taches.mettre_a_jour(tid, (await req.json()).get("texte", ""))}
     if action == "arreter":
         return {"message": taches.arreter(tid)}
     if action == "reprendre":
-        t = taches.lire(tid)
-        if t and t["statut"] != "en_cours":
-            t["statut"] = "en_cours"
-            taches._sauver(t)
-            taches.demarrer(tid)
-        return {"message": "Tâche reprise."}
+        try:
+            return {"message": taches.reprendre(tid)}
+        except ValueError as e:
+            raise HTTPException(404, str(e))
     if action == "ouvrir":
         t = taches.lire(tid)
         if t and t.get("dossier"):
@@ -889,6 +902,8 @@ async def agir_tache(tid: str, action: str, req: Request):
 def supprimer_tache(tid: str, req: Request):
     _verifier(req)
     from . import taches
+    if not taches.lire(tid):
+        return {"ok": True, "message": _agir_a_distance("tache", tid, "supprimer")}
     return {"ok": taches.supprimer(tid)}
 
 
@@ -1036,8 +1051,11 @@ def _lancer_transcription(fichier_temp: Path | None = None, reprendre: str = "",
 def lister_transcriptions(req: Request):
     _verifier(req)
     from . import transcription
+    from . import partage
     t = transcription.en_cours()
-    return {"liste": transcription.lister(), "en_cours": t.instantane() if t else None,
+    liste = [r | {"appareil": MACHINE} for r in transcription.lister()] + partage.distants("transcription")
+    return {"liste": sorted(liste, key=lambda r: r.get("debut") or 0, reverse=True),
+            "en_cours": t.instantane() if t else None, "appareil": MACHINE,
             "modeles": transcription.MODELES_WHISPER,
             "modele": transcription.modele_par_defaut(), "modele_auto": transcription.modele_auto(),
             "dossier": str(transcription.dossier_export()), "plateforme": "mac" if MAC else "windows" if WIN else "linux"}
@@ -1052,8 +1070,28 @@ def lire_transcription(tid: str, req: Request):
     except ValueError:
         s = None
     if s is None:
-        raise HTTPException(404, "Transcription introuvable.")
+        from . import partage
+        d = partage.lire("transcription", tid)   # faite sur un autre appareil : dernière version publiée
+        if d is None:
+            raise HTTPException(404, "Transcription introuvable.")
+        return d | {"locuteurs": d.get("locuteurs") or transcription.locuteurs(d), "regroupable": False}
     return s | {"locuteurs": transcription.locuteurs(s), "regroupable": transcription.regroupable(tid)}
+
+
+def reprendre_transcription(tid: str, d: dict) -> dict:
+    """Reprend une transcription de cet appareil : la suite s'ajoute à la même transcription ; source d'origine
+    par défaut (micro pour un fichier importé). ValueError avec la raison si c'est impossible."""
+    from . import transcription
+    s = transcription.lire(tid)
+    if not s:
+        raise ValueError("Transcription introuvable.")
+    source = d.get("source") or (s.get("source") if s.get("source") in ("micro", "systeme") else "micro")
+    source = source if source in ("micro", "systeme") else "micro"
+    avec_micro = bool(d["avec_micro"]) if "avec_micro" in d else bool(s.get("avec_micro"))
+    try:
+        return _lancer_transcription(reprendre=tid, source=source, avec_micro=avec_micro and source == "systeme")
+    except HTTPException as e:
+        raise ValueError(e.detail)
 
 
 @app.post("/api/transcriptions/demarrer")
@@ -1111,6 +1149,12 @@ async def agir_transcription(tid: str, action: str, req: Request):
     from .plateforme import ouvrir_chemin
     d = await req.json() if (await req.body()) else {}
     try:
+        local = transcription.lire(tid) is not None
+    except ValueError:
+        raise HTTPException(400, "Identifiant de transcription invalide.")
+    if not local:
+        return await _agir_transcription_distante(tid, action, d)
+    try:
         if action == "exporter":
             f = await asyncio.to_thread(transcription.enregistrer_sous, tid, d.get("format", "md"))
             if d.get("ouvrir"):
@@ -1124,19 +1168,41 @@ async def agir_transcription(tid: str, action: str, req: Request):
             ouvrir_chemin(str(f if f.is_file() else transcription.dossier_export()))
             return {"ok": True}
         if action == "reprendre":
-            # la suite s'ajoute à la même transcription ; source d'origine par défaut (micro pour un fichier importé)
+            return await asyncio.to_thread(reprendre_transcription, tid, d)
+        if action == "arreter":
+            t = transcription.en_cours()
+            if t is None or t.session["id"] != tid:
+                raise ValueError("Cette transcription n'est pas en cours.")
+            transcription.arreter()
             s = transcription.lire(tid)
-            if not s:
-                raise ValueError("Transcription introuvable.")
-            source = d.get("source") or (s.get("source") if s.get("source") in ("micro", "systeme") else "micro")
-            source = source if source in ("micro", "systeme") else "micro"
-            avec_micro = bool(d["avec_micro"]) if "avec_micro" in d else bool(s.get("avec_micro"))
-            return await asyncio.to_thread(_lancer_transcription, reprendre=tid, source=source,
-                                           avec_micro=avec_micro and source == "systeme")
-        s = await asyncio.to_thread(transcription.modifier, tid, action, d)
+        else:
+            s = await asyncio.to_thread(transcription.modifier, tid, action, d)
     except ValueError as e:
         raise HTTPException(400, str(e))
     return s | {"locuteurs": transcription.locuteurs(s), "regroupable": transcription.regroupable(tid)}
+
+
+async def _agir_transcription_distante(tid: str, action: str, d: dict):
+    """Transcription faite sur un autre appareil : la lecture et l'export se font ici, avec la dernière version
+    publiée ; reprendre, arrêter et modifier sont demandés à l'appareil d'origine (sinon : la raison)."""
+    from . import partage, transcription
+    s = await asyncio.to_thread(partage.lire, "transcription", tid)
+    if s is None:
+        raise HTTPException(404, "Transcription introuvable (supprimée sur son appareil ?).")
+    if action == "exporter":
+        format = "txt" if d.get("format") == "txt" else "md"
+        debut = datetime.fromtimestamp(s["debut"]).strftime("%Y-%m-%d %Hh%M")
+        f = transcription.dossier_export() / f"{debut} - {transcription.nom_de_fichier(s.get('titre', ''))}.{format}"
+        texte = transcription.exporter(s, format)
+        f.write_text(texte, encoding="utf-8")
+        if d.get("ouvrir"):
+            from .plateforme import ouvrir_chemin
+            ouvrir_chemin(str(f))
+        return {"fichier": str(f), "texte": texte}
+    if action == "ouvrir":
+        raise HTTPException(400, f"Le fichier est sur {s.get('appareil')} : exporte la transcription pour l'avoir ici.")
+    message = await asyncio.to_thread(_agir_a_distance, "transcription", tid, action, d)
+    return {"message": message, "distant": True}
 
 
 @app.delete("/api/transcriptions/{tid}")
@@ -1144,6 +1210,8 @@ def supprimer_transcription(tid: str, req: Request, fichier: bool = False):
     _verifier(req)
     from . import transcription
     try:
+        if transcription.lire(tid) is None:
+            return {"ok": True, "message": _agir_a_distance("transcription", tid, "supprimer", {"fichier": fichier})}
         return {"ok": transcription.supprimer(tid, fichier)}
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -1800,6 +1868,9 @@ def preparer():
     from . import transcription
     transcription.ecouteurs.append(lambda tid: diffuser(type="transcription_maj", id=tid))
     transcription.au_demarrage()  # transcription coupée par la fermeture : marquée « interrompue »
+    from . import partage
+    partage.demarrer()           # tâches et transcriptions visibles (chiffrées) sur tes autres appareils
+    partage.ecouteurs.append(lambda: (diffuser(type="tache_maj", id=""), diffuser(type="transcription_maj", id="")))
     from . import agents_code
     agents_code.surveiller()     # prévient si Claude Code / Codex ne sont plus connectés
     if CONFIG.get("cerveau") == "ollama":

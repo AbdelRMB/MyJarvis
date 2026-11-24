@@ -6,10 +6,12 @@
 import { api, chargerCoffre, ErreurCompte, VERSION_MOBILE } from "./compte";
 import { traiter } from "./appareils";
 import { chargerAppareils, synchroniser, useDonnees, viderAttente, type Changements } from "./donnees";
+import { chargerPartages } from "./partages";
 import { nomTelephone, reglagesTel, session } from "./stockage";
 
 let lancee = false;
 let revision = 0;
+let partages = 0; // dernière version vue des tâches / transcriptions des ordinateurs (moteur/partages.ts)
 let occupe = false;
 let controleur: AbortController | null = null;
 const ecouteurs: ((c: Changements & { coffre?: boolean }) => void)[] = [];
@@ -74,11 +76,18 @@ export function demarrerSynchro() {
         }
         await viderAttente();
         controleur = new AbortController();
-        const r = await api<{ revision: number; change: boolean; ordres: { id: string; blob: string }[] }>("GET", `/attendre?depuis=${revision}`, undefined, {
-          signal: controleur.signal,
-        });
+        const r = await api<{ revision: number; change: boolean; ordres: { id: string; blob: string }[]; partages?: number }>(
+          "GET",
+          `/attendre?depuis=${revision}&partages=${partages}`,
+          undefined,
+          { signal: controleur.signal },
+        );
         useDonnees.setState({ enLigne: true });
         if (r.ordres?.length) void traiter(r.ordres);
+        if (r.partages !== undefined && r.partages >= 0 && r.partages !== partages) {
+          partages = r.partages; // une tâche ou une transcription a changé sur un ordinateur
+          void chargerPartages();
+        }
         if (r.change && revision !== 0) await synchroComplete();
         revision = r.revision;
       } catch (e) {
@@ -96,6 +105,7 @@ export function demarrerSynchro() {
     if (!document.hidden && session()) {
       controleur?.abort(); // l'attente en cours a pu être coupée pendant la pause : on repart sur une neuve
       void synchroComplete().catch(() => {});
+      void chargerPartages();
       void presence();
     }
   });
@@ -105,6 +115,7 @@ export function demarrerSynchro() {
 export function arreterSynchro() {
   lancee = false;
   revision = 0;
+  partages = 0;
   controleur?.abort();
 }
 

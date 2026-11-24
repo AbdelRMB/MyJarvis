@@ -32,6 +32,7 @@ import {
 } from "./donnees";
 import { nomTelephone } from "./stockage";
 import type { Automatisation, Connecteurs } from "./types";
+import { agirPartage, chargerPartages, horodatage, lirePartage, toursDeParole, usePartages, type Genre, type Partage, type Segment } from "./partages";
 
 export type Contexte = { surEtat: (s: string) => void; signal?: AbortSignal };
 type Params = Record<string, { type: "string" | "integer" | "boolean" | "number"; description: string; enum?: string[] }>;
@@ -57,6 +58,19 @@ async function parOrdinateur(demande: string, c: Contexte, appareil = "") {
 }
 
 const pad = (x: number) => String(x).padStart(2, "0");
+
+/** Tâche ou transcription d'un ordinateur, par son code (vide = la plus récente). */
+async function partage(genre: Genre, identifiant: string): Promise<Partage> {
+  await chargerPartages();
+  const l = usePartages
+    .getState()
+    .liste.filter((x) => x.genre === genre)
+    .sort((a, b) => (b.resume.debut || b.resume.cree || 0) - (a.resume.debut || a.resume.cree || 0));
+  const id = identifiant.replace(/[[\]\s]/g, "");
+  const p = id ? l.find((x) => x.resume.id === id) : l[0];
+  if (!p) throw new Error(genre === "tache" ? "Tâche introuvable." : "Transcription introuvable.");
+  return p;
+}
 
 // ---------- GitHub (directement depuis le téléphone, avec le jeton du coffre) ----------
 function jetonGitHub() {
@@ -430,32 +444,110 @@ export const OUTILS: Outil[] = [
         a.appareil || "",
       ),
   },
+  // tâches et transcriptions des ordinateurs : lues ici (publiées chiffrées dans le compte), et les actions sont
+  // demandées à l'ordinateur qui les a lancées (moteur/partages.ts) ; s'il ne peut pas, on dit pourquoi
   {
     nom: "lister_taches",
-    description: "Liste les tâches de fond (code) des ordinateurs, avec leur état et leur bilan.",
-    params: { appareil: s("ordinateur (vide = celui qui est allumé)") },
-    executer: (a, c) => parOrdinateur("Utilise lister_taches et donne-moi la liste brute.", c, a.appareil || ""),
+    description: "Liste les tâches de fond (code) de tous tes ordinateurs, avec leur état, leur bilan et l'ordinateur où elles tournent.",
+    params: {},
+    executer: async () => {
+      await chargerPartages();
+      const l = usePartages.getState().liste.filter((x) => x.genre === "tache");
+      return (
+        l
+          .map((p) => `[${p.resume.id}] ${p.resume.statut} — ${p.resume.titre} (sur ${p.resume.appareil_nom}, ${p.resume.projet || ""})` + (p.resume.bilan ? `\n   bilan : ${p.resume.bilan}` : ""))
+          .join("\n") || "Aucune tâche."
+      );
+    },
   },
   {
     nom: "suivre_tache",
     description: "Donne l'état d'une tâche de fond et ses dernières étapes.",
-    params: { identifiant: s("code de la tâche"), appareil: s("ordinateur") },
+    params: { identifiant: s("code de la tâche"), dernieres: { type: "number", description: "nombre d'étapes à afficher (15 par défaut)" } },
     requis: ["identifiant"],
-    executer: (a, c) => parOrdinateur(`Utilise suivre_tache pour la tâche ${a.identifiant} et donne-moi le résultat brut.`, c, a.appareil || ""),
+    executer: async (a) => {
+      const p = await partage("tache", a.identifiant);
+      const t = await lirePartage<{ journal: { genre: string; texte: string }[] }>("tache", p.resume.id);
+      const j = (t.journal ?? []).slice(-Math.max(1, Number(a.dernieres) || 15)).map((e) => `- (${e.genre}) ${String(e.texte).slice(0, 300)}`);
+      return `[${p.resume.id}] ${p.resume.statut} — ${p.resume.titre} (sur ${p.resume.appareil_nom})\nBranche : ${p.resume.branche || "—"}\nBilan : ${p.resume.bilan || "—"}\n${j.join("\n")}`;
+    },
   },
   {
     nom: "mettre_a_jour_tache",
-    description: "Ajoute ou change une consigne d'une tâche de fond en cours (ou la relance).",
-    params: { identifiant: s("code de la tâche"), consigne: s("la nouvelle consigne"), appareil: s("ordinateur") },
+    description: "Ajoute ou change une consigne d'une tâche de fond en cours (ou la relance) : demandé à l'ordinateur où elle tourne.",
+    params: { identifiant: s("code de la tâche"), consigne: s("la nouvelle consigne") },
     requis: ["identifiant", "consigne"],
-    executer: (a, c) => parOrdinateur(`Utilise mettre_a_jour_tache pour la tâche ${a.identifiant} avec la consigne : « ${a.consigne} »`, c, a.appareil || ""),
+    executer: async (a, c) => agirPartage(await partage("tache", a.identifiant), "consigne", { texte: a.consigne }, c.surEtat),
   },
   {
     nom: "arreter_tache",
-    description: "Arrête une tâche de fond.",
-    params: { identifiant: s("code de la tâche"), appareil: s("ordinateur") },
+    description: "Arrête une tâche de fond (sur l'ordinateur où elle tourne).",
+    params: { identifiant: s("code de la tâche") },
     requis: ["identifiant"],
-    executer: (a, c) => parOrdinateur(`Utilise arreter_tache pour la tâche ${a.identifiant}.`, c, a.appareil || ""),
+    executer: async (a, c) => agirPartage(await partage("tache", a.identifiant), "arreter", {}, c.surEtat),
+  },
+  {
+    nom: "reprendre_tache",
+    description:
+      "Relance une tâche de fond arrêtée, interrompue, terminée ou en échec, sur l'ordinateur où elle a été lancée. S'il est éteint ou ne peut pas, la réponse dit pourquoi : répète-le simplement à l'utilisateur.",
+    params: { identifiant: s("code de la tâche") },
+    requis: ["identifiant"],
+    executer: async (a, c) => agirPartage(await partage("tache", a.identifiant), "reprendre", {}, c.surEtat),
+  },
+
+  // ---------- transcriptions de réunions (faites sur les ordinateurs) ----------
+  {
+    nom: "lister_transcriptions",
+    description: "Liste les transcriptions de réunions faites sur tes ordinateurs (titre, date, durée, personnes, état, ordinateur, identifiant).",
+    params: {},
+    executer: async () => {
+      await chargerPartages();
+      const l = usePartages.getState().liste.filter((x) => x.genre === "transcription").sort((a, b) => (b.resume.debut || 0) - (a.resume.debut || 0));
+      return (
+        l
+          .map(
+            (p) =>
+              `[${p.resume.id}] ${p.resume.titre} — ${new Date((p.resume.debut || 0) * 1000).toLocaleString("fr-FR")}, ${horodatage(p.resume.duree || 0)}, ` +
+              `${p.resume.nb_locuteurs ?? 0} locuteur(s), ${p.resume.etat}, sur ${p.resume.appareil_nom}`,
+          )
+          .join("\n") || "Aucune transcription."
+      );
+    },
+  },
+  {
+    nom: "lire_transcription",
+    description:
+      "Renvoie le texte exact d'une transcription de réunion (heure et locuteur de chaque prise de parole), pour la résumer ou retrouver qui a dit quoi. Longue réunion : par parties (partie=2, 3… quand la réponse l'indique).",
+    params: { identifiant: s("code de la transcription (vide = la plus récente)"), partie: { type: "number", description: "partie à lire (1 par défaut)" } },
+    executer: async (a) => {
+      const p = await partage("transcription", a.identifiant || "");
+      const c = await lirePartage<{ segments: Segment[]; noms: Record<string, string> }>("transcription", p.resume.id);
+      const nom = (l: number) => c.noms?.[String(l)]?.trim() || `Locuteur ${l}`;
+      const texte = toursDeParole(c.segments ?? []).map((x) => `[${horodatage(x.debut)}] ${nom(x.locuteur)} : ${x.texte}`).join("\n");
+      const n = Math.max(1, Number(a.partie) || 1);
+      const morceau = texte.slice((n - 1) * 9000, n * 9000);
+      const suite = texte.length > n * 9000 ? `\n\n(Suite : partie=${n + 1})` : "";
+      return `${p.resume.titre} (sur ${p.resume.appareil_nom})\n${morceau || "Rien n'a été transcrit."}${suite}`;
+    },
+  },
+  {
+    nom: "reprendre_transcription",
+    description:
+      "Reprend une transcription de réunion (terminée ou interrompue) sur l'ordinateur où elle a été faite : la suite s'ajoute, mêmes personnes, horodatage qui continue. S'il ne peut pas (éteint, autre transcription en cours…), la réponse dit pourquoi : répète-le à l'utilisateur.",
+    params: { identifiant: s("code de la transcription (vide = la plus récente)") },
+    executer: async (a, c) => agirPartage(await partage("transcription", a.identifiant || ""), "reprendre", {}, c.surEtat),
+  },
+  {
+    nom: "arreter_transcription",
+    description: "Arrête la transcription de réunion en cours sur un de tes ordinateurs.",
+    params: { identifiant: s("code de la transcription (vide = celle en cours)") },
+    executer: async (a, c) => {
+      await chargerPartages();
+      const enCours = usePartages.getState().liste.filter((x) => x.genre === "transcription" && ["preparation", "en_cours"].includes(x.resume.etat || ""));
+      const p = a.identifiant ? await partage("transcription", a.identifiant) : enCours[0];
+      if (!p) return "Aucune transcription en cours sur tes ordinateurs.";
+      return agirPartage(p, "arreter", {}, c.surEtat);
+    },
   },
 
   // ---------- GitHub (direct) ----------

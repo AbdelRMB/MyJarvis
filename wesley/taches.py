@@ -72,6 +72,11 @@ def _diffuser(tid):
         web.diffuser(type="tache_maj", id=tid)
     except Exception:
         pass
+    try:
+        from . import partage
+        partage.signaler("tache", tid)   # visible sur les autres appareils du compte
+    except Exception:
+        pass
 
 
 def _noter(t: dict, genre: str, texte: str):
@@ -142,6 +147,20 @@ def arreter(tid: str) -> str:
     return "Tâche arrêtée."
 
 
+def reprendre(tid: str) -> str:
+    """Relance une tâche arrêtée, terminée, en échec ou interrompue (là où elle en était)."""
+    with _verrou:
+        t = lire(tid)
+        if not t:
+            raise ValueError("Tâche introuvable.")
+        if t["statut"] == "en_cours" and tid in _actives:
+            return f"La tâche « {t['titre']} » tourne déjà."
+        t["statut"] = "en_cours"
+        _sauver(t)
+    demarrer(tid)
+    return f"Tâche « {t['titre']} » reprise."
+
+
 def supprimer(tid: str) -> bool:
     arreter(tid)
     try:
@@ -149,6 +168,8 @@ def supprimer(tid: str) -> bool:
         return True
     except OSError:
         return False
+    finally:
+        _diffuser(tid)
 
 
 def _interrompre(a):

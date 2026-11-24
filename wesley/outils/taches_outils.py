@@ -16,12 +16,35 @@ def lancer_tache_code(consigne: str, projet: str, outil: str = "claude_code", ti
             "Elle crée sa branche et travaille ; suivi dans l'onglet Tâches.")
 
 
+def _distante(identifiant: str) -> bool:
+    """La tâche a été lancée sur un autre appareil du compte (elle n'existe pas ici)."""
+    from .. import taches
+    return not taches.lire(identifiant) and _partage().trouver("tache", identifiant) is not None
+
+
+def _partage():
+    from .. import partage
+    return partage
+
+
+def _a_distance(identifiant: str, action: str, params: dict | None = None) -> str:
+    try:
+        return _partage().agir("tache", identifiant, action, params)
+    except ValueError as e:
+        return str(e)
+
+
 @outil
 def lister_taches():
-    """Liste les tâches de fond (en cours, terminées, arrêtées) avec leur état et leur dernier bilan."""
+    """Liste les tâches de fond (en cours, terminées, arrêtées) avec leur état et leur dernier bilan, celles de cet ordinateur puis celles lancées sur tes autres appareils (« sur … »)."""
     from .. import taches
-    return "\n".join(f"[{t['id']}] {t['statut']} — {t['titre']} ({t['projet']}, branche {t.get('branche') or '—'})"
-                     + (f"\n   bilan : {t['bilan']}" if t.get("bilan") else "") for t in taches.lister()[:20]) or "Aucune tâche."
+    lignes = [f"[{t['id']}] {t['statut']} — {t['titre']} ({t['projet']}, branche {t.get('branche') or '—'})"
+              + (f"\n   bilan : {t['bilan']}" if t.get("bilan") else "") for t in taches.lister()[:20]]
+    for t in _partage().distants("tache")[:20]:
+        lignes.append(f"[{t['id']}] {t['statut']} — {t['titre']} (sur {t['appareil']}"
+                      + ("" if t.get("en_ligne") else ", hors ligne") + f", {t.get('projet')})"
+                      + (f"\n   bilan : {t['bilan']}" if t.get("bilan") else ""))
+    return "\n".join(lignes) or "Aucune tâche."
 
 
 @outil
@@ -30,7 +53,10 @@ def mettre_a_jour_tache(identifiant: str, consigne: str):
     identifiant: code de la tâche (lister_taches)
     consigne: la nouvelle consigne / le changement demandé"""
     from .. import taches
-    return taches.mettre_a_jour(identifiant.strip("[] "), consigne)
+    tid = identifiant.strip("[] ")
+    if _distante(tid):   # lancée sur un autre appareil : c'est lui qui la change
+        return _a_distance(tid, "consigne", {"texte": consigne})
+    return taches.mettre_a_jour(tid, consigne)
 
 
 @outil
@@ -38,7 +64,24 @@ def arreter_tache(identifiant: str):
     """Arrête une tâche de fond (quand l'utilisateur ne veut plus qu'elle continue).
     identifiant: code de la tâche (lister_taches)"""
     from .. import taches
-    return taches.arreter(identifiant.strip("[] "))
+    tid = identifiant.strip("[] ")
+    if _distante(tid):
+        return _a_distance(tid, "arreter")
+    return taches.arreter(tid)
+
+
+@outil
+def reprendre_tache(identifiant: str):
+    """Relance une tâche de fond arrêtée, interrompue, terminée ou en échec, là où elle en était. Une tâche lancée sur un autre appareil est relancée sur cet appareil-là (s'il est allumé avec Wesley ouvert ; sinon tu dis pourquoi ce n'est pas possible).
+    identifiant: code de la tâche (lister_taches)"""
+    from .. import taches
+    tid = identifiant.strip("[] ")
+    if _distante(tid):
+        return _a_distance(tid, "reprendre")
+    try:
+        return taches.reprendre(tid)
+    except ValueError as e:
+        return str(e)
 
 
 @outil
@@ -47,7 +90,7 @@ def suivre_tache(identifiant: str, dernieres: int = 15):
     identifiant: code de la tâche
     dernieres: nombre d'entrées du journal à afficher"""
     from .. import taches
-    t = taches.lire(identifiant.strip("[] "))
+    t = taches.lire(identifiant.strip("[] ")) or _partage().lire("tache", identifiant.strip("[] "))
     if not t:
         return "Tâche introuvable."
     j = "\n".join(f"- ({e['genre']}) {e['texte'][:300]}" for e in t.get("journal", [])[-max(1, int(dernieres)):])

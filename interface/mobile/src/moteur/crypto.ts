@@ -4,7 +4,8 @@
  *   → 32 premiers octets = preuve d'identité (envoyée au serveur, en hexadécimal) ;
  *   → 32 derniers = clé du coffre (reste sur le téléphone).
  * - AES-GCM : nonce (12 octets) + chiffré, en base64 ; données associées "wesley-coffre" (coffre) ou
- *   "wesley-ordre" (ordres entre appareils).
+ *   "wesley-ordre" (ordres entre appareils) ou "wesley-partage" (tâches et transcriptions des ordinateurs,
+ *   compressées zlib avant d'être chiffrées : wesley/partage.py).
  */
 import scryptJs from "scrypt-js"; // module CommonJS : import par défaut (Vite comme Node)
 const { scrypt } = scryptJs;
@@ -25,7 +26,7 @@ export async function deriver(email: string, motDePasse: string): Promise<{ auth
   return { auth: hex(maitre.slice(0, 32)), cle: maitre.slice(32) };
 }
 
-export type Contexte = "wesley-coffre" | "wesley-ordre";
+export type Contexte = "wesley-coffre" | "wesley-ordre" | "wesley-partage";
 
 const cles = new Map<string, CryptoKey>();
 async function cleAes(cleB64: string) {
@@ -46,6 +47,18 @@ export async function chiffrer(obj: unknown, cleB64: string, contexte: Contexte)
   tout.set(iv);
   tout.set(c, 12);
   return b64(tout);
+}
+
+/** Déchiffre puis décompresse (zlib) un élément partagé par un ordinateur (wesley/partage.py). */
+export async function dechiffrerPartage<T = Record<string, unknown>>(blob: string, cleB64: string): Promise<T> {
+  const brut = deb64(blob);
+  const p = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: brut.slice(0, 12), additionalData: enc.encode("wesley-partage") },
+    await cleAes(cleB64),
+    brut.slice(12),
+  );
+  const flux = new Blob([p]).stream().pipeThrough(new DecompressionStream("deflate"));
+  return JSON.parse(await new Response(flux).text()) as T;
 }
 
 export async function dechiffrer<T = Record<string, unknown>>(blob: string, cleB64: string, contexte: Contexte): Promise<T> {
