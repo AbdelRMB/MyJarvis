@@ -76,12 +76,14 @@ def tours_de_parole(session: dict) -> list[dict]:
     """Phrases consécutives d'un même locuteur réunies en un tour de parole, coupé à chaque pause
     (PAUSE_TOUR) et au plus ~DUREE_TOUR_MAX s : horodatage fidèle, jamais un bloc de 15 minutes."""
     tours: list[dict] = []
+    reprises = [float(r.get("position", 0)) for r in session.get("reprises") or []]
     for s in session.get("segments", []):
         texte = s["texte"].strip()
         if not texte:
             continue
         if tours and tours[-1]["locuteur"] == s["locuteur"] and s["debut"] - tours[-1]["fin"] < PAUSE_TOUR \
-                and s["fin"] - tours[-1]["debut"] <= DUREE_TOUR_MAX:
+                and s["fin"] - tours[-1]["debut"] <= DUREE_TOUR_MAX \
+                and not any(tours[-1]["debut"] < p <= s["debut"] for p in reprises):   # jamais à cheval sur une reprise
             tours[-1]["texte"] += " " + texte
             tours[-1]["fin"] = s["fin"]
         else:
@@ -99,10 +101,23 @@ def exporter(session: dict, format: str = "md") -> str:
         source += " + micro"
     noms = ", ".join(l["nom"] for l in locuteurs(session)) or "—"
     tours = tours_de_parole(session)
+    reprises = sorted(session.get("reprises") or [], key=lambda r: r.get("position", 0))
+
+    def reprise_avant(i):
+        """Repère « Reprise le … » avant le premier tour de parole qui suit chaque reprise."""
+        res = []
+        for r in reprises:
+            p = float(r.get("position", 0))
+            if tours[i]["debut"] >= p and (i == 0 or tours[i - 1]["debut"] < p):
+                res.append(f"Reprise le {datetime.fromtimestamp(r.get('date') or 0).strftime('%d/%m/%Y à %H:%M')}"
+                           f" ({horodatage(p)})")
+        return res
     if format == "txt":
         lignes = [titre, debut.strftime("%d/%m/%Y %H:%M") + f" · durée {duree} · source : {source}",
                   f"Participants : {noms}", ""]
-        lignes += [f"[{horodatage(t['debut'])}] {nom_locuteur(session, t['locuteur'])} : {t['texte']}" for t in tours]
+        for i, t in enumerate(tours):
+            lignes += [f"— {r} —" for r in reprise_avant(i)]
+            lignes.append(f"[{horodatage(t['debut'])}] {nom_locuteur(session, t['locuteur'])} : {t['texte']}")
         return "\n".join(lignes).rstrip() + "\n"
     lignes = [f"# {titre}", "",
               f"- **Date** : {debut.strftime('%d/%m/%Y %H:%M')}",
@@ -110,7 +125,9 @@ def exporter(session: dict, format: str = "md") -> str:
               f"- **Source** : {source}",
               f"- **Participants** : {noms}", "", "---", ""]
     for i, t in enumerate(tours):
-        if i and tours[i - 1]["locuteur"] == t["locuteur"]:     # même personne qui continue : l'heure suffit
+        marques = reprise_avant(i)
+        lignes += [x for r in marques for x in (f"_— {r} —_", "")]
+        if i and tours[i - 1]["locuteur"] == t["locuteur"] and not marques:     # même personne : l'heure suffit
             lignes += [f"`{horodatage(t['debut'])}` {t['texte']}", ""]
         else:
             lignes += [f"**{nom_locuteur(session, t['locuteur'])}** · `{horodatage(t['debut'])}`", "", t["texte"], ""]
@@ -335,6 +352,49 @@ class Diariseur:
             self.centres.append(somme)
             self.poids.append(poids)
         self.dernier = self.etiquettes[-1]
+
+    def amorcer(self, historique: list):
+        """Reprise d'une transcription : les phrases déjà écrites (empreinte ou None, fiable, durée) servent de
+        point de départ, pour que la suite retrouve les mêmes voix."""
+        self.historique = [(None if e is None else _normer(e), bool(f), float(d)) for e, f, d in historique]
+        if any(e is not None for e, _, _ in self.historique):
+            self.regrouper_tout()
+        else:
+            self.historique, self.etiquettes = [], []
+
+
+def rattacher(anciens: list[int], etiquettes: list[int], valides: list[bool] | None = None,
+              durees: list[float] | None = None, depart: int = 0) -> list[int]:
+    """Reprise : etiquettes = regroupement de toutes les phrases (les len(anciens) premières sont celles d'avant).
+    Les anciennes phrases gardent leur locuteur (noms, fusions et corrections de l'utilisateur compris) ; une voix
+    regroupée avec des phrases d'avant prend leur locuteur (le plus présent, en durée), une voix nouvelle prend
+    le numéro suivant (N+1, N+2… par ordre d'apparition ; N = depart s'il est plus grand). Renvoie le locuteur
+    de chaque phrase."""
+    n0 = len(anciens)
+    valides = list(valides) if valides is not None else [True] * len(etiquettes)
+    durees = list(durees) if durees is not None else [1.0] * len(etiquettes)
+    votes: dict[int, dict[int, float]] = {}
+    total: dict[int, float] = {}
+    for i, l in enumerate(etiquettes):
+        d = max(0.1, float(durees[i]))
+        total[l] = total.get(l, 0.0) + d
+        if i < n0 and valides[i]:
+            votes.setdefault(l, {})
+            votes[l][anciens[i]] = votes[l].get(anciens[i], 0.0) + d
+    table: dict[int, int] = {}
+    for l, v in votes.items():
+        ancien, d = max(v.items(), key=lambda x: x[1])
+        # quelques phrases d'avant mal placées ne suffisent pas à rattacher une voix nouvelle
+        if d >= min(DUREE_SOLIDE, 0.25 * total[l]):
+            table[l] = ancien
+    suivant = max([int(a) for a in anciens] + [int(depart)])
+    res = list(anciens)
+    for l in etiquettes[n0:]:
+        if l not in table:
+            suivant += 1
+            table[l] = suivant
+        res.append(table[l])
+    return res
 
 
 def regrouper_complet(empreintes: list, seuil: float = 0.5, nombre: int = 0, fiables: list | None = None,
@@ -717,6 +777,9 @@ class Tampon:
         self.verrou = threading.Lock()
         self.erreur = ""
         self.recu = 0               # échantillons reçus (diagnostic : la source envoie-t-elle du son ?)
+        self.perdu = 0.0            # s jetées parce que la source avait trop d'avance (diagnostic)
+
+    RETARD_MAX = 15.0           # s d'avance tolérées (horloge de la carte son un peu plus rapide que le Mac)
 
     def pousser(self, x, sr: float = SR):
         x = reechantillonner(x, sr)
@@ -724,9 +787,13 @@ class Tampon:
             self.morceaux.append(x)
             self.taille += len(x)
             self.recu += len(x)
-            if self.taille > SR * 3:        # en retard de plus de 3 s : on jette le plus ancien
+            if self.taille > SR * self.RETARD_MAX:
+                # très en retard : on jette le plus ancien (gardé 3 s). Avant, la limite était de 3 s et on ne
+                # gardait que la dernière seconde : un simple à-coup de la source faisait perdre 2 s de parole.
                 import numpy as np
-                tout = np.concatenate(self.morceaux)[-SR:]
+                tout = np.concatenate(self.morceaux)
+                self.perdu += (len(tout) - 3 * SR) / SR
+                tout = tout[-3 * SR:]
                 self.morceaux, self.taille = [tout], len(tout)
 
     def prendre(self, n: int):
@@ -1141,6 +1208,7 @@ def au_demarrage():
             s = json.loads(f.read_text(encoding="utf-8"))
             if s.get("etat") in ("preparation", "en_cours", "finalisation"):
                 s["etat"] = "interrompue"
+                s["duree"] = round(max([float(s.get("duree") or 0)] + [float(x["fin"]) for x in s.get("segments", [])]), 1)
                 s["segments"] = [dict(x, locuteur=l) for x, l in
                                  zip(s.get("segments", []), renumeroter([x["locuteur"] for x in s.get("segments", [])]))]
                 sauver(s)
@@ -1259,7 +1327,44 @@ class Transcription:
         if self.session["modele"] not in MODELES_WHISPER or self.session["modele"] == "auto":
             self.session["modele"] = modele_auto(source)
         self._fichier_audio = fichier_audio
-        self.position = 0.0                 # s d'audio déjà lues (avancement d'un fichier importé)
+        self.position = 0.0                 # s depuis le début de la transcription (horodatage du son lu)
+        self._anciens: list[int] = []       # reprise : locuteur des phrases déjà écrites (gardé tel quel)
+        self._amorce: list = []             # reprise : empreintes des phrases déjà écrites (diariseur amorcé)
+
+    @classmethod
+    def reprise(cls, session: dict, source: str = "", avec_micro=None, fichier_audio: str = "", **tests):
+        """Reprend une transcription (terminée, interrompue ou en erreur) : la suite s'ajoute à la même
+        transcription, horodatée après la fin, avec les mêmes locuteurs (numéros, noms, empreintes vocales)."""
+        import numpy as np
+        source = source or (session.get("source") if session.get("source") in ("micro", "systeme") else "micro")
+        if source == "fichier" and not fichier_audio:
+            source = "micro"
+        t = cls(source, session.get("avec_micro") if avec_micro is None else avec_micro, session.get("langue", "fr"),
+                session.get("modele", ""), session.get("titre", ""), session.get("nb_locuteurs", 0), fichier_audio,
+                vocabulaire=session.get("vocabulaire", ""), **tests)
+        s = t.session | json.loads(json.dumps(session))     # champs absents des anciennes versions : par défaut
+        s["id"] = session["id"]
+        segs = s.setdefault("segments", [])
+        reprise_a = round(max([float(s.get("duree") or 0)] + [float(x["fin"]) for x in segs]), 1)
+        s.update(source=t.session["source"], avec_micro=t.session["avec_micro"], modele=t.session["modele"],
+                 etat="preparation", erreur="", duree=reprise_a,
+                 reprises=list(s.get("reprises") or []) + [{"position": reprise_a, "date": time.time()}])
+        t.session = s
+        t.position = reprise_a
+        t._anciens = [int(x["locuteur"]) for x in segs]
+        # empreintes des phrases d'avant (si elles ont été gardées et viennent du même extracteur)
+        amorce = [(None, False, max(0.0, x["fin"] - x["debut"])) for x in segs]
+        try:
+            with np.load(_chemin_empreintes(s["id"])) as z:
+                emb, fi, du = list(z["empreintes"]), list(z["fiables"]), list(z["durees"])
+                va = list(z["valides"]) if "valides" in z.files else [True] * len(emb)
+            if len(emb) == len(segs):
+                amorce = [(e if v else None, bool(f), float(d)) for e, f, d, v in zip(emb, fi, du, va)]
+        except (OSError, KeyError, ValueError):
+            pass
+        t._amorce = amorce
+        t._empreintes = list(amorce)
+        return t
 
     # --- état lisible par l'interface
     def instantane(self) -> dict:
@@ -1267,7 +1372,7 @@ class Transcription:
             s = json.loads(json.dumps(self.session))
         s["niveau"], s["retard"] = round(self.niveau, 3), round(self.retard, 1)
         if s["etat"] == "en_cours":
-            s["duree"] = round(self.position if s["source"] == "fichier" else time.time() - s["debut"], 1)
+            s["duree"] = round(self.position, 1)     # reprise : durée d'avant comprise
         return s
 
     def demarrer(self):
@@ -1309,6 +1414,15 @@ class Transcription:
         nom = getattr(self._empreinte_fn, "nom", "")
         seuil = float(CONFIG.get("transcription_seuil") or getattr(self._empreinte_fn, "seuil", 0.5))
         self.diariseur = Diariseur(seuil, self.session["nb_locuteurs"])
+        if self._amorce:
+            ancien = self.session.get("empreinte") or ""
+            dims = {len(np.ravel(e)) for e, _, _ in self._amorce if e is not None}
+            if ancien != nom or len(dims) > 1:
+                # autre extracteur de voix qu'à l'époque : empreintes incomparables, les voix de la suite
+                # deviennent de nouveaux locuteurs (les phrases d'avant gardent les leurs)
+                self._amorce = [(None, False, d) for _, _, d in self._amorce]
+                self._empreintes = list(self._amorce)
+            self.diariseur.amorcer(self._amorce)
         self.session["empreinte"] = nom
         if self.session["source"] == "fichier":
             self._audio_fichier = lire_fichier_audio(self._fichier_audio)
@@ -1342,21 +1456,31 @@ class Transcription:
             return
         with _verrou:
             self.session["etat"] = "en_cours"
-            self.session["debut"] = time.time()
+            if not self._anciens and not self.session.get("reprises"):
+                self.session["debut"] = time.time()     # reprise : la date de début reste celle d'origine
         sauver(self.session)
         _signaler(self.session["id"])
         mixeur = Mixeur([t for _, t in self._captures])
         decoupeur = Decoupeur()
+        decoupeur.debut = self.position         # reprise : l'horodatage continue après la fin
         travailleur = threading.Thread(target=self._travailler, daemon=True, name="transcription-whisper")
         travailleur.start()
         fichier = getattr(self, "_audio_fichier", None)
+        lu = 0                                  # échantillons du fichier importé déjà lus
+
+        def traiter(x):
+            if len(x):
+                self.niveau = 0.8 * self.niveau + 0.2 * float(np.sqrt(np.mean(x * x)))
+                bloc = decoupeur.ajouter(x)
+                if bloc is not None:
+                    self._blocs.put(bloc)
         try:
             while self._continuer:
                 if fichier is not None:     # fichier importé : lu d'un coup (sans attendre l'horloge)
-                    i = int(self.position * SR)
-                    x = fichier[i: i + SR // 10]
+                    x = fichier[lu: lu + SR // 10]
                     if not len(x):
                         break
+                    lu += len(x)
                     self.position += len(x) / SR
                     while self._blocs.qsize() > 3 and self._continuer:   # pas plus vite que Whisper
                         time.sleep(0.05)
@@ -1364,14 +1488,17 @@ class Transcription:
                     time.sleep(0.1)
                     x = mixeur.lire()
                     self.position += len(x) / SR
-                if len(x):
-                    self.niveau = 0.8 * self.niveau + 0.2 * float(np.sqrt(np.mean(x * x)))
-                    bloc = decoupeur.ajouter(x)
-                    if bloc is not None:
-                        self._blocs.put(bloc)
+                traiter(x)
                 for _, t in self._captures:
                     if t.erreur:
                         raise RuntimeError(t.erreur)
+            if fichier is None:
+                # arrêt demandé juste après un mot : le son encore en route (latence de la carte son, ~0,3 s)
+                # est lu avant de couper, sinon la fin de la dernière phrase manquait
+                time.sleep(0.3)
+                x = mixeur.lire()
+                self.position += len(x) / SR
+                traiter(x)
         except Exception as e:
             traceback.print_exc()
             self.session["erreur"] = str(e)
@@ -1411,16 +1538,23 @@ class Transcription:
             consigne = self._consigne()
             try:
                 phrases = self._transcrire(audio, self.session["langue"], consigne)
-            except Exception as e:
+            except Exception:
+                # une erreur passagère (mémoire, décodage) ne doit pas faire perdre tout le bloc : 2e essai sans amorce
                 traceback.print_exc()
-                self.session["erreur"] = f"Transcription : {e}"
-                continue
+                try:
+                    phrases = self._transcrire(audio, self.session["langue"], "")
+                    consigne = ""
+                except Exception as e:
+                    traceback.print_exc()
+                    self.session["erreur"] = f"Transcription : {e}"
+                    continue
             nouveaux = []
             for d, f, texte in phrases:
                 texte = (texte or "").strip()
                 if not texte or _hallucination(texte) or recopie_consigne(texte, consigne):
                     continue
-                d, f = max(0.0, float(d)), min(len(audio) / SR, float(f))
+                d = min(max(0.0, float(d)), max(0.0, len(audio) / SR - 0.01))
+                f = min(len(audio) / SR, float(f))
                 if f <= d:
                     f = min(len(audio) / SR, d + 0.01)
                 fiable = f - d >= DUREE_FIABLE
@@ -1440,12 +1574,27 @@ class Transcription:
                 with _verrou:
                     segs = self.session["segments"]
                     segs.extend(nouveaux)
-                    # locuteurs à jour de toutes les phrases (fusions et regroupements réguliers du direct)
-                    for x, l in zip(segs, self.diariseur.etiquettes):
+                    # locuteurs à jour de toutes les phrases (fusions et regroupements réguliers du direct) ;
+                    # reprise : celles d'avant gardent le leur
+                    n0 = len(self._anciens)
+                    for x, l in zip(segs[n0:], self._suite(self.diariseur.etiquettes, self.diariseur.historique)):
                         x["locuteur"] = l
+                    self.session["duree"] = round(max(self.session.get("duree") or 0, debut + len(audio) / SR), 1)
                 sauver(self.session)
                 _signaler(self.session["id"])
             self.retard = sum(len(b[1]) for b in list(self._blocs.queue) if b) / SR
+
+    def _suite(self, etiquettes: list[int], historique: list) -> list[int]:
+        """Locuteurs des phrases de cette session (après les len(self._anciens) d'une reprise), d'après le
+        regroupement `etiquettes` (aligné sur `historique` : (empreinte, fiable, durée)), qui couvre aussi les
+        phrases d'avant si le diariseur a été amorcé avec."""
+        n0 = len(self._anciens)
+        nouvelles = len(self.session["segments"]) - n0
+        base = len(etiquettes) - nouvelles          # n0 (amorcé) ou 0 (pas d'empreintes d'avant)
+        anciens = self._anciens if base == n0 else []
+        res = rattacher(anciens, list(etiquettes), [e is not None for e, _, _ in historique],
+                        [d for _, _, d in historique], depart=max(self._anciens, default=0))
+        return res[base:]
 
     def _finaliser(self):
         """Regroupement final des voix sur toute la réunion (aucune phrase laissée de côté, numéros 1, 2, 3…
@@ -1459,16 +1608,20 @@ class Transcription:
             except Exception:
                 traceback.print_exc()
             try:
-                etiquettes = regrouper_complet([e for e, _, _ in self._empreintes], self.diariseur.seuil,
-                                               self.session["nb_locuteurs"], [f for _, f, _ in self._empreintes],
-                                               [d for _, _, d in self._empreintes])
+                etiquettes = self._suite(
+                    regrouper_complet([e for e, _, _ in self._empreintes], self.diariseur.seuil,
+                                      self.session["nb_locuteurs"], [f for _, f, _ in self._empreintes],
+                                      [d for _, _, d in self._empreintes]), self._empreintes)
             except Exception:
                 traceback.print_exc()
-                etiquettes = renumeroter([x["locuteur"] for x in segs])
+                etiquettes = None
         else:
-            etiquettes = renumeroter([x["locuteur"] for x in segs])
+            etiquettes = None
+        n0 = len(self._anciens)
+        if etiquettes is None:      # pas de regroupement final possible : numéros du direct, sans trou
+            etiquettes = [x["locuteur"] for x in segs[n0:]] if n0 else renumeroter([x["locuteur"] for x in segs])
         with _verrou:
-            for x, l in zip(segs, etiquettes):
+            for x, l in zip(segs[n0:], etiquettes):
                 x["locuteur"] = l
             self.session["etat"] = "terminee"
         sauver(self.session)
@@ -1493,10 +1646,15 @@ class Transcription:
 # (le texte n'est jamais reformulé ni résumé : on écarte ce que Whisper invente, on ne réécrit rien)
 # ====================================================================================================
 # Phrases que Whisper invente sur du silence, du bruit ou de la musique (apprises de sous-titres de vidéos)
+# Toujours écartées : génériques de sous-titres, musique seule, ponctuation seule. Précis exprès : avant, « sous-titr »
+# n'importe où suffisait, et une vraie phrase (« ajoute un sous-titre à la page ») disparaissait.
 _HALLUCINATIONS = re.compile(
-    r"(sous-?titr|sous titr|merci d'avoir regardé|merci de nous avoir regardé|abonnez-vous|"
-    r"n'oubliez pas de vous abonner|thanks for watching|thank you for watching|subtitles by|"
-    r"amara\.org|radio-canada|^\W*\[?\(?musique\)?\]?\W*$|^\W*♪|^[\s.…!?,-]*$)", re.I)
+    r"(sous[- ]?titr\w*\s+(r[ée]alis|fait|par\b|:|de la soci)|^\W*sous[- ]?titrage\b|subtitles by|"
+    r"amara\.org|soci[ée]t[ée] radio-canada|^\W*\[?\(?musique\)?\]?\W*$|^\W*♪[\s♪.]*$|^[\s.…!?,-]*$)", re.I)
+# Formules de fin de vidéo : écartées seulement dans une phrase courte (c'est là que Whisper les invente)
+_HALLUCINATIONS_VIDEO = re.compile(
+    r"(merci d'avoir regardé|merci de nous avoir regardé|abonnez-vous|n'oubliez pas de vous abonner|"
+    r"thanks for watching|thank you for watching)", re.I)
 # Courtes phrases plausibles que Whisper invente aussi sur du silence : écartées seulement si le son est douteux
 _HALLUCINATIONS_COURTES = re.compile(r"^\W*(merci( beaucoup)?|au revoir|bonne journée|à bientôt|"
                                      r"thank you|bye|you)\W*$", re.I)
@@ -1505,7 +1663,9 @@ DUREE_PHRASE_MAX = 30.0     # s : une phrase plus longue est coupée en fin de p
 
 
 def _hallucination(texte: str) -> bool:
-    return bool(_HALLUCINATIONS.search(texte.strip()))
+    texte = texte.strip()
+    return bool(_HALLUCINATIONS.search(texte)) or (
+        len(texte.split()) <= 12 and bool(_HALLUCINATIONS_VIDEO.search(texte)))
 
 
 def modele_auto(source: str = "micro") -> str:
@@ -1539,7 +1699,9 @@ def options_whisper(langue: str, consigne: str = "") -> dict:
     return {"language": langue or None, "task": "transcribe", "beam_size": 5, "best_of": 5, "temperature": 0.0,
             "condition_on_previous_text": False, "initial_prompt": consigne or None,
             "compression_ratio_threshold": 2.4, "log_prob_threshold": -1.0, "no_speech_threshold": 0.6,
-            "vad_filter": True, "vad_parameters": {"min_silence_duration_ms": 500, "speech_pad_ms": 300},
+            # VAD un peu plus sensible que par défaut (0,5) : une voix faible ou lointaine n'est pas jetée
+            "vad_filter": True, "vad_parameters": {"threshold": 0.35, "min_silence_duration_ms": 500,
+                                                   "speech_pad_ms": 400},
             "word_timestamps": True, "hallucination_silence_threshold": 2.0}
 
 
@@ -1601,8 +1763,8 @@ def decouper_phrases(segments, pause: float = PAUSE_DECOUPE, duree_max: float = 
             texte = sans_boucles(re.sub(r"\s+", " ", texte or "").strip())
             if not texte or _hallucination(texte):
                 continue
-            if phrases and len(texte) > 15 and texte == phrases[-1][2]:
-                continue        # même phrase rendue deux fois par Whisper
+            if phrases and len(texte) > 15 and texte == phrases[-1][2] and d - phrases[-1][1] < 1.0:
+                continue        # même phrase rendue deux fois d'affilée par Whisper (redite plus tard : gardée)
             phrases.append((d, max(f, d + 0.01), texte))
     return phrases
 
@@ -1654,7 +1816,14 @@ def recopie_consigne(texte: str, consigne: str) -> bool:
     """Whisper recopie parfois son amorce quand le son est inaudible : cette « phrase » est écartée."""
     norme = lambda x: re.sub(r"\W+", " ", x.lower()).strip()
     t = norme(texte)
-    return bool(consigne) and len(t) >= 8 and (t in norme(consigne) or norme(texte).startswith("vocabulaire"))
+    if not consigne or len(t) < 8:
+        return False
+    if t.startswith("vocabulaire"):
+        return True
+    # Recopie du titre entier, ou d'une liste de mots du vocabulaire (« getter, setter, constructeur »). Avant,
+    # toute phrase contenue dans l'amorce était jetée : « le constructeur » dit en cours disparaissait.
+    titre = consigne.split(" Vocabulaire :")[0]
+    return t == norme(titre) or (f" {t} " in f" {norme(consigne)} " and texte.count(",") >= 2)
 
 
 def _liberer(t: Transcription):
@@ -1676,6 +1845,23 @@ def demarrer(source="micro", avec_micro=False, langue=None, modele="", titre="",
             raise ValueError("Modèle de transcription inconnu.")
         t = Transcription(source, avec_micro, langue if langue is not None else (CONFIG.get("langue") or "fr"),
                           modele, titre, nb_locuteurs, fichier_audio, vocabulaire=vocabulaire, **tests)
+        _en_cours = t
+    t.demarrer()
+    return t.instantane()
+
+
+def reprendre(tid: str, source: str = "", avec_micro=None, fichier_audio: str = "", **tests) -> dict:
+    """Reprend une transcription déjà faite (terminée, interrompue ou en erreur) : la suite s'écrit à la fin de
+    la même transcription, mêmes locuteurs, horodatage continu. source vide = celle d'origine (micro pour un
+    fichier importé) ; « fichier » + fichier_audio : un enregistrement à ajouter à la suite."""
+    global _en_cours
+    with _verrou:
+        if _en_cours is not None:
+            raise ValueError("Une transcription est déjà en cours : arrête-la d'abord.")
+        s = lire(tid)
+        if s is None:
+            raise ValueError("Transcription introuvable.")
+        t = Transcription.reprise(s, source, avec_micro, fichier_audio, **tests)
         _en_cours = t
     t.demarrer()
     return t.instantane()
