@@ -35,5 +35,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22", cache: npm, cache-dependency-path: interface/package-lock.json }
-      - name: Types
-        run: cd interface && npm ci && npx tsc -p .
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Types et compilation
+        run: cd interface && npm ci && npx tsc -p . && npm run build
+      - name: Parcours de l'interface de bureau (Playwright, Chromium)
+        run: |
+          python -m pip install -q playwright
+          python -m playwright install --with-deps chromium
+          python tests/e2e_bureau.py
