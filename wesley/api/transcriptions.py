@@ -1,4 +1,4 @@
-"""Transcription de réunions (wesley/transcription.py, 100 % local)."""
+"""Transcription de réunions (paquet wesley/transcription, 100 % local)."""
 import asyncio
 import re
 import secrets
@@ -17,7 +17,7 @@ router = APIRouter()
 from .taches import _agir_a_distance  # noqa: E402
 
 
-# ---------- transcription de réunions (wesley/transcription.py, 100 % local) ----------
+# ---------- transcription de réunions (paquet wesley/transcription, 100 % local) ----------
 def _apres_transcription(t, ecoute_coupee: bool, fichier_temp: Path | None):
     """Fin d'une transcription : l'écoute « Wesley » reprend, le fichier importé temporaire est effacé."""
     t.attendre()
