@@ -34,6 +34,16 @@ rm -rf "$SORTIE/build" "$SORTIE/dist" dist/Wesley dist/Wesley.app
 pyinstaller wesley-mac.spec --noconfirm --log-level WARN --distpath "$SORTIE/dist" --workpath "$SORTIE/build"
 mkdir -p dist && ln -sfn "$SORTIE/dist/Wesley.app" dist/Wesley.app   # dist/Wesley.app reste utilisable
 xattr -cr "$SORTIE/dist/Wesley.app"   # retire les attributs Finder (sinon codesign refuse)
+# Vérifie que le binaire est bien celui de LA puce de ce Mac (le .spec n'est pas
+# universal2 : il compile pour l'interpréteur hôte uniquement).
+EXECUTABLE="$SORTIE/dist/Wesley.app/Contents/MacOS/Wesley"
+ARCHES=$(lipo -archs "$EXECUTABLE")
+case "$PUCE" in
+  arm64)   echo "$ARCHES" | grep -qw arm64   || { echo "Erreur : binaire $ARCHES, arm64 attendu"; exit 1; } ;;
+  x86_64)  echo "$ARCHES" | grep -qw x86_64  || { echo "Erreur : binaire $ARCHES, x86_64 attendu"; exit 1; } ;;
+  *)       echo "Erreur : puce $PUCE non prise en charge"; exit 1 ;;
+esac
+echo "    architecture vérifiée : $ARCHES"
 # Signature STABLE : macOS rattache les autorisations (micro, écran, accessibilité…) à la signature.
 # Avec une signature « ad hoc », elle change à chaque version et macOS oublie tout ; avec un certificat
 # Apple (Developer ID ou Apple Development), les autorisations restent acquises après chaque mise à jour.

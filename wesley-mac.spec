@@ -57,7 +57,7 @@ app = BUNDLE(
         "CFBundleShortVersionString": VERSION,
         "NSHumanReadableCopyright": "© Abdelrahim Riche",
         "LSUIElement": True,                     # icône dans la barre des menus, pas dans le Dock
-        "LSMinimumSystemVersion": "12.0",
+        "LSMinimumSystemVersion": "13.0",   # macOS 13 minimum : onnxruntime 1.23.x (dernière série Intel) l'exige
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription": "Wesley écoute quand tu l'appelles (« Wesley, … ») et transcrit ta voix ou tes réunions sur ton Mac.",
         "NSAppleEventsUsageDescription": "Wesley pilote tes applications (ouvrir, fermer, régler le volume) quand tu le lui demandes.",

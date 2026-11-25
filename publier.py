@@ -4,10 +4,12 @@ Utilisé par publier-mac.sh (Mac), publier.bat (Windows) et la CI (.github/workf
     python publier.py installateur/Wesley-2.0.1-mac-arm64.dmg
 Crée la release vX.Y.Z si elle n'existe pas (description = section « ## X.Y.Z » de CHANGELOG.md),
 puis y ajoute le fichier (remplace un fichier du même nom).
-Ensuite, depuis une machine (pas depuis la CI), demande à GitHub de fabriquer l'installateur de L'AUTRE système :
-publié depuis le Mac -> GitHub fait le .exe Windows ; publié depuis Windows -> GitHub fait le .dmg Mac.
+Ensuite, depuis une machine (pas depuis la CI), demande à GitHub de fabriquer ce qui manque :
+publié depuis un Mac -> GitHub fait le .exe Windows et le .dmg de l'autre puce Mac ;
+publié depuis Windows -> GitHub fait les deux .dmg Mac (puce Apple et Intel).
 Identifiant GitHub : celui que git utilise déjà sur cette machine (aucun jeton à créer).
 """
+import platform
 import re
 import subprocess
 import sys
@@ -45,6 +47,17 @@ def notes() -> str:
     if not m or not m.group(1).strip():
         sys.exit(f"CHANGELOG.md n'a pas de description pour la version {VERSION} (section « ## {VERSION} »).")
     return m.group(1).strip()
+
+
+def entrees_autres(plateforme: str, machine: str) -> dict:
+    """Cases à cocher du workflow versions.yml pour fabriquer ce qui manque après une
+    publication locale : depuis un Mac, Windows + l'autre puce Mac ; depuis Windows,
+    les deux puces Mac."""
+    if plateforme == "darwin":
+        # Mac Apple Silicon publié localement : la CI fait l'Intel, et inversement.
+        besoin_intel = machine == "arm64"
+        return {"windows": True, "mac": not besoin_intel, "mac_intel": besoin_intel}
+    return {"windows": False, "mac": True, "mac_intel": True}
 
 
 def main():
@@ -87,15 +100,15 @@ def main():
 
     import os
     if not os.environ.get("GITHUB_ACTIONS") and "--sans-autre" not in sys.argv:
-        autre = "windows" if sys.platform == "darwin" else "mac"
+        entrees = entrees_autres(sys.platform, platform.machine())
         r = s.post(f"{API}/actions/workflows/versions.yml/dispatches",
-                   json={"ref": "main", "inputs": {"windows": autre == "windows", "mac": autre == "mac"}})
+                   json={"ref": "main", "inputs": entrees})
         if r.status_code == 204:
-            print(f"GitHub fabrique maintenant l'installateur {autre.capitalize()} (quelques minutes), "
-                  f"il sera ajouté à la même version : {DEPOT_URL}/actions")
+            print(f"GitHub fabrique maintenant les installateurs manquants "
+                  f"(Windows et/ou l'autre puce Mac), ils seront ajoutés à la même version : {DEPOT_URL}/actions")
         else:
-            print(f"! Impossible de lancer la fabrication {autre} sur GitHub ({r.status_code}) : "
-                  f"Actions > Versions de Wesley > Run workflow, case « {autre} ».")
+            print(f"! Impossible de lancer la fabrication sur GitHub ({r.status_code}) : "
+                  f"Actions > Versions de Wesley > Run workflow, coche les cases voulues.")
 
 
 if __name__ == "__main__":
