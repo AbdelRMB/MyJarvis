@@ -1,8 +1,8 @@
 # Fabrique l'installateur de l'AUTRE système et l'ajoute à la release vX.Y.Z (dépôt privé, gratuit).
 #
 # Lancé automatiquement par publier.py à la fin d'une publication locale :
-# - publié depuis le Mac (./publier-mac.sh)  -> ce workflow fabrique le .exe Windows (~12 min de quota)
-# - publié depuis Windows (publier.bat)      -> ce workflow fabrique le .dmg Mac (~70 min de quota, runner x10)
+# - publié depuis un Mac (./publier-mac.sh) -> ce workflow fabrique le .exe Windows et le .dmg de l'autre puce Mac
+# - publié depuis Windows (publier.bat)     -> ce workflow fabrique les deux .dmg Mac (Apple Silicon et Intel)
 # Quota gratuit : 2000 min/mois. Lancement manuel possible : Actions > Run workflow.
 name: Versions de Wesley
 
@@ -14,7 +14,11 @@ on:
         type: boolean
         default: false
       mac:
-        description: "Construire le .dmg Mac"
+        description: "Construire le .dmg Mac (Apple Silicon)"
+        type: boolean
+        default: false
+      mac_intel:
+        description: "Construire le .dmg Mac (Intel)"
         type: boolean
         default: false
 
@@ -40,7 +44,7 @@ jobs:
         run: |
           git config --global user.name "CI Wesley"
           git config --global user.email "ci@example.invalid"
-          python -m pip install -q pytest numpy cryptography pypdf
+          python -m pip install -q pytest numpy cryptography pypdf requests
           python -m pytest tests -q
 
   # serveur de comptes + appli du téléphone de bout en bout (iPhone émulé, WebKit) + types de l'interface :
@@ -100,8 +104,13 @@ jobs:
 
   mac:
     needs: [version, e2e]
-    if: inputs.mac
-    runs-on: macos-15
+    if: inputs.mac || inputs.mac_intel
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-15 : Apple Silicon ; macos-15-intel : Mac Intel (macos-13 n'est plus proposé par GitHub)
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -112,6 +121,7 @@ jobs:
       # Secrets : APPLE_CERT_P12 (certificat « Developer ID Application » exporté en .p12, encodé en base64),
       # APPLE_CERT_MDP (mot de passe du .p12), APPLE_ID, APPLE_MDP_APPLI (mot de passe pour app), APPLE_EQUIPE (Team ID).
       - name: Certificat Apple
+        if: (matrix.runner == 'macos-15' && inputs.mac) || (matrix.runner == 'macos-15-intel' && inputs.mac_intel)
         env:
           CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
           CERT_MDP: ${{ secrets.APPLE_CERT_MDP }}
@@ -129,6 +139,7 @@ jobs:
           security list-keychains -d user -s "$TROUSSEAU" $(security list-keychains -d user | tr -d '"')
           security find-identity -v -p codesigning "$TROUSSEAU"
       - name: Construire et publier le .dmg
+        if: (matrix.runner == 'macos-15' && inputs.mac) || (matrix.runner == 'macos-15-intel' && inputs.mac_intel)
         env:
           PYTHON: python
           GH_TOKEN: ${{ github.token }}
@@ -139,5 +150,5 @@ jobs:
           bash construire-mac.sh
           .venv-mac/bin/python publier.py "installateur/Wesley-${{ needs.version.outputs.version }}-mac-$(uname -m).dmg"
       - name: Retirer le certificat
-        if: always()
+        if: ((matrix.runner == 'macos-15' && inputs.mac) || (matrix.runner == 'macos-15-intel' && inputs.mac_intel)) && always()
         run: security delete-keychain "$RUNNER_TEMP/wesley.keychain-db" 2>/dev/null || true

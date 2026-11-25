@@ -88,6 +88,7 @@ haute ce qu'il a fait.
    | Ton ordinateur | Fichier |
    |---|---|
    | Mac avec puce Apple (M1 à M4) | `Wesley-<version>-mac-arm64.dmg` |
+   | Mac avec processeur Intel | `Wesley-<version>-mac-x86_64.dmg` |
    | PC Windows 10/11 | `WesleySetup-<version>.exe` |
 
 2. **Installe** : glisse Wesley dans Applications (Mac) ou lance l'installateur (Windows, sans droits administrateur).

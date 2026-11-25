@@ -10,6 +10,7 @@ keyring
 mcp
 numpy
 ollama>=0.6
+onnxruntime<1.24   # Intel : 1.24+ est arm64 uniquement ; macOS 13 minimum requis
 openwakeword
 pillow
 piper-tts
@@ -30,6 +31,6 @@ pyobjc-framework-ScreenCaptureKit
 pyobjc-framework-CoreMedia
 sounddevice
 uvicorn[standard]
-cryptography
+cryptography<49   # Intel : 49+ est arm64 uniquement
 openai
 paramiko

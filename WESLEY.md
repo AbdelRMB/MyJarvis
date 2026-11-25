@@ -4,7 +4,7 @@
 > Wesley (et les agents de code qu'il pilote) le tiennent à jour à chaque modification du projet.
 
 ## Présentation
-Wesley lui-même : assistant personnel de bureau (Python + interface React) pour macOS (puce Apple) et Windows,
+Wesley lui-même : assistant personnel de bureau (Python + interface React) pour macOS (puce Apple ou Intel) et Windows,
 avec une appli mobile web (`interface/mobile`) et un serveur de comptes (`serveur/`).
 Le guide complet (installation, construction, règles du dépôt) est dans `CLAUDE.md` : il s'applique aussi ici.
 

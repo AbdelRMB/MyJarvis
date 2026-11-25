@@ -4,7 +4,7 @@ Tu es Claude Code, ouvert dans le dossier de ce projet. Quand l'utilisateur te d
 (« installe Wesley », « installe le projet », « mets-moi Wesley sur ce PC »…), suis ce guide de bout en bout,
 toi-même, sans lui faire taper les commandes. Parle-lui en français, simplement.
 
-Wesley est un assistant personnel de bureau (Python + interface React) pour **macOS** (puce Apple) et **Windows**.
+Wesley est un assistant personnel de bureau (Python + interface React) pour **macOS** (puce Apple ou Intel) et **Windows**.
 Il pilote l'ordinateur (applis, fichiers, souris/clavier, écran), parle et écoute, et garde une mémoire par
 utilisateur dans un **compte en ligne**.
 
@@ -20,7 +20,7 @@ utilisateur dans un **compte en ligne**.
 ## 1. Installer l'appli (recommandé)
 
 Les installateurs sont publiés dans les **Releases** du dépôt GitHub (`wesley/version.py` → `DEPOT`) :
-`Wesley-<version>-mac-arm64.dmg` (Mac puce Apple) et `WesleySetup-<version>.exe` (Windows 10/11 x64).
+`Wesley-<version>-mac-arm64.dmg` (Mac puce Apple), `Wesley-<version>-mac-x86_64.dmg` (Mac Intel) et `WesleySetup-<version>.exe` (Windows 10/11 x64).
 Dernière version : `https://api.github.com/repos/<DEPOT>/releases/latest` (champ `assets[].browser_download_url`).
 
 **macOS**
@@ -137,8 +137,9 @@ téléphone ne peut pas faire passe par un ordinateur du compte (ordres chiffré
   `APPLE_MDP_APPLI`, `APPLE_EQUIPE`. Sans eux, la construction continue en signature ad hoc.
 - **Windows** (sur un PC) : installer **Inno Setup 6** (`winget install JRSoftware.InnoSetup`), puis `construire.bat`
   → `installateur\WesleySetup-<version>.exe`.
-- Un Mac ne peut pas construire le .exe et un PC ne peut pas construire le .dmg. Le workflow GitHub Actions
-  `.github/workflows/versions.yml` (Actions › Run workflow) construit l'un ou l'autre sur les machines de GitHub.
+- Un Mac (puce Apple ou Intel) ne peut pas construire le .exe et un PC ne peut pas construire le .dmg. Le workflow
+  GitHub Actions `.github/workflows/versions.yml` (Actions › Run workflow) construit sur les machines de GitHub ce qui
+  manque : le .exe Windows et/ou le .dmg de l'autre puce Mac.
 - La version vient de `wesley/version.py` ; la description de chaque version, de `CHANGELOG.md`.
 - Les installateurs (~250 Mo) ne vont jamais dans git (limite GitHub de 100 Mo) : ils sont publiés dans les Releases.
 

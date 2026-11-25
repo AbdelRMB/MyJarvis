@@ -84,6 +84,7 @@ files, browser and servers, and tells you out loud what it did.
    | Your computer | File |
    |---|---|
    | Mac with Apple silicon (M1–M4) | `Wesley-<version>-mac-arm64.dmg` |
+   | Mac with Intel chip | `Wesley-<version>-mac-x86_64.dmg` |
    | Windows 10/11 PC | `WesleySetup-<version>.exe` |
 
 2. **Install**: drag Wesley into Applications (Mac) or run the installer (Windows, no admin rights needed).
