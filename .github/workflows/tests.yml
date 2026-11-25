@@ -1,0 +1,39 @@
+# Tests à chaque push et pull request : cœur Python, serveur de comptes, types et parcours de l'interface de bureau.
+# Rapide (~3 min de quota Linux) ; la construction des installateurs reste dans versions.yml.
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore: ["**.md", "docs/**", "installateur/**"]
+  pull_request:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: serveur/requirements.txt }
+      - name: Dépendances
+        run: |
+          git config --global user.name "CI Wesley"
+          git config --global user.email "ci@example.invalid"
+          python -m pip install -q pytest numpy cryptography pypdf httpx requests -r serveur/requirements.txt
+      - name: Tests du cœur
+        run: python -m pytest tests -q
+      - name: Tests du serveur de comptes
+        run: cd serveur && WESLEY_DB=/tmp/wesley-test.db python -m pytest tests -q
+
+  interface:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: interface/package-lock.json }
+      - name: Types
+        run: cd interface && npm ci && npx tsc -p .
