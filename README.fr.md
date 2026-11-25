@@ -211,7 +211,7 @@ décisions, journal des changements.
                                 serveur de comptes (FastAPI + SQLite) : mémoire, historique, synchro
 ```
 
-- **Cœur** : Python 3.12 (`wesley/`), outils dans `wesley/outils/`, serveur local `wesley/web.py`.
+- **Cœur** : Python 3.12 (`wesley/`), outils dans `wesley/outils/`, serveur local `wesley/web.py` (routes rangées par domaine dans `wesley/api/`).
 - **Interface** : React + TypeScript + Tailwind (`interface/`), affichée dans une fenêtre native (pywebview).
 - **Serveur de comptes** : FastAPI + SQLite (`serveur/`), auto-hébergeable.
 
@@ -250,7 +250,7 @@ cd interface; npm ci; npm run build; cd ..
 
 | Dossier / fichier | Rôle |
 |---|---|
-| `wesley/` | Cœur en Python : agent, outils (`outils/`), voix, écoute, serveur local (`web.py`), compte (`compte.py`), mises à jour |
+| `wesley/` | Cœur en Python : agent, outils (`outils/`), voix, écoute, serveur local (`web.py` + routes dans `api/`), compte (`compte.py`), mises à jour |
 | `interface/` | Interface React + TypeScript + Tailwind, compilée dans `wesley/static/` |
 | `serveur/` | Serveur des comptes (FastAPI + SQLite), appli mobile compilée et pages légales (`mobile/`) |
 | `interface/mobile/` | Wesley mobile (téléphones seulement) : moteur de l'assistant et écrans tactiles, réutilise `interface/src` |

@@ -205,7 +205,7 @@ holds what Wesley needs to know to work on it: overview, useful commands, conven
                                    account server (FastAPI + SQLite): memory, history, sync
 ```
 
-- **Core**: Python 3.12 (`wesley/`), tools in `wesley/outils/`, local server `wesley/web.py`.
+- **Core**: Python 3.12 (`wesley/`), tools in `wesley/outils/`, local server `wesley/web.py` (routes split by area in `wesley/api/`).
 - **Interface**: React + TypeScript + Tailwind (`interface/`), shown in a native window (pywebview).
 - **Account server**: FastAPI + SQLite (`serveur/`), self-hostable.
 
@@ -245,7 +245,7 @@ cd interface; npm ci; npm run build; cd ..
 
 | Folder / file | Role |
 |---|---|
-| `wesley/` | Python core: agent, tools (`outils/`), voice, listening, local server (`web.py`), account (`compte.py`), updates |
+| `wesley/` | Python core: agent, tools (`outils/`), voice, listening, local server (`web.py` + routes in `api/`), account (`compte.py`), updates |
 | `interface/` | React + TypeScript + Tailwind interface, built into `wesley/static/` |
 | `serveur/` | Account server (FastAPI + SQLite), built mobile app and legal pages (`mobile/`) |
 | `interface/mobile/` | Wesley mobile (phones only): assistant engine and touch screens, reuses `interface/src` |
