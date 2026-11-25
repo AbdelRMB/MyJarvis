@@ -14,6 +14,14 @@ from ..web import _verifier
 router = APIRouter()
 
 
+# ---------- recherche unique (souvenirs, conversations, transcriptions, documents, À faire) ----------
+@router.get("/api/recherche")
+async def recherche_partout(req: Request, q: str = "", n: int = 6):
+    _verifier(req)
+    from .. import recherche
+    return await asyncio.to_thread(recherche.chercher_partout, q, max(1, min(20, n)))
+
+
 # ---------- mémoire ----------
 @router.get("/api/memoire")
 def lire_memoire(req: Request):

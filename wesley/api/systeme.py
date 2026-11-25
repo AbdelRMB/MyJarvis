@@ -143,3 +143,28 @@ async def regler_appli(req: Request):
     if APPLI["ecoute"] and "ecoute_fond" in d:
         APPLI["ecoute"].demarrer() if d["ecoute_fond"] else APPLI["ecoute"].arreter()
     return etat_appli(req)
+
+
+# ---------- Wesley comme serveur MCP (Claude Desktop, Claude Code…) ----------
+@router.get("/api/mcp")
+def etat_mcp(req: Request):
+    _verifier(req)
+    from .. import serveur_mcp
+    return serveur_mcp.etat()
+
+
+@router.post("/api/mcp")
+async def regler_mcp(req: Request):
+    """{"actif": bool} : active ou coupe le serveur ; {"nouvelle_cle": true} : régénère la clé (l'ancienne ne marche plus)."""
+    _verifier(req)
+    import asyncio
+    from .. import serveur_mcp
+    d = await req.json()
+    if d.get("nouvelle_cle"):
+        serveur_mcp.regenerer_cle()
+        if serveur_mcp.actif():
+            await asyncio.to_thread(serveur_mcp.regler, True)   # redémarre avec la nouvelle clé
+    if "actif" in d:
+        await asyncio.to_thread(serveur_mcp.regler, bool(d["actif"]))
+        await asyncio.sleep(0.4)   # le temps d'ouvrir le port (ou de voir qu'il est pris)
+    return serveur_mcp.etat()

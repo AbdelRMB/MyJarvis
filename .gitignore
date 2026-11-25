@@ -42,3 +42,5 @@ serveur/deploiement-vps.sh
 serveur/Jenkinsfile.serveur
 serveur/COMMIT
 .pytest_cache/
+# Clé du serveur MCP de Wesley (propre à cet appareil)
+mcp.json

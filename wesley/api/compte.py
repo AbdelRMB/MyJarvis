@@ -198,3 +198,36 @@ async def agir_notifications(action: str, req: Request):
     elif action == "effacer":
         notifications.effacer()
     return {"ok": True}
+
+
+# ---------- sauvegarde complète chiffrée et restauration (fusion) ----------
+@router.post("/api/sauvegarde")
+async def creer_sauvegarde(req: Request):
+    _verifier(req)
+    from .. import sauvegarde
+    try:
+        return await asyncio.to_thread(sauvegarde.creer, str((await req.json()).get("mot_de_passe", "")))
+    except sauvegarde.ErreurSauvegarde as e:
+        raise HTTPException(400, str(e))
+
+
+@router.post("/api/sauvegarde/restaurer")
+async def restaurer_sauvegarde(req: Request):
+    """Corps : le fichier .wesley ; mot de passe dans l'en-tête x-mot-de-passe (encodé en URI)."""
+    _verifier(req)
+    from urllib.parse import unquote
+    from .. import sauvegarde
+    blob = await req.body()
+    if len(blob) > 2 * 1024**3:
+        raise HTTPException(413, "Fichier trop gros.")
+    try:
+        r = await asyncio.to_thread(sauvegarde.restaurer, blob, unquote(req.headers.get("x-mot-de-passe", "")))
+    except sauvegarde.ErreurSauvegarde as e:
+        raise HTTPException(400, str(e))
+    if web.wesley is not None:   # Wesley tient compte des souvenirs repris dès maintenant
+        from ..agent import prompt_systeme
+        web.wesley.messages[0]["content"] = prompt_systeme()
+    diffuser(type="memoire_maj", faits=True, faits_texte=True)
+    diffuser(type="afaire_maj")
+    diffuser(type="transcription_maj", id="")
+    return r

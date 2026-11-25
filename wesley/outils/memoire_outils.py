@@ -32,6 +32,14 @@ def chercher_memoire(requete: str):
 
 
 @outil
+def chercher_partout(requete: str):
+    """Cherche en une fois dans TOUT ce que Wesley sait : souvenirs, conversations passées, transcriptions (cours, réunions… de tous tes appareils), documents indexés (PDF, Word…) et liste À faire. À utiliser quand on ne sait pas où est l'information (« où on a parlé de … ? », « qu'est-ce que je sais sur … ? ») ; sinon l'outil spécialisé suffit.
+    requete: le sujet, en quelques mots (par le sens : d'autres mots que ceux de la source marchent aussi)"""
+    from .. import recherche
+    return recherche.en_texte(recherche.chercher_partout(requete), requete)
+
+
+@outil
 def lister_souvenirs(categorie: str = ""):
     """Liste tous les souvenirs sur l'utilisateur avec leur identifiant (pour en modifier ou en supprimer un précisément).
     categorie: (optionnel) identite | preference | projet | contact | habitude | general | lecon"""

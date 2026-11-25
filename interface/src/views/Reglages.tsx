@@ -6,6 +6,8 @@ import { sons } from "../audio/bips";
 import { chargerVoix, listerVoixServeur, parler, taire, type VoixServeur } from "../audio/tts";
 import { transcrire } from "../audio/voix";
 import { OngletAutorisations } from "../components/Autorisations";
+import { PanneauSauvegarde } from "../components/Sauvegarde";
+import { PanneauServeurMCP } from "../components/ServeurMCP";
 import { Bouton, Champ, Curseur, EnTetePage, Interrupteur, Onglets, Panneau, Selecteur } from "../components/ui";
 import { VuMetre } from "../components/VuMetre";
 import { api } from "../lib/api";
@@ -362,6 +364,8 @@ function OngletApplication() {
         <MesDonnees urlConf={compte?.url_confidentialite ?? ""} urlMentions={compte?.url_mentions ?? ""} />
       </Panneau>
       )}
+      <PanneauSauvegarde />
+      <PanneauServeurMCP />
     </div>
   );
 }

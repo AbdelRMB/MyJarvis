@@ -199,13 +199,11 @@ def _vers_afaire(session: dict, actions: list) -> int:
 def au_terme(tid: str):
     """Appelé quand une transcription de cet appareil vient de se terminer : résumé automatique en fond."""
     from . import transcription
-    if not CONFIG.get("transcription_resume_auto", True):
-        return
     s = transcription.lire(tid)
-    if not s or s.get("etat") != "terminee" or not resumable(s):
+    if (not CONFIG.get("transcription_resume_auto", True) or not s or s.get("etat") != "terminee"
+            or not resumable(s) or (s.get("resume") or {}).get("nb_phrases") == len(s.get("segments") or [])):
+        _automatisations(tid)   # pas de nouveau résumé à attendre
         return
-    if (s.get("resume") or {}).get("nb_phrases") == len(s.get("segments") or []):
-        return   # déjà résumée telle quelle
 
     def fond():
         try:
@@ -216,7 +214,17 @@ def au_terme(tid: str):
                                   (r["texte"].split("\n\n")[0][:300]) + plus, genre="succes", vue="transcription")
         except Exception as e:
             print(f"  ! Résumé automatique de {tid} : {e}")
+        _automatisations(tid)   # avec le résumé s'il a réussi, sans sinon
     threading.Thread(target=fond, daemon=True, name=f"resume-{tid}").start()
+
+
+def _automatisations(tid: str):
+    """Règles « quand une transcription se termine » (ex : envoyer le compte rendu sur Telegram)."""
+    try:
+        from . import automatisations
+        automatisations.transcription_finie(tid)
+    except Exception as e:
+        print(f"  ! Automatisations de fin de transcription ({tid}) : {e}")
 
 
 def en_markdown(resume: dict) -> str:

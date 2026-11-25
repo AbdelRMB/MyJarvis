@@ -23,7 +23,7 @@ jobs:
         run: |
           git config --global user.name "CI Wesley"
           git config --global user.email "ci@example.invalid"
-          python -m pip install -q pytest numpy cryptography pypdf httpx requests -r serveur/requirements.txt
+          python -m pip install -q pytest numpy cryptography pypdf httpx requests mcp uvicorn -r serveur/requirements.txt
       - name: Tests du cœur
         run: python -m pytest tests -q
       - name: Tests du serveur de comptes

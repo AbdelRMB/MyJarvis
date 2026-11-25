@@ -452,6 +452,8 @@ def preparer():
     from . import transcription
     transcription.ecouteurs.append(lambda tid: diffuser(type="transcription_maj", id=tid))
     transcription.au_demarrage()  # transcription coupée par la fermeture : marquée « interrompue »
+    from . import serveur_mcp
+    serveur_mcp.au_demarrage()   # Wesley comme serveur MCP, si activé (Réglages › Application)
     from . import partage
     partage.demarrer()           # tâches et transcriptions visibles (chiffrées) sur tes autres appareils
     from . import consolidation, semantique

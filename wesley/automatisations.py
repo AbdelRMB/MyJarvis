@@ -14,6 +14,8 @@ Autres déclencheurs (2.8.0) :
 - « fichier »     : un nouveau fichier arrive dans un dossier (Téléchargements…), filtré par motif (*.pdf) ;
 - « tache_finie » : une tâche de code se termine (ici ou sur un autre appareil du compte) ;
 - « site »        : un site ou un serveur ne répond plus (vérifié toutes les X minutes) ; prévenu aussi au retour.
+- « transcription_finie » (2.9.0) : une transcription de cet appareil se termine, avec son résumé en contexte
+  (« envoie-moi le compte rendu sur Telegram », « envoie les actions à l'équipe sur Slack ») ;
 Toute règle peut avoir une « condition » en français (« seulement si c'est une facture ») : Wesley la vérifie
 avec le contexte (mail, fichier, rendez-vous…) avant d'agir.
 """
@@ -54,7 +56,7 @@ def _ecrire(regles: list, synchro=True):
 
 
 TYPES = ("mail", "horaire", "intervalle", "demarrage", "commande",   # commande = routine lancée en la disant
-         "rendez_vous", "fichier", "tache_finie", "site")
+         "rendez_vous", "fichier", "tache_finie", "site", "transcription_finie")
 IGNORES = (".crdownload", ".part", ".tmp", ".download", ".partial", ".~lock")   # téléchargements en cours
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 
@@ -64,7 +66,8 @@ def creer(nom: str, expediteur="", sujet="", contient="", connecteur="", action=
           avant=0, dossier="", motif="", url="", condition="") -> dict:
     """type_declencheur : mail | horaire (heure HH:MM, jours 0=lundi…6=dimanche, vide = tous) | intervalle (minutes)
     | demarrage (à chaque lancement de Wesley) | rendez_vous (avant minutes avant, mots du titre dans contient)
-    | fichier (dossier, motif) | tache_finie | site (url, toutes les minutes). appareil : celui qui l'exécute (« » = tous).
+    | fichier (dossier, motif) | tache_finie | site (url, toutes les minutes)
+    | transcription_finie (mots du titre dans contient). appareil : celui qui l'exécute (« » = tous).
     condition : phrase vérifiée par Wesley avant d'agir (facultatif)."""
     from .config import MACHINE
     type_declencheur = type_declencheur if type_declencheur in TYPES else "mail"
@@ -149,6 +152,8 @@ def decrire(r: dict) -> str:
         quand = f"Quand un fichier {d.get('motif') or '*'} arrive dans {d.get('dossier')}"
     elif t == "tache_finie":
         quand = "Quand une tâche de code se termine" + (f" (« {d['contient']} »)" if d.get("contient") else "")
+    elif t == "transcription_finie":
+        quand = "Quand une transcription se termine" + (f" (« {d['contient']} »)" if d.get("contient") else "")
     elif t == "site":
         quand = f"Quand {d.get('url')} ne répond plus (vérifié toutes les {d.get('minutes') or 5} min)"
     else:
@@ -465,6 +470,30 @@ def verifier_taches():
             ou = f" sur {t['appareil']}" if t.get("appareil") else ""
             _executer_regle(r, f"La tâche de code « {t.get('titre')} »{ou} est {etat}. Bilan : {t.get('bilan') or '—'}",
                             f"Tâche {etat}{ou} : {t.get('titre')}")
+
+
+def transcription_finie(tid: str):
+    """Une transcription de CET appareil vient de se terminer (et d'être résumée si le résumé automatique est
+    actif) : les règles « transcription_finie » reçoivent le titre, la durée et le résumé en contexte."""
+    regles = [r for r in lister() if r.get("actif") and r["declencheur"].get("type") == "transcription_finie"
+              and _pour_cet_appareil(r)]
+    if not regles:
+        return
+    from . import resume_transcription, transcription
+    s = transcription.lire(tid)
+    if not s or s.get("etat") != "terminee":
+        return
+    titre = s.get("titre") or "Transcription"
+    minutes = round((s.get("duree") or 0) / 60)
+    resume = resume_transcription.en_markdown(s.get("resume") or {})
+    contexte = (f"La transcription « {titre} » ({minutes} min, {len(transcription.locuteurs(s))} personne(s), "
+                f"identifiant {tid}) est terminée.\n\n"
+                + (resume or "Pas de résumé : lis-la avec lire_transcription si tu en as besoin."))
+    for r in regles:
+        mots = (r["declencheur"].get("contient") or "").lower()
+        if mots and mots not in titre.lower():
+            continue
+        _executer_regle(r, contexte[:8000], f"Transcription terminée : {titre}")
 
 
 _sites: dict = {}   # id -> {"dernier": ts, "ok": bool | None}

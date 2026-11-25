@@ -984,4 +984,42 @@ export const EN: Record<string, string> = {
   "{n} demandes · {e} échecs · {d} s": "{n} requests · {e} failures · {d} s",
   "Outils qui échouent le plus": "Tools that fail the most",
   "Aucun outil en échec sur cette période.": "No failing tools over this period.",
+  // recherche unique (barre du haut)
+  "Rechercher partout (Ctrl+Maj+F)": "Search everywhere (Ctrl+Shift+F)",
+  "Rechercher partout": "Search everywhere",
+  "Chercher dans tes souvenirs, conversations, transcriptions, documents…": "Search your memories, conversations, transcriptions, documents…",
+  "Tape au moins deux lettres. Wesley cherche par le sens : d'autres mots que ceux d'origine marchent aussi.": "Type at least two letters. Wesley searches by meaning: other words than the original ones work too.",
+  "Transcriptions": "Transcriptions",
+  "Conversations passées": "Past conversations",
+  "page {n}": "page {n}",
+  // serveur MCP (Réglages › Application)
+  "Serveur MCP (Claude Desktop, Claude Code…)": "MCP server (Claude Desktop, Claude Code…)",
+  "Partager Wesley avec mes autres assistants": "Share Wesley with my other assistants",
+  "Claude Desktop, Claude Code ou tout client MCP peuvent chercher dans ta mémoire, tes transcriptions, tes documents et ta liste À faire, et y ajouter un souvenir ou une tâche. Seulement sur cet ordinateur, avec une clé. Jamais la souris, le clavier, tes fichiers ni tes commandes.":
+    "Claude Desktop, Claude Code or any MCP client can search your memory, transcriptions, documents and to-do list, and add a memory or a task. Only on this computer, with a key. Never your mouse, keyboard, files or commands.",
+  "En marche": "Running",
+  "Arrêté": "Stopped",
+  "Copié.": "Copied.",
+  "Claude Code : colle cette commande dans un terminal": "Claude Code: paste this command in a terminal",
+  "Claude Desktop : ajoute ceci à claude_desktop_config.json (Node.js requis)": "Claude Desktop: add this to claude_desktop_config.json (Node.js required)",
+  "Outils partagés : {liste}.": "Shared tools: {liste}.",
+  "Changer la clé": "Change the key",
+  "L'ancienne clé ne marchera plus : recopie la commande dans tes assistants.": "The old key will stop working: copy the command into your assistants again.",
+  // automatisation « quand une transcription se termine »
+  "Quand une transcription se termine": "When a transcription ends",
+  "Mot dans le titre de la transcription (optionnel)": "Word in the transcription title (optional)",
+  "Compte rendu sur Telegram": "Meeting notes on Telegram",
+  "Envoie-moi sur Telegram le compte rendu de cette transcription : le résumé en quelques lignes puis les actions à faire (qui, quoi, pour quand).":
+    "Send me the notes of this transcription on Telegram: the summary in a few lines, then the action items (who, what, by when).",
+  // sauvegarde complète (Réglages › Application)
+  "Sauvegarde complète": "Full backup",
+  "Un seul fichier chiffré avec tes souvenirs, tes conversations, ta liste À faire, tes automatisations, tes sites appris et tes transcriptions. Pour changer d'ordinateur, garder une copie à toi ou repartir en local. Les clés et mots de passe des connecteurs n'y sont pas.":
+    "A single encrypted file with your memories, conversations, to-do list, automations, learned sites and transcriptions. To switch computers, keep your own copy or go back to local. Connector keys and passwords are not included.",
+  "Mot de passe de la sauvegarde (8 caractères ou plus)": "Backup password (8 characters or more)",
+  "Sans ce mot de passe, la sauvegarde est illisible : personne ne peut le retrouver.": "Without this password the backup can't be read: nobody can recover it.",
+  "Créer une sauvegarde": "Create a backup",
+  "Restaurer…": "Restore…",
+  "Restaurer ajoute seulement ce qui manque : rien n'est écrasé ni mis en double.": "Restoring only adds what's missing: nothing is overwritten or duplicated.",
+  "Sauvegarde enregistrée : {f} ({s} souvenirs, {j} jours de conversation, {tr} transcriptions).": "Backup saved: {f} ({s} memories, {j} days of conversation, {tr} transcriptions).",
+  "Restauré : {s} souvenirs, {h} lignes de conversation, {a} tâches, {au} automatisations, {tr} transcriptions ajoutés.": "Restored: {s} memories, {h} conversation lines, {a} tasks, {au} automations, {tr} transcriptions added.",
 };

@@ -161,19 +161,25 @@ def _lignes_historique(limite: int = HISTORIQUE_MAX) -> list[tuple[str, str]]:
     return res[:limite]
 
 
+def chercher_detail(req: str, k_faits: int = 12, k_historique: int = 25) -> dict:
+    """Comme chercher, en données : {"souvenirs": [{fid, fait, categorie, score}], "historique": [{jour, texte, score}]}."""
+    from . import semantique
+    faits = _charger()
+    classes = semantique.classer(req, [x["fait"] for x in faits], k=k_faits, nom_index="faits", seuil=0.77)
+    _signaler_utilisation([faits[i] for i, _ in classes])
+    hist = _lignes_historique()
+    return {"souvenirs": [{"fid": faits[i].get("fid", ""), "fait": faits[i]["fait"],
+                           "categorie": faits[i].get("categorie", "general"), "score": round(s, 3)} for i, s in classes],
+            "historique": [{"jour": hist[i][0], "texte": hist[i][1][:250], "score": round(s, 3)}
+                           for i, s in semantique.classer(req, [l for _, l in hist], k=k_historique,
+                                                          nom_index="historique", seuil=0.80)]}
+
+
 def chercher(req):
     """Souvenirs et passages des conversations passées qui correspondent à la demande, PAR LE SENS
     (« ma voiture » trouve « la Clio est au garage ») et par les mots exacts. Sans le modèle : par les mots."""
-    from . import semantique
-    faits = _charger()
-    res = []
-    trouves = [faits[i] for i, _ in semantique.classer(req, [x["fait"] for x in faits], k=12, nom_index="faits", seuil=0.77)]
-    _signaler_utilisation(trouves)
-    res += [f"[mémoire] {x['fait']}" for x in trouves]
-    hist = _lignes_historique()
-    for i, _ in semantique.classer(req, [l for _, l in hist], k=25, nom_index="historique", seuil=0.80):
-        jour, l = hist[i]
-        res.append(f"[{jour}] {l[:250]}")
+    d = chercher_detail(req)
+    res = [f"[mémoire] {x['fait']}" for x in d["souvenirs"]] + [f"[{x['jour']}] {x['texte']}" for x in d["historique"]]
     return "\n".join(res) or "Rien trouvé."
 
 

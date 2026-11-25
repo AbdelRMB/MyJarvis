@@ -10,7 +10,7 @@ def creer_automatisation(description: str, declencheur: str = "mail", heure: str
                          condition: str = ""):
     """Crée une automatisation (règle permanente) : « tous les matins à 8 h lis-moi mon agenda », « toutes les heures vérifie mon serveur », « quand je reçois un mail de papa préviens-moi », « 15 min avant chaque rendez-vous prépare-moi le contexte », « quand une facture arrive dans Téléchargements range-la », « préviens-moi quand ma tâche de code est finie », « préviens-moi si mon site tombe »…
     description: nom court de la règle (ex : « Agenda du matin »)
-    declencheur: « horaire » (à heure fixe), « intervalle » (toutes les X minutes), « demarrage » (quand Wesley démarre), « mail » (arrivée d'un e-mail), « commande » (ROUTINE lancée quand l'utilisateur dit sa phrase : « mode travail »… ; consigne = toutes les étapes), « rendez_vous » (X minutes avant un événement de l'agenda), « fichier » (un nouveau fichier arrive dans un dossier), « tache_finie » (une tâche de code se termine) ou « site » (un site ou serveur ne répond plus)
+    declencheur: « horaire » (à heure fixe), « intervalle » (toutes les X minutes), « demarrage » (quand Wesley démarre), « mail » (arrivée d'un e-mail), « commande » (ROUTINE lancée quand l'utilisateur dit sa phrase : « mode travail »… ; consigne = toutes les étapes), « rendez_vous » (X minutes avant un événement de l'agenda), « fichier » (un nouveau fichier arrive dans un dossier), « tache_finie » (une tâche de code se termine), « transcription_finie » (une transcription se termine ; son résumé est en contexte : « envoie-moi le compte rendu sur Telegram ») ou « site » (un site ou serveur ne répond plus)
     avant: pour rendez_vous, combien de minutes avant (15 par défaut)
     dossier: pour fichier, le dossier surveillé (vide = Téléchargements)
     motif: pour fichier, filtre sur le nom (ex : « *.pdf », « facture* » ; vide = tous)
@@ -21,7 +21,7 @@ def creer_automatisation(description: str, declencheur: str = "mail", heure: str
     minutes: pour intervalle, toutes les combien de minutes
     expediteur: pour mail, adresse ou nom de l'expéditeur. « Mon père », « ma femme »… : utilise l'adresse connue dans sa mémoire, sinon demande-la
     sujet: pour mail, mot à trouver dans le sujet
-    contient: pour mail, mot à trouver dans le texte ; pour rendez_vous et tache_finie, mot à trouver dans le titre
+    contient: pour mail, mot à trouver dans le texte ; pour rendez_vous, tache_finie et transcription_finie, mot à trouver dans le titre
     compte_mail: pour mail, identifiant du connecteur à surveiller (vide = toutes ses boîtes)
     action: « wesley » (tu exécutes la consigne avec tous tes outils et tu lis le résultat à voix haute) ou « prevenir » (dire simplement le message)
     consigne: pour action wesley, ce que tu dois faire (ex : « lis mon agenda du jour et résume-le »)

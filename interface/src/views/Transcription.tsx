@@ -859,9 +859,28 @@ function Recherche({ ouvrir }: { ouvrir: (id: string) => void }) {
   );
 }
 
+/** Transcription à afficher à l'ouverture de l'onglet (recherche unique de la barre du haut). */
+let aOuvrir: string | null = null;
+export function ouvrirTranscription(id: string) {
+  aOuvrir = id;
+  bus.dispatchEvent(new CustomEvent("ouvrir_transcription", { detail: id }));
+}
+
 export function VueTranscription() {
   const [infos, setInfos] = useState<Liste | null>(null);
-  const [choisie, setChoisie] = useState<string | null>(null);
+  const [choisie, setChoisie] = useState<string | null>(() => {
+    const id = aOuvrir;
+    aOuvrir = null;
+    return id;
+  });
+  useEffect(() => {
+    const sur = (e: Event) => {
+      aOuvrir = null;
+      setChoisie((e as CustomEvent<string>).detail);
+    };
+    bus.addEventListener("ouvrir_transcription", sur);
+    return () => bus.removeEventListener("ouvrir_transcription", sur);
+  }, []);
   const [detail, setDetail] = useState<Session | null>(null);
   const choisieRef = useRef<string | null>(null);
 

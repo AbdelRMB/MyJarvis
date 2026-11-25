@@ -48,6 +48,7 @@ class FauxWesley:
                        "budget_mensuel": 0, "modele_rapide_fond": True, "bilan_soir": False, "bilan_soir_heure": "19:00"}
         self.cle_claude = False
         self.transcription = None
+        self.mcp_actif = False
 
     def _session_transcription(self, titre: str, source: str) -> dict:
         return {"id": "t1", "titre": titre or "Réunion", "source": source, "avec_micro": True, "etat": "en_cours",
@@ -111,6 +112,21 @@ class FauxWesley:
             return self.transcription or {}
         if chemin == "/api/appareils/ordinateurs":
             return {"ordinateurs": [], "moi": "PC-Test"}
+        if chemin == "/api/recherche":
+            return {"souvenirs": [{"fid": "f1", "fait": "La Clio est au garage", "categorie": "general"}],
+                    "historique": [], "documents": [], "afaire": [], "erreurs": {},
+                    "transcriptions": [{"id": "t1", "titre": "Réunion budget", "date": 1764064800.0, "heure": "00:12",
+                                        "locuteur": "Paul", "texte": "le garage coûte 400 euros", "appareil": ""}]}
+        if chemin == "/api/mcp":
+            if methode == "POST" and "actif" in corps:
+                self.mcp_actif = bool(corps["actif"])
+            return {"actif": self.mcp_actif, "en_marche": self.mcp_actif, "url": "http://127.0.0.1:7778/mcp",
+                    "cle": "wesley-cle", "erreur": "", "outils": ["chercher_partout", "memoriser"],
+                    "claude_code": 'claude mcp add --transport http wesley http://127.0.0.1:7778/mcp --header "Authorization: Bearer wesley-cle"',
+                    "claude_desktop": "{}"}
+        if chemin == "/api/sauvegarde":
+            return {"fichier": "C:/Users/test/Downloads/wesley-sauvegarde.wesley",
+                    "contenu": {"souvenirs": 1, "jours": 2, "transcriptions": 1}}
         # réponses neutres des autres vues (mêmes formes que le vrai serveur, sans contenu)
         listes = {"/api/notifications", "/api/agents_code", "/api/afaire", "/api/afaire/faits", "/api/historique",
                   "/api/actions", "/api/memoire", "/api/memoire/journal", "/api/taches", "/api/outils"}
@@ -247,7 +263,33 @@ def main() -> int:
         appel(faux, "POST", "/api/transcriptions/arreter")
         print("✓ lancement et arrêt d'une transcription")
 
-        # 4. chaque vue s'ouvre sans planter
+        # 4. recherche unique : un résultat de transcription ouvre la bonne transcription
+        ouvrir_vue(page, "Assistant")
+        page.get_by_role("button", name="Rechercher partout").click()
+        page.get_by_placeholder(re.compile("^Chercher dans tes souvenirs")).fill("garage")
+        expect(page.get_by_text("La Clio est au garage")).to_be_visible()
+        appel(faux, "GET", "/api/recherche")
+        capture(page, "4-recherche")
+        page.get_by_text("le garage coûte 400 euros").click()
+        expect(page.get_by_role("dialog")).to_have_count(0)
+        expect(page.get_by_role("button", name="Lancer la transcription")).to_be_visible()
+        appel(faux, "GET", "/api/transcriptions/t1")
+        print("✓ recherche unique")
+
+        # 5. Réglages › Application : serveur MCP et sauvegarde complète
+        ouvrir_vue(page, "Réglages")
+        page.get_by_role("tab", name="Application", exact=True).click()
+        page.get_by_text("Partager Wesley avec mes autres assistants").click()
+        assert appel(faux, "POST", "/api/mcp") == {"actif": True}
+        expect(page.get_by_text(re.compile("claude mcp add --transport http wesley"))).to_be_visible()
+        page.get_by_placeholder(re.compile("^Mot de passe de la sauvegarde")).fill("motdepasse-solide")
+        page.get_by_role("button", name="Créer une sauvegarde").click()
+        expect(page.get_by_text(re.compile("Sauvegarde enregistrée"))).to_be_visible()
+        assert appel(faux, "POST", "/api/sauvegarde") == {"mot_de_passe": "motdepasse-solide"}
+        capture(page, "5-application")
+        print("✓ serveur MCP et sauvegarde")
+
+        # 6. chaque vue s'ouvre sans planter
         for libelle in ["Assistant", "À faire", "Historique", "Mémoire", "Connecteurs", "Activité", "Arsenal", "Tâches",
                         "Automatisations", "Mes appareils", "Système", "Mises à jour", "Tickets", "Sites appris", "Réglages"]:
             ouvrir_vue(page, libelle)

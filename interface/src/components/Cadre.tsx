@@ -1,4 +1,5 @@
 import { Cloche } from "./Notifications";
+import { RechercheGlobale } from "./RechercheGlobale";
 import { t } from "../lib/i18n";
 import {
   Activity,
@@ -254,6 +255,7 @@ export function BarreHaut() {
       </button>
 
       <div className="ml-auto flex items-center gap-5">
+        <RechercheGlobale />
         <button
           onClick={() => location.reload()}
           title={t("Recharger l'application")}
