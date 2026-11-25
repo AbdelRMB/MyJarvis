@@ -40,7 +40,7 @@ jobs:
         run: |
           git config --global user.name "CI Wesley"
           git config --global user.email "ci@example.invalid"
-          python -m pip install -q pytest numpy cryptography pypdf
+          python -m pip install -q pytest numpy cryptography pypdf requests
           python -m pytest tests -q
 
   # serveur de comptes + appli du téléphone de bout en bout (iPhone émulé, WebKit) + types de l'interface :
