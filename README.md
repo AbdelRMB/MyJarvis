@@ -51,7 +51,8 @@ files, browser and servers, and tells you out loud what it did.
 - 🌐 **Learns your websites.** Explores your intranet or business tools read-only, records your demonstrations,
   then does the task for you. Signs in on its own, **including 2FA codes** (TOTP computed locally).
 - 🔌 **Connectors + any MCP server.** Gmail/IMAP, calendar, GitHub, Notion, SSH servers (with a setup wizard),
-  WhatsApp, Spotify, Slack, Home Assistant…
+  WhatsApp, Spotify, Slack, Home Assistant… And the other way round: Wesley **is an MCP server itself**, so
+  Claude Desktop or Claude Code can search its memory and your transcriptions.
 - 📱 **Follows you.** One account: memory, history and to-dos synced across your Mac, PC and phone.
   On your phone Wesley really runs (voice, AI, memory, to-dos, automations): open
   https://wesley.abdelrahimriche.com/mobile/ on your iPhone or Android. "On my PC, launch Discord" works too.
@@ -144,7 +145,7 @@ Wesley can also update itself automatically at the next start.
 | **Web** | Search with sources, news, read a page, weather, download |
 | **Memory** | Remembers what it learns about you, your instructions, and lessons from its own mistakes |
 | **Organization** | To-do list, reminders spoken at the right time, morning briefing, routines, automations |
-| **Connectors** | Gmail, IMAP, iCal, GitHub, Notion, SSH servers (sudo with approval), WhatsApp, **any MCP server** |
+| **Connectors** | Gmail, IMAP, iCal, GitHub, Notion, SSH servers (sudo with approval), WhatsApp, **any MCP server**; Wesley is an MCP server too |
 | **Voice** | Microsoft neural voices, Piper (local) or **Kyutai** (very natural, local); custom pronunciation dictionary |
 | **Devices** | Control your other computers, to-dos and tickets from your phone |
 

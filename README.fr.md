@@ -54,7 +54,8 @@ haute ce qu'il a fait.
 - 🌐 **Apprend tes sites.** Explore ton intranet ou tes logiciels métier sans rien modifier, retient tes
   démonstrations, puis fait la tâche à ta place. Se connecte tout seul, **codes 2FA compris** (calculés en local).
 - 🔌 **Connecteurs + n'importe quel serveur MCP.** Gmail/IMAP, agenda, GitHub, Notion, serveurs SSH (avec assistant
-  de configuration), WhatsApp, Spotify, Slack, Home Assistant…
+  de configuration), WhatsApp, Spotify, Slack, Home Assistant… Et dans l'autre sens : Wesley **est lui-même un
+  serveur MCP**, pour que Claude Desktop ou Claude Code cherchent dans sa mémoire et tes transcriptions.
 - 📱 **Te suit partout.** Un compte : mémoire, historique et liste À faire synchronisés entre ton Mac, ton PC et ton
   téléphone. Sur le téléphone, Wesley tourne en vrai (voix, IA, mémoire, À faire, automatisations) : ouvre
   https://wesley.abdelrahimriche.com/mobile/ sur ton iPhone ou Android. « Sur mon PC, lance Discord » marche aussi.
@@ -148,7 +149,7 @@ Wesley peut aussi se mettre à jour tout seul au prochain démarrage.
 | **Web** | Recherche avec sources, actualités, lire une page, météo, télécharger |
 | **Mémoire** | Retient ce qu'il apprend sur toi, tes consignes, et les leçons de ses propres erreurs |
 | **Organisation** | Liste À faire, rappels dits à voix haute à l'heure, briefing du matin, routines, automatisations |
-| **Connecteurs** | Gmail, IMAP, iCal, GitHub, Notion, serveurs SSH (sudo avec ton accord), WhatsApp, **n'importe quel serveur MCP** |
+| **Connecteurs** | Gmail, IMAP, iCal, GitHub, Notion, serveurs SSH (sudo avec ton accord), WhatsApp, **n'importe quel serveur MCP** ; Wesley est aussi serveur MCP |
 | **Voix** | Voix neuronales Microsoft, Piper (local) ou **Kyutai** (très naturelle, locale) ; dictionnaire de prononciation |
 | **Appareils** | Pilote tes autres ordinateurs ; liste À faire et tickets sur ton téléphone |
 
