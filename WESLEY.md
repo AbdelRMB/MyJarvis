@@ -26,7 +26,7 @@ Le guide complet (installation, construction, règles du dépôt) est dans `CLAU
 - Essai réel de Whisper sans l'appli : `say -v Thomas -o x.aiff "…"`, `afconvert -f WAVE -d LEI16@16000 -c 1 x.aiff x.wav`, puis `WhisperModel("tiny").transcribe(audio, **options_whisper("fr", consigne))` et `decouper_phrases(segs)`
 
 ## Conventions
-- Messages, commits, CHANGELOG et textes de l'interface en français ; traductions anglaises dans `interface/src/lib/en.ts` (mobile : `en-mobile.ts`).
+- Messages, CHANGELOG et textes de l'interface en français (commits en anglais) ; traductions anglaises dans `interface/src/lib/en.ts` (mobile : `en-mobile.ts`).
 - Un changement de l'appli = nouvelle version dans `wesley/version.py` + section `## x.y.z` en haut de `CHANGELOG.md`, écrite pour l'utilisateur.
 - Jamais de données personnelles ni de secrets dans git (`.env`, `config.json`, `memoire/`, `logs/`, `comptes/`, fichiers de déploiement du serveur).
 - Serveur de comptes : n'utiliser que **GET, POST et PUT** (`compte._appel` côté bureau, `api()` dans `interface/mobile/src`). Le proxy Apache devant l'API renvoie un 404 HTML à toute autre méthode (PATCH, DELETE…), vu dans Wesley comme « Erreur du serveur (404) sur … ». Pour modifier ou supprimer : `POST /v1/…/{id}` ou `POST /v1/…/{id}/supprimer`. Vérifié par `tests/test_methodes_serveur.py`.

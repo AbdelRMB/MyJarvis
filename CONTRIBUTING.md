@@ -29,7 +29,7 @@ Requirements: Python **3.12** (not 3.13), Node.js **22+**, git. The full command
 4. Never commit personal data or secrets: `.env`, `config.json`, `memoire/`, `logs/`, `comptes/`, API keys, tokens.
 5. Open the PR and describe what changes and how you tested it.
 
-The code, comments and commit messages are in **French** (variable names like `outil`, `memoire`, `reglages`).
+The code and comments are in **French**, commit messages in **English** (variable names like `outil`, `memoire`, `reglages`).
 Writing your issue or PR in English is completely fine.
 
 By contributing, you agree that your code is published under the project's license (GPLv3 or later).

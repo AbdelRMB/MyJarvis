@@ -164,7 +164,7 @@ VPS) n'est **pas publiée** : ces fichiers sont ignorés par git et restent sur 
 
 ## Règles pour Claude dans ce dépôt
 
-- Messages, commits, CHANGELOG et textes de l'interface **en français**.
+- Messages, CHANGELOG et textes de l'interface **en français** ; messages de commit **en anglais** (clairs, décrivant le changement réel).
 - Ne committe jamais de données personnelles ou secrets : `.env`, `config.json`, `memoire/`, `logs/`, `comptes/`,
   `serveur/.env`, jetons, clés, ni les fichiers de déploiement du serveur (Docker, Apache).
 - Un changement de l'appli = nouvelle version dans `wesley/version.py` + section `## x.y.z` décrite pour
